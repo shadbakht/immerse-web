@@ -19,9 +19,7 @@ export const metadata: Metadata = {
   title: 'Immerse',
   description: 'Sacred texts from all traditions',
   // iOS native Smart App Banner — Safari renders this automatically when APP_STORE_ID is set
-  ...(APP_STORE_ID && {
-    other: { 'apple-itunes-app': `app-id=${APP_STORE_ID}` },
-  }),
+  other: APP_STORE_ID ? { 'apple-itunes-app': `app-id=${APP_STORE_ID}` } : undefined,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
