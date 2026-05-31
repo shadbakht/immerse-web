@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { ReaderTarget } from './AppShell';
+import PanelSheet from './PanelSheet';
 import TagPanel from './TagPanel';
 import NotePanel from './NotePanel';
 import XRefPanel from './XRefPanel';
@@ -76,7 +77,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [activeFootnote, setActiveFootnote] = useState<{ num: string; text: string } | null>(null);
   const [selectionBar, setSelectionBar] = useState<SelectionBar | null>(null);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
-  const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | null>(null);
+  const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | 'signin' | null>(null);
   const [isPro, setIsPro] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
@@ -223,7 +224,7 @@ async function handleCopy() {
   }
 
   function openPanel(panel: 'tag' | 'note' | 'xref' | 'ai') {
-    setActivePanel(panel);
+    setActivePanel(userId ? panel : 'signin');
     window.getSelection()?.removeAllRanges();
   }
 
@@ -421,6 +422,22 @@ async function handleCopy() {
           </div>
         </>
       )}
+
+      {/* Sign-in prompt for guests */}
+      <PanelSheet visible={activePanel === 'signin'} onClose={closePanel} title="Sign In Required">
+        <div className="px-5 py-8 text-center">
+          <div className="text-4xl mb-4">✦</div>
+          <p className="text-sm text-gray-600 leading-relaxed mb-6">
+            Sign in to tag, annotate, and save passages across all your devices.
+          </p>
+          <a
+            href="/login"
+            className="block w-full bg-[#1B6B7B] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] transition-colors text-sm"
+          >
+            Sign In or Create Account
+          </a>
+        </div>
+      </PanelSheet>
 
       {/* Annotation panels */}
       <TagPanel
