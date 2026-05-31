@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import type { NavTab } from './AppShell';
 
-const NAV_ITEMS: { tab: NavTab; label: string; icon: string }[] = [
+const NAV_ITEMS: { tab: NavTab; label: string; icon: string; mirror?: boolean }[] = [
   { tab: 'home',      label: 'Home',       icon: '🏠' },
   { tab: 'library',   label: 'Library',    icon: '📚' },
-  { tab: 'tags',      label: 'Tags',        icon: '🏷️' },
+  { tab: 'tags',      label: 'Tags',        icon: '🏷️', mirror: true },
   { tab: 'notes',     label: 'Notes',       icon: '📝' },
   { tab: 'xrefs',     label: 'X-Refs',      icon: '🔗' },
   { tab: 'community', label: 'Community',   icon: '🌐' },
@@ -54,7 +54,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <span className="text-base">{icon}</span>
+            <span className={`text-base inline-block${item.mirror ? ' scale-x-[-1]' : ''}`}>{icon}</span>
             {label}
           </button>
         ))}
