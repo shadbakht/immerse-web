@@ -25,6 +25,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Search term highlight in reader — fades out after 5s */
+@keyframes highlight-fade {
+  0%   { background-color: #fef08a; }
+  70%  { background-color: #fef08a; }
+  100% { background-color: transparent; }
+}
+.search-highlight {
+  animation: highlight-fade 5s ease forwards;
+}
+
 /* Ensure typed text is always visible in light inputs */
 input:not([class*="text-white"]),
 textarea:not([class*="text-white"]) {

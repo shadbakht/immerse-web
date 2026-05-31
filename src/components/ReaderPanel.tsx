@@ -42,8 +42,23 @@ interface ReaderPanelProps {
   userId: string;
 }
 
-function PassageContent({ text, onFootnoteClick }: { text: string; onFootnoteClick: (n: string) => void }) {
-  const parts = text.replace(/\/\*[^*]*\*\//g, '').split(/(\[\d+\])/g);
+function PassageContent({ text, onFootnoteClick, highlight }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string }) {
+  const clean = text.replace(/\/\*[^*]*\*\//g, '');
+  if (highlight) {
+    const words = highlight.trim().split(/\s+/).filter(Boolean);
+    const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    const parts = clean.split(pattern);
+    return (
+      <>
+        {parts.map((part, i) =>
+          pattern.test(part)
+            ? <mark key={i} className="search-highlight rounded px-0.5">{part}</mark>
+            : <span key={i}>{part}</span>
+        )}
+      </>
+    );
+  }
+  const parts = clean.split(/(\[\d+\])/g);
   return (
     <>
       {parts.map((part, i) => {
@@ -79,6 +94,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [savingAnnotation, setSavingAnnotation] = useState(false);
   const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | 'signin' | null>(null);
   const [isPro, setIsPro] = useState(false);
+  const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
@@ -163,6 +179,10 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
         setTimeout(() => {
           document.getElementById(`p-${scrollToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
+        if (target?.highlightQuery) {
+          setSearchHighlight({ passageId: scrollToId, query: target.highlightQuery });
+          setTimeout(() => setSearchHighlight(null), 5000);
+        }
       } else {
         scrollRef.current?.scrollTo({ top: 0 });
       }
@@ -392,6 +412,7 @@ async function handleCopy() {
                       const text = footnoteMap[n];
                       if (text) setActiveFootnote({ num: n, text });
                     }}
+                    highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                   />
                 </p>
               </div>

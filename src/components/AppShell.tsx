@@ -18,7 +18,7 @@ function ComingSoon({ label }: { label: string }) {
   );
 }
 
-export type ReaderTarget = { bookId: string; passageId?: string } | null;
+export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string } | null;
 
 interface AppShellProps {
   user:          User | null;
@@ -35,8 +35,8 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   const isFullWidth = activeTab !== 'library';
   const userId = user?.id ?? '';
 
-  function openBook(bookId: string, passageId?: string) {
-    setReaderTarget({ bookId, passageId });
+  function openBook(bookId: string, passageId?: string, highlightQuery?: string) {
+    setReaderTarget({ bookId, passageId, highlightQuery });
     setActiveTab('library');
     history.replaceState(null, '', `/read/${bookId}`);
   }

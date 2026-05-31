@@ -38,7 +38,7 @@ interface SearchResult {
 interface LibraryPanelProps {
   activeTab:  NavTab;
   userId:     string;
-  onOpenBook: (bookId: string, passageId?: string) => void;
+  onOpenBook: (bookId: string, passageId?: string, highlightQuery?: string) => void;
 }
 
 export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryPanelProps) {
@@ -346,7 +346,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                             return next;
                           });
                         }}
-                        onDoubleClick={() => onOpenBook(result.bookId, result.passageId)}
+                        onDoubleClick={() => onOpenBook(result.bookId, result.passageId, searchQuery.trim())}
                       >
                         <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
                           {result.bookTitle}{location ? ` · ${location}` : ''}
@@ -360,7 +360,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                               {highlightQuery(result.content, searchQuery)}
                             </p>
                             <button
-                              onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId); }}
+                              onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, searchQuery.trim()); }}
                               className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
                             >
                               Open in reader →
