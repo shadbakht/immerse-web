@@ -200,7 +200,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     if (!selectionBar) return;
     const passage = passages.find(p => p.id === selectionBar.startPassageId);
     const location = passage?.chapter_label || passage?.section_title || null;
-    const para = passage?.paragraph_number ? `¶${passage.paragraph_number}` : null;
+    const para = passage?.paragraph_number ? `p.${passage.paragraph_number}` : null;
     const citationParts = [book?.authorName, book?.title, location, para].filter(Boolean);
     const citation = citationParts.length ? `— ${citationParts.join(', ')}` : '';
     const textToCopy = citation ? `"${selectionBar.text}"\n${citation}` : selectionBar.text;
