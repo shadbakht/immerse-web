@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import Sidebar from './Sidebar';
 import LibraryPanel from './LibraryPanel';
@@ -19,7 +18,6 @@ interface AppShellProps {
 }
 
 export default function AppShell({ user, initialBookId }: AppShellProps) {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<NavTab>(initialBookId ? 'library' : 'home');
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
     initialBookId ? { bookId: initialBookId } : null,
@@ -31,7 +29,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   function openBook(bookId: string, passageId?: string) {
     setReaderTarget({ bookId, passageId });
     setActiveTab('library');
-    router.push(`/read/${bookId}`, { scroll: false });
+    history.replaceState(null, '', `/read/${bookId}`);
   }
 
   return (
