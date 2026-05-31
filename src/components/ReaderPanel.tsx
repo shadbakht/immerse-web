@@ -68,6 +68,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [savingAnnotation, setSavingAnnotation] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
+  const selectionBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!target?.bookId) return;
@@ -75,6 +76,17 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     setSelectionBar(null);
     loadBook(target.bookId, target.passageId);
   }, [target?.bookId]);
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (selectionBar && selectionBarRef.current && !selectionBarRef.current.contains(e.target as Node)) {
+        setSelectionBar(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [selectionBar]);
 
   async function loadBook(bookId: string, scrollToId?: string) {
     setLoading(true);
@@ -294,38 +306,28 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
       {/* Selection action bar */}
       {selectionBar && (
         <div
-          className="absolute z-30 flex items-center gap-1 bg-gray-900 rounded-xl px-2 py-1.5 shadow-xl"
-          style={{ left: selectionBar.x - 80, top: Math.max(8, selectionBar.y) }}
+          ref={selectionBarRef}
+          className="absolute z-30 flex items-center bg-gray-900 rounded-xl px-1 py-1 shadow-xl"
+          style={{ left: Math.max(8, selectionBar.x - 120), top: Math.max(8, selectionBar.y) }}
         >
-          <button
-            onClick={handleCopy}
-            className="px-2.5 py-1 text-xs text-white hover:bg-white/20 rounded-lg transition-colors"
-          >
-            Copy
-          </button>
-          <div className="w-px h-4 bg-white/20" />
-          <button
-            onClick={handleAddTag}
-            disabled={savingAnnotation}
-            className="px-2.5 py-1 text-xs text-white hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
-          >
-            Tag
-          </button>
-          <div className="w-px h-4 bg-white/20" />
-          <button
-            onClick={handleAddNote}
-            disabled={savingAnnotation}
-            className="px-2.5 py-1 text-xs text-white hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
-          >
-            Note
-          </button>
-          <div className="w-px h-4 bg-white/20" />
-          <button
-            onClick={() => { setSelectionBar(null); window.getSelection()?.removeAllRanges(); }}
-            className="px-1.5 py-1 text-xs text-white/50 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-          >
-            ✕
-          </button>
+          {[
+            { label: 'Tag',  onClick: handleAddTag },
+            { label: 'Note', onClick: handleAddNote },
+            { label: 'Xref', onClick: () => alert('Xref coming soon') },
+            { label: 'AI',   onClick: () => alert('AI summary coming soon') },
+            { label: 'Copy', onClick: handleCopy },
+          ].map(({ label, onClick }, i, arr) => (
+            <div key={label} className="flex items-center">
+              <button
+                onClick={onClick}
+                disabled={savingAnnotation}
+                className="px-3 py-1.5 text-xs text-white hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {label}
+              </button>
+              {i < arr.length - 1 && <div className="w-px h-3.5 bg-white/20" />}
+            </div>
+          ))}
         </div>
       )}
 
