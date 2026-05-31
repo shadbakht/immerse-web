@@ -204,6 +204,37 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
 
   // ── Search ────────────────────────────────────────────────────────────────────
 
+  // Cross-tradition synonyms: matches mobile app's SYNONYM_GROUPS
+  const SYNONYM_GROUPS = [
+    ['god', 'allah', 'lord', 'creator'],
+    ['prayer', 'supplication', 'invocation'],
+    ['soul', 'spirit', 'self'],
+    ['love', 'affection', 'devotion'],
+    ['heart', 'mind', 'conscience'],
+    ['faith', 'belief', 'trust'],
+    ['light', 'radiance', 'illumination'],
+    ['truth', 'reality', 'fact'],
+    ['peace', 'tranquility', 'serenity'],
+    ['unity', 'oneness', 'harmony'],
+  ];
+  const synonymMap = new Map<string, string[]>();
+  for (const group of SYNONYM_GROUPS) {
+    for (const word of group) synonymMap.set(word, group);
+  }
+
+  function normalize(s: string) {
+    return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+
+  function expandSynonyms(q: string): string {
+    // Don't expand if user typed explicit operators
+    if (/\b(AND|OR|NOT)\b/.test(q) || q.includes('"') || q.includes('*')) return q;
+    return q.trim().split(/\s+/).map(token => {
+      const group = synonymMap.get(token.toLowerCase());
+      return group ? `(${group.join(' | ')})` : token;
+    }).join(' & ');
+  }
+
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) { setSearchResults([]); return; }
@@ -214,55 +245,134 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   async function doSearch(q: string) {
     setSearchLoading(true);
     try {
-      let query = supabase
-        .from('passages')
-        .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
-        .textSearch('content', q, { type: 'plain', config: 'english' })
-        .limit(40);
-      if (selectedBookIds.size > 0) {
-        query = query.in('book_id', [...selectedBookIds]);
+      const scope = selectedBookIds.size > 0 ? [...selectedBookIds] : null;
+      const results = await runFtsSearch(q, scope);
+      if (results.length > 0) {
+        setSearchResults(results);
+      } else {
+        // Fuzzy LIKE fallback
+        setSearchResults(await runFuzzySearch(q, scope));
       }
-      const { data } = await query;
-
-      setSearchResults((data ?? []).map((p: any) => ({
-        passageId:    p.id,
-        bookId:       p.books?.id ?? '',
-        bookTitle:    p.books?.title ?? '',
-        authorName:   p.books?.authors?.name ?? '',
-        chapterLabel: p.chapter_label,
-        sectionTitle: p.section_title,
-        content:      p.content,
-      })));
     } finally {
       setSearchLoading(false);
     }
   }
 
+  async function runFtsSearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
+    const expanded = expandSynonyms(q);
+    // Build websearch query with prefix wildcards for each plain word
+    const hasOps = /[|&!()"]/.test(expanded);
+    const tsQuery = hasOps ? expanded : q.trim().split(/\s+/).filter(Boolean).map(t => `${t}:*`).join(' & ');
+
+    let query = supabase
+      .from('passages')
+      .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
+      .textSearch('content', tsQuery, { type: 'websearch', config: 'english' })
+      .limit(40);
+    if (scope) query = query.in('book_id', scope);
+    const { data } = await query;
+    return mapResults(data ?? []);
+  }
+
+  async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
+    // ILIKE fallback: each word must appear somewhere in the passage
+    const words = q.trim().split(/\s+/).filter(w => w.length >= 2);
+    if (words.length === 0) return [];
+    // Use the first word for a Supabase ILIKE call, then filter client-side for extra words
+    let query = supabase
+      .from('passages')
+      .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
+      .ilike('content', `%${words[0]}%`)
+      .limit(60);
+    if (scope) query = query.in('book_id', scope);
+    const { data } = await query;
+    const filtered = (data ?? []).filter((p: any) =>
+      words.every(w => normalize(p.content).includes(normalize(w)))
+    );
+    return mapResults(filtered.slice(0, 40));
+  }
+
+  function mapResults(data: any[]): SearchResult[] {
+    return data.map((p: any) => ({
+      passageId:    p.id,
+      bookId:       p.books?.id ?? '',
+      bookTitle:    p.books?.title ?? '',
+      authorName:   p.books?.authors?.name ?? '',
+      chapterLabel: p.chapter_label,
+      sectionTitle: p.section_title,
+      content:      p.content,
+    }));
+  }
+
   function getSnippet(content: string, query: string): string {
     const words = query.trim().split(/\s+/).filter(Boolean);
-    const lower = content.toLowerCase();
+    const normContent = normalize(content);
     let bestIdx = -1;
     for (const w of words) {
-      const idx = lower.indexOf(w.toLowerCase());
-      if (idx !== -1) { bestIdx = idx; break; }
+      const idx = normContent.indexOf(normalize(w.replace(/[*":]/g, '')));
+      if (idx >= 0 && (bestIdx < 0 || idx < bestIdx)) bestIdx = idx;
     }
-    if (bestIdx === -1) return content.slice(0, 200);
+    if (bestIdx < 0) return content.slice(0, 220);
     const start = Math.max(0, bestIdx - 80);
-    const end   = Math.min(content.length, bestIdx + 200);
+    const end   = Math.min(content.length, bestIdx + 220);
     return (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
   }
 
   function highlightQuery(text: string, query: string) {
-    const words = query.trim().split(/\s+/).filter(Boolean);
+    const words = query.trim().split(/\s+/)
+      .map(w => w.replace(/[*":()&|]/g, '').trim())
+      .filter(w => w.length >= 2);
     if (!words.length) return <span>{text}</span>;
-    const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-    const parts = text.split(pattern);
+
+    // Build ranges using diacritic-normalized matching
+    const normText = normalize(text);
+    const ranges: { start: number; end: number }[] = [];
+    for (const w of words) {
+      const normW = normalize(w);
+      let idx = normText.indexOf(normW);
+      while (idx >= 0) {
+        ranges.push({ start: idx, end: idx + normW.length });
+        idx = normText.indexOf(normW, idx + 1);
+      }
+      // Also try synonym group members
+      const group = synonymMap.get(w.toLowerCase());
+      if (group) {
+        for (const syn of group) {
+          const normSyn = normalize(syn);
+          let sidx = normText.indexOf(normSyn);
+          while (sidx >= 0) {
+            ranges.push({ start: sidx, end: sidx + normSyn.length });
+            sidx = normText.indexOf(normSyn, sidx + 1);
+          }
+        }
+      }
+    }
+    if (!ranges.length) return <span>{text}</span>;
+
+    ranges.sort((a, b) => a.start - b.start);
+    // Merge overlapping
+    const merged = [ranges[0]];
+    for (let i = 1; i < ranges.length; i++) {
+      const last = merged[merged.length - 1];
+      if (ranges[i].start <= last.end) last.end = Math.max(last.end, ranges[i].end);
+      else merged.push({ ...ranges[i] });
+    }
+
+    const parts: { t: string; hi: boolean }[] = [];
+    let pos = 0;
+    for (const { start, end } of merged) {
+      if (pos < start) parts.push({ t: text.slice(pos, start), hi: false });
+      parts.push({ t: text.slice(start, end), hi: true });
+      pos = end;
+    }
+    if (pos < text.length) parts.push({ t: text.slice(pos), hi: false });
+
     return (
       <>
-        {parts.map((part, i) =>
-          pattern.test(part)
-            ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{part}</mark>
-            : <span key={i}>{part}</span>
+        {parts.map((p, i) =>
+          p.hi
+            ? <mark key={i} className="bg-yellow-100 text-yellow-900 font-semibold rounded px-0.5">{p.t}</mark>
+            : <span key={i}>{p.t}</span>
         )}
       </>
     );
