@@ -412,8 +412,8 @@ async function handleCopy() {
                 )}
                 <div className="relative">
                   {annotatedPassageIds.has(passage.id) && (
-                    <div className="absolute -left-6 top-1 flex flex-col gap-1">
-                      <span className="text-[#3B82F6] text-xs leading-none inline-block scale-x-[-1]" title="Tagged">🏷</span>
+                    <div className="absolute -left-8 top-1 flex flex-col gap-1">
+                      <span className="text-[#3B82F6] text-base leading-none inline-block scale-x-[-1]" title="Tagged">🏷</span>
                     </div>
                   )}
                   <p
