@@ -95,9 +95,12 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | 'signin' | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
+  const [annotatedPassageIds, setAnnotatedPassageIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
+  // Persists the selection data while a panel is open (selectionBar state gets cleared by mousedown listener)
+  const pendingSelectionRef = useRef<SelectionBar | null>(null);
 
   useEffect(() => {
     if (!target?.bookId) return;
@@ -113,15 +116,16 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   }, [userId]);
 
   async function createSelection(): Promise<string> {
-    if (!selectionBar || !target) throw new Error('No selection');
+    const bar = pendingSelectionRef.current ?? selectionBar;
+    if (!bar || !target) throw new Error('No selection');
     const { data, error } = await supabase
       .from('selections')
       .insert({
         user_id:       userId,
-        passage_id:    selectionBar.startPassageId,
-        start_offset:  selectionBar.startOffset,
-        end_offset:    selectionBar.endOffset,
-        snapshot_text: selectionBar.text,
+        passage_id:    bar.startPassageId,
+        start_offset:  bar.startOffset,
+        end_offset:    bar.endOffset,
+        snapshot_text: bar.text,
         created_at:    new Date().toISOString(),
       })
       .select('id')
@@ -244,6 +248,7 @@ async function handleCopy() {
   }
 
   function openPanel(panel: 'tag' | 'note' | 'xref' | 'ai') {
+    pendingSelectionRef.current = selectionBar; // capture before mousedown clears it
     setActivePanel(userId ? panel : 'signin');
     window.getSelection()?.removeAllRanges();
   }
@@ -251,14 +256,17 @@ async function handleCopy() {
   function closePanel() {
     setActivePanel(null);
     setSelectionBar(null);
+    pendingSelectionRef.current = null;
   }
 
   async function handleTagSave(tagIds: string[]) {
+    const bar = pendingSelectionRef.current ?? selectionBar;
     const selId = await createSelection();
     const now = new Date().toISOString();
     await Promise.all(tagIds.map(tagId =>
       supabase.from('selection_tags').insert({ selection_id: selId, tag_id: tagId, created_at: now })
     ));
+    if (bar) setAnnotatedPassageIds(prev => new Set(prev).add(bar.startPassageId));
   }
 
   async function handleNoteSave(content: string) {
@@ -402,19 +410,26 @@ async function handleCopy() {
                     {passage.section_title}
                   </h3>
                 )}
-                <p
-                  data-pid={passage.id}
-                  className="text-gray-800 leading-relaxed mb-4 text-[17px]"
-                >
-                  <PassageContent
-                    text={passage.content}
-                    onFootnoteClick={n => {
-                      const text = footnoteMap[n];
-                      if (text) setActiveFootnote({ num: n, text });
-                    }}
-                    highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
-                  />
-                </p>
+                <div className="relative">
+                  {annotatedPassageIds.has(passage.id) && (
+                    <div className="absolute -left-6 top-1 flex flex-col gap-1">
+                      <span className="text-[#3B82F6] text-xs leading-none" title="Tagged">🏷</span>
+                    </div>
+                  )}
+                  <p
+                    data-pid={passage.id}
+                    className="text-gray-800 leading-relaxed mb-4 text-[17px]"
+                  >
+                    <PassageContent
+                      text={passage.content}
+                      onFootnoteClick={n => {
+                        const text = footnoteMap[n];
+                        if (text) setActiveFootnote({ num: n, text });
+                      }}
+                      highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
+                    />
+                  </p>
+                </div>
               </div>
             );
           })}
