@@ -7,85 +7,90 @@ import type { NavTab } from './AppShell';
 interface Tradition {
   id: string;
   name: string;
-  bookCount: number;
+  sort_order: number;
+}
+
+interface Author {
+  id: string;
+  name: string;
+  tradition_id: string;
+  sort_order: number;
 }
 
 interface Book {
   id: string;
   title: string;
-  author: string;
-  traditionId: string;
+  authorName: string;
+  authorId: string;
 }
 
 interface LibraryPanelProps {
-  activeTab:   NavTab;
-  userId:      string;
-  onOpenBook:  (bookId: string, passageId?: string) => void;
+  activeTab:  NavTab;
+  userId:     string;
+  onOpenBook: (bookId: string, passageId?: string) => void;
 }
 
 export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryPanelProps) {
   const supabase = createClient();
+
   const [traditions, setTraditions] = useState<Tradition[]>([]);
-  const [books, setBooks] = useState<Record<string, Book[]>>({});
+  const [authors, setAuthors] = useState<Author[]>([]);
+  const [books, setBooks] = useState<Record<string, Book[]>>({});           // keyed by authorId
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
+  const [openAuthors, setOpenAuthors] = useState<Set<string>>(new Set());
+  const [loadingBooks, setLoadingBooks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (activeTab !== 'library') return;
-    loadTraditions();
+    load();
   }, [activeTab]);
 
-  async function loadTraditions() {
+  async function load() {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('traditions')
-        .select('id, name')
-        .order('name');
-
-      if (!data) return;
-
-      // Get book counts per tradition
-      const { data: counts } = await supabase
-        .from('books')
-        .select('tradition_id')
-        .eq('is_imported', false);
-
-      const countMap: Record<string, number> = {};
-      counts?.forEach(b => {
-        countMap[b.tradition_id] = (countMap[b.tradition_id] ?? 0) + 1;
-      });
-
-      setTraditions(data.map(t => ({ id: t.id, name: t.name, bookCount: countMap[t.id] ?? 0 })));
+      const [{ data: trad }, { data: auth }] = await Promise.all([
+        supabase.from('traditions').select('id, name, sort_order').order('sort_order').order('name'),
+        supabase.from('authors').select('id, name, tradition_id, sort_order').order('sort_order').order('name'),
+      ]);
+      setTraditions(trad ?? []);
+      setAuthors(auth ?? []);
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadBooks(traditionId: string) {
-    if (books[traditionId]) return;
-    const { data } = await supabase
-      .from('books')
-      .select('id, title, author_id, authors(name)')
-      .eq('tradition_id', traditionId)
-      .eq('is_imported', false)
-      .order('title');
-
-    if (data) {
+  async function loadBooks(authorId: string) {
+    if (books[authorId] || loadingBooks.has(authorId)) return;
+    setLoadingBooks(prev => new Set(prev).add(authorId));
+    try {
+      const { data } = await supabase
+        .from('books')
+        .select('id, title, author_id')
+        .eq('author_id', authorId)
+        .eq('is_user_imported', false)
+        .order('sort_order')
+        .order('title');
+      const authorName = authors.find(a => a.id === authorId)?.name ?? '';
       setBooks(prev => ({
         ...prev,
-        [traditionId]: data.map((b: any) => ({
-          id: b.id,
-          title: b.title,
-          author: b.authors?.name ?? '',
-          traditionId,
-        })),
+        [authorId]: (data ?? []).map(b => ({ id: b.id, title: b.title, authorName, authorId: b.author_id })),
       }));
+    } finally {
+      setLoadingBooks(prev => { const next = new Set(prev); next.delete(authorId); return next; });
     }
   }
 
   function toggleTradition(id: string) {
     setOpenTraditions(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAuthor(id: string) {
+    setOpenAuthors(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -118,36 +123,57 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
       ) : (
         <div className="flex-1 overflow-y-auto">
           {traditions.map(tradition => {
+            const tradAuthors = authors.filter(a => a.tradition_id === tradition.id);
             const isOpen = openTraditions.has(tradition.id);
             return (
               <div key={tradition.id}>
+                {/* Tradition row */}
                 <button
                   onClick={() => toggleTradition(tradition.id)}
                   className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 transition-colors border-b border-gray-100"
                 >
                   <span className="text-sm font-medium text-gray-800">{tradition.name}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{tradition.bookCount}</span>
-                    <span className={`text-gray-400 text-xs transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="text-xs text-gray-400">{tradAuthors.length}</span>
+                    <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
 
-                {isOpen && (
-                  <div className="bg-gray-50">
-                    {(books[tradition.id] ?? []).map(book => (
+                {/* Authors */}
+                {isOpen && tradAuthors.map(author => {
+                  const isAuthorOpen = openAuthors.has(author.id);
+                  const authorBooks = books[author.id] ?? [];
+                  return (
+                    <div key={author.id}>
                       <button
-                        key={book.id}
-                        onClick={() => onOpenBook(book.id)}
-                        className="w-full text-left px-6 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors"
+                        onClick={() => toggleAuthor(author.id)}
+                        className="w-full flex items-center justify-between pl-7 pr-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 bg-gray-50/50"
                       >
-                        <div className="text-sm text-gray-800">{book.title}</div>
-                        {book.author && (
-                          <div className="text-xs text-gray-400 mt-0.5">{book.author}</div>
-                        )}
+                        <span className="text-sm text-gray-700">{author.name}</span>
+                        <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isAuthorOpen ? 'rotate-90' : ''}`}>›</span>
                       </button>
-                    ))}
-                  </div>
-                )}
+
+                      {/* Books */}
+                      {isAuthorOpen && (
+                        <div className="bg-white">
+                          {loadingBooks.has(author.id) ? (
+                            <div className="flex justify-center py-3">
+                              <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          ) : authorBooks.map(book => (
+                            <button
+                              key={book.id}
+                              onClick={() => onOpenBook(book.id)}
+                              className="w-full text-left pl-11 pr-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="text-sm text-gray-800">{book.title}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
