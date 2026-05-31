@@ -37,8 +37,7 @@ interface ReaderPanelProps {
   userId: string;
 }
 
-// Render passage content, turning [n] markers into superscripts
-function PassageContent({ text }: { text: string }) {
+function PassageContent({ text, onFootnoteClick }: { text: string; onFootnoteClick: (n: string) => void }) {
   const parts = text.split(/(\[\d+\])/g);
   return (
     <>
@@ -46,7 +45,12 @@ function PassageContent({ text }: { text: string }) {
         const match = part.match(/^\[(\d+)\]$/);
         if (match) {
           return (
-            <sup key={i} className="text-[10px] text-[#1B6B7B] font-medium ml-0.5 select-none">
+            <sup
+              key={i}
+              onClick={e => { e.stopPropagation(); onFootnoteClick(match[1]); }}
+              className="text-[10px] text-[#1B6B7B] font-medium ml-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
+              title={`Footnote ${match[1]}`}
+            >
               {match[1]}
             </sup>
           );
@@ -64,6 +68,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [loading, setLoading] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [toc, setToc] = useState<TocEntry[]>([]);
+  const [footnoteMap, setFootnoteMap] = useState<Record<string, string>>({});
+  const [activeFootnote, setActiveFootnote] = useState<{ num: string; text: string } | null>(null);
   const [selectionBar, setSelectionBar] = useState<SelectionBar | null>(null);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,7 +100,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     setBook(null);
     try {
       const [{ data: bookData }, { data: passageData }] = await Promise.all([
-        supabase.from('books').select('title, authors(name)').eq('id', bookId).single(),
+        supabase.from('books').select('title, authors(name), footnotes').eq('id', bookId).single(),
         supabase
           .from('passages')
           .select('id, content, chapter_label, section_title, paragraph_number, sort_order')
@@ -104,6 +110,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
 
       if (bookData) {
         setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '' });
+        setFootnoteMap((bookData as any).footnotes ?? {});
       }
 
       const ps: Passage[] = passageData ?? [];
@@ -363,13 +370,42 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
                   data-pid={passage.id}
                   className="text-gray-800 leading-relaxed mb-4 text-[17px]"
                 >
-                  <PassageContent text={passage.content} />
+                  <PassageContent
+                    text={passage.content}
+                    onFootnoteClick={n => {
+                      const text = footnoteMap[n];
+                      if (text) setActiveFootnote({ num: n, text });
+                    }}
+                  />
                 </p>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Footnote panel */}
+      {activeFootnote && (
+        <>
+          <div className="absolute inset-0 z-30" onClick={() => setActiveFootnote(null)} />
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl rounded-t-2xl px-6 py-5 max-h-52 overflow-y-auto">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-[#1B6B7B] uppercase tracking-widest mb-2 block">
+                  Footnote {activeFootnote.num}
+                </span>
+                <p className="text-sm text-gray-700 leading-relaxed">{activeFootnote.text}</p>
+              </div>
+              <button
+                onClick={() => setActiveFootnote(null)}
+                className="text-gray-400 hover:text-gray-600 text-lg shrink-0 mt-0.5"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
