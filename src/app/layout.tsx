@@ -18,6 +18,10 @@ const PLAY_STORE_ID   = '';   // TODO: fill in after Play Store launch
 export const metadata: Metadata = {
   title: 'Immerse',
   description: 'Sacred texts from all traditions',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/favicon.png',
+  },
   // iOS native Smart App Banner — Safari renders this automatically when APP_STORE_ID is set
   other: APP_STORE_ID ? { 'apple-itunes-app': `app-id=${APP_STORE_ID}` } : undefined,
 };
