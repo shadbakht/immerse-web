@@ -256,9 +256,17 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
       {toc.length > 0 && (
         <button
           onClick={() => setTocOpen(o => !o)}
-          className="absolute top-4 right-4 z-20 px-3 py-1.5 text-xs font-medium text-[#1B6B7B] bg-white border border-[#1B6B7B]/30 rounded-lg hover:bg-[#1B6B7B]/5 transition-colors shadow-sm"
+          className="absolute top-4 right-4 z-20 p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          title="Table of Contents"
         >
-          Contents
+          <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+            <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600" />
+            <line x1="6" y1="4"  x2="20" y2="4"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600" />
+            <circle cx="3" cy="9"  r="1.5" fill="currentColor" className="text-gray-600" />
+            <line x1="6" y1="9"  x2="20" y2="9"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600" />
+            <circle cx="3" cy="14" r="1.5" fill="currentColor" className="text-gray-600" />
+            <line x1="6" y1="14" x2="20" y2="14" stroke="currentColor" strokeWidth="1.2" className="text-gray-600" />
+          </svg>
         </button>
       )}
 
