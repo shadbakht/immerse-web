@@ -354,24 +354,25 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                         <p className="text-sm text-gray-700 leading-relaxed">
                           {highlightQuery(snippet, searchQuery)}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1.5">
-                          {isExpanded ? 'Click to collapse · Double-click to open' : 'Click to expand · Double-click to open'}
-                        </p>
+                        {isExpanded ? (
+                          <>
+                            <p className="text-sm text-gray-700 leading-relaxed mt-1">
+                              {highlightQuery(result.content, searchQuery)}
+                            </p>
+                            <button
+                              onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId); }}
+                              className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+                            >
+                              Open in reader →
+                            </button>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {highlightQuery(snippet, searchQuery)}
+                          </p>
+                        )}
                       </button>
                     </div>
-                    {isExpanded && (
-                      <div className="pl-8 pr-4 pb-3 bg-gray-50">
-                        <p className="text-sm text-gray-700 leading-relaxed">
-                          {highlightQuery(result.content, searchQuery)}
-                        </p>
-                        <button
-                          onClick={() => onOpenBook(result.bookId, result.passageId)}
-                          className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
-                        >
-                          Open in reader →
-                        </button>
-                      </div>
-                    )}
                   </div>
                 );
               })}
