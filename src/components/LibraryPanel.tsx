@@ -187,28 +187,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   async function handleTagSave(tagIds: string[]) {
     if (!userId || tagIds.length === 0) return;
     const now = new Date().toISOString();
-    // For each selected book, create selections for all its passages and tag them
-    // For simplicity, create one selection per book (first passage) and assign tags
-    const bookList = [...selectedBookIds];
-    for (const bookId of bookList) {
-      const { data: firstPassage } = await supabase
-        .from('passages')
-        .select('id, content')
-        .eq('book_id', bookId)
-        .order('sort_order')
-        .limit(1)
-        .single();
-      if (!firstPassage) continue;
+    const checkedResults = searchResults.filter(r => checkedResultIds.has(r.passageId));
+    for (const result of checkedResults) {
       const { data: sel } = await supabase
         .from('selections')
-        .insert({ user_id: userId, passage_id: firstPassage.id, start_offset: 0, end_offset: firstPassage.content.length, snapshot_text: firstPassage.content.slice(0, 300), created_at: now })
+        .insert({ user_id: userId, passage_id: result.passageId, start_offset: 0, end_offset: result.content.length, snapshot_text: result.content.slice(0, 300), created_at: now })
         .select('id').single();
       if (!sel) continue;
       await Promise.all(tagIds.map(tagId =>
         supabase.from('selection_tags').insert({ selection_id: sel.id, tag_id: tagId, created_at: now })
       ));
     }
-    setSelectedBookIds(new Set());
+    setCheckedResultIds(new Set());
     setTagPanelVisible(false);
   }
 
@@ -332,33 +322,45 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
               <p className="text-xs text-gray-400 px-4 py-2">{searchResults.length} results</p>
               {searchResults.map(result => {
                 const isExpanded = expandedResults.has(result.passageId);
+                const isChecked = checkedResultIds.has(result.passageId);
                 const snippet = getSnippet(result.content, searchQuery);
                 const location = result.chapterLabel || result.sectionTitle;
                 return (
-                  <div key={result.passageId} className="border-b border-gray-100">
-                    <button
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
-                      onClick={() => {
-                        setExpandedResults(prev => {
+                  <div key={result.passageId} className={`border-b border-gray-100 ${isChecked ? 'bg-[#1B6B7B]/5' : ''}`}>
+                    <div className="flex items-start">
+                      <Checkbox
+                        state={isChecked ? 'checked' : 'unchecked'}
+                        onChange={() => setCheckedResultIds(prev => {
                           const next = new Set(prev);
                           next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
                           return next;
-                        });
-                      }}
-                      onDoubleClick={() => onOpenBook(result.bookId, result.passageId)}
-                    >
-                      <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
-                        {result.bookTitle}{location ? ` · ${location}` : ''}
-                      </p>
-                      <p className="text-sm text-gray-700 leading-relaxed">
-                        {highlightQuery(snippet, searchQuery)}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1.5">
-                        {isExpanded ? 'Click to collapse · Double-click to open in reader' : 'Click to expand · Double-click to open in reader'}
-                      </p>
-                    </button>
+                        })}
+                        className="pl-3 pr-1 pt-3.5 shrink-0"
+                      />
+                      <button
+                        className="flex-1 text-left pr-4 py-3 hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          setExpandedResults(prev => {
+                            const next = new Set(prev);
+                            next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
+                            return next;
+                          });
+                        }}
+                        onDoubleClick={() => onOpenBook(result.bookId, result.passageId)}
+                      >
+                        <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
+                          {result.bookTitle}{location ? ` · ${location}` : ''}
+                        </p>
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {highlightQuery(snippet, searchQuery)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1.5">
+                          {isExpanded ? 'Click to collapse · Double-click to open' : 'Click to expand · Double-click to open'}
+                        </p>
+                      </button>
+                    </div>
                     {isExpanded && (
-                      <div className="px-4 pb-3 bg-gray-50">
+                      <div className="pl-8 pr-4 pb-3 bg-gray-50">
                         <p className="text-sm text-gray-700 leading-relaxed">
                           {highlightQuery(result.content, searchQuery)}
                         </p>
@@ -470,20 +472,20 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
         </div>
       )}
 
-      {/* Action bar */}
-      {selectedBookIds.size > 0 && (
+      {/* Action bar — search results only */}
+      {checkedResultIds.size > 0 && (
         <div className="border-t border-gray-200 px-4 py-3 bg-white flex items-center justify-between gap-3 shrink-0">
           <button
-            onClick={() => setSelectedBookIds(new Set())}
+            onClick={() => setCheckedResultIds(new Set())}
             className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleTagSelected}
+            onClick={() => setTagPanelVisible(true)}
             className="flex-1 bg-[#1B6B7B] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-[#155a68] transition-colors"
           >
-            Tag ({selectedBookIds.size})
+            Tag ({checkedResultIds.size})
           </button>
         </div>
       )}
@@ -492,7 +494,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
         visible={tagPanelVisible}
         onClose={() => setTagPanelVisible(false)}
         userId={userId}
-        selectionText={`${selectedBookIds.size} book${selectedBookIds.size !== 1 ? 's' : ''} selected`}
+        selectionText={searchResults.filter(r => checkedResultIds.has(r.passageId)).map(r => r.content.slice(0, 80)).join(' · ')}
         onSave={handleTagSave}
       />
     </div>
