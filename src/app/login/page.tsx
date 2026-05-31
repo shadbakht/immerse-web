@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useRef, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -12,6 +12,7 @@ function LoginPageInner() {
   const supabase = createClient();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const pendingModeRef = useRef<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +23,7 @@ function LoginPageInner() {
     setError('');
     setLoading(true);
     try {
-      if (mode === 'signin') {
+      if (pendingModeRef.current === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
@@ -79,9 +80,18 @@ function LoginPageInner() {
           <button
             type="submit"
             disabled={loading}
+            onClick={() => { pendingModeRef.current = 'signin'; }}
             className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
           >
-            {loading ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {loading && pendingModeRef.current === 'signin' ? 'Please wait…' : 'Sign In'}
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            onClick={() => { pendingModeRef.current = 'signup'; }}
+            className="w-full border border-[#1B6B7B] text-[#1B6B7B] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 transition disabled:opacity-50"
+          >
+            {loading && pendingModeRef.current === 'signup' ? 'Please wait…' : 'Sign Up'}
           </button>
         </form>
 
@@ -98,15 +108,6 @@ function LoginPageInner() {
           Continue as Guest
         </button>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-          <button
-            onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-            className="text-[#1B6B7B] hover:underline"
-          >
-            {mode === 'signin' ? 'Sign up' : 'Sign in'}
-          </button>
-        </p>
       </div>
     </div>
   );
