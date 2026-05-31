@@ -447,41 +447,33 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                         })}
                         className="pl-3 pr-1 pt-3.5 shrink-0"
                       />
-                      <button
-                        className="flex-1 text-left pr-4 py-3 hover:bg-gray-50 transition-colors"
-                        onClick={() => {
-                          setExpandedResults(prev => {
-                            const next = new Set(prev);
-                            next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
-                            return next;
-                          });
-                        }}
-                        onDoubleClick={() => onOpenBook(result.bookId, result.passageId, searchQuery.trim())}
+                      {/* Use div — avoids invalid button-in-button */}
+                      <div
+                        className="flex-1 text-left pr-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => setExpandedResults(prev => {
+                          const next = new Set(prev);
+                          next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
+                          return next;
+                        })}
                       >
                         <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
                           {result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="text-sm text-gray-700 leading-relaxed">
-                          {highlightQuery(snippet, searchQuery)}
+                          {isExpanded
+                            ? highlightQuery(result.content, searchQuery)
+                            : highlightQuery(snippet, searchQuery)
+                          }
                         </p>
-                        {isExpanded ? (
-                          <>
-                            <p className="text-sm text-gray-700 leading-relaxed mt-1">
-                              {highlightQuery(result.content, searchQuery)}
-                            </p>
-                            <button
-                              onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, searchQuery.trim()); }}
-                              className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
-                            >
-                              Open in reader →
-                            </button>
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-700 leading-relaxed">
-                            {highlightQuery(snippet, searchQuery)}
-                          </p>
+                        {isExpanded && (
+                          <button
+                            onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, searchQuery.trim()); }}
+                            className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+                          >
+                            Open in reader →
+                          </button>
                         )}
-                      </button>
+                      </div>
                     </div>
                   </div>
                 );
