@@ -46,8 +46,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
 
   const [traditions, setTraditions] = useState<Tradition[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [bookCounts, setBookCounts] = useState<Record<string, number>>({});  // keyed by authorId
-  const [books, setBooks] = useState<Record<string, Book[]>>({});            // keyed by authorId
+  const [bookCounts, setBookCounts] = useState<Record<string, number>>({});    // keyed by authorId
+  const [allBookIds, setAllBookIds] = useState<Record<string, string[]>>({});  // authorId -> bookIds (upfront)
+  const [books, setBooks] = useState<Record<string, Book[]>>({});              // keyed by authorId (lazy titles)
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
   const [openAuthors, setOpenAuthors] = useState<Set<string>>(new Set());
   const [loadingBooks, setLoadingBooks] = useState<Set<string>>(new Set());
@@ -69,16 +70,22 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   async function load() {
     setLoading(true);
     try {
-      const [{ data: trad }, { data: auth }, { data: counts }] = await Promise.all([
+      const [{ data: trad }, { data: auth }, { data: bookData }] = await Promise.all([
         supabase.from('traditions').select('id, name, sort_order').order('sort_order').order('name'),
         supabase.from('authors').select('id, name, tradition_id, sort_order').order('sort_order').order('name'),
-        supabase.from('books').select('author_id').eq('is_user_imported', false),
+        supabase.from('books').select('id, author_id').eq('is_user_imported', false),
       ]);
       setTraditions(trad ?? []);
       setAuthors(auth ?? []);
       const countMap: Record<string, number> = {};
-      for (const b of counts ?? []) countMap[b.author_id] = (countMap[b.author_id] ?? 0) + 1;
+      const idMap: Record<string, string[]> = {};
+      for (const b of bookData ?? []) {
+        countMap[b.author_id] = (countMap[b.author_id] ?? 0) + 1;
+        if (!idMap[b.author_id]) idMap[b.author_id] = [];
+        idMap[b.author_id].push(b.id);
+      }
       setBookCounts(countMap);
+      setAllBookIds(idMap);
     } finally {
       setLoading(false);
     }
@@ -128,16 +135,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
 
   // ── Checkbox helpers ──────────────────────────────────────────────────────────
 
-  // Get all book IDs under an author
+  // Get all book IDs under an author (from upfront-loaded map)
   function bookIdsForAuthor(authorId: string): string[] {
-    return (books[authorId] ?? []).map(b => b.id);
+    return allBookIds[authorId] ?? [];
   }
 
-  // Get all book IDs under a tradition (only loaded authors)
+  // Get all book IDs under a tradition
   function bookIdsForTradition(traditionId: string): string[] {
     return authors
       .filter(a => a.tradition_id === traditionId)
-      .flatMap(a => bookIdsForAuthor(a.id));
+      .flatMap(a => allBookIds[a.id] ?? []);
   }
 
   function checkStateFor(ids: string[]): 'checked' | 'indeterminate' | 'unchecked' {
@@ -212,16 +219,20 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
     if (!q) { setSearchResults([]); return; }
     const timer = setTimeout(() => doSearch(q), 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, selectedBookIds]);
 
   async function doSearch(q: string) {
     setSearchLoading(true);
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('passages')
         .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
         .textSearch('content', q, { type: 'plain', config: 'english' })
         .limit(40);
+      if (selectedBookIds.size > 0) {
+        query = query.in('book_id', [...selectedBookIds]);
+      }
+      const { data } = await query;
 
       setSearchResults((data ?? []).map((p: any) => ({
         passageId:    p.id,
@@ -289,7 +300,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search all books…"
+            placeholder={selectedBookIds.size > 0 ? `Search ${selectedBookIds.size} selected book${selectedBookIds.size !== 1 ? 's' : ''}…` : 'Search all books…'}
             className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
           />
           {searchQuery && (
