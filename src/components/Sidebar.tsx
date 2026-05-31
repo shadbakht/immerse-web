@@ -44,7 +44,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
 
       {/* Nav items */}
       <nav className="flex-1 py-3">
-        {NAV_ITEMS.map(({ tab, label, icon }) => (
+        {NAV_ITEMS.map(({ tab, label, icon, mirror }) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
@@ -54,7 +54,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <span className={`text-base inline-block${item.mirror ? ' scale-x-[-1]' : ''}`}>{icon}</span>
+            <span className={`text-base inline-block${mirror ? ' scale-x-[-1]' : ''}`}>{icon}</span>
             {label}
           </button>
         ))}
