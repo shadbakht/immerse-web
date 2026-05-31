@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 interface AppBannerProps {
   playStoreId: string;   // e.g. "com.shadbakht.immerse" — empty = hidden
@@ -54,8 +55,8 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-[#1C2B35] text-white w-full z-50">
       {/* App icon */}
-      <div className="w-12 h-12 rounded-xl bg-[#1B6B7B] flex items-center justify-center shrink-0 text-2xl shadow-md">
-        ✦
+      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-md">
+        <Image src="/immerse-icon.png" alt="Immerse" width={48} height={48} />
       </div>
 
       {/* Text */}

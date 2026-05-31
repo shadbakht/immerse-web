@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -86,7 +87,9 @@ function LoginPageInner() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-5xl text-[#1B6B7B] mb-3">✦</div>
+          <div className="flex justify-center mb-3">
+            <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
+          </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Immerse</h1>
           <p className="text-sm text-gray-400 mt-1">Sacred texts from all traditions</p>
         </div>

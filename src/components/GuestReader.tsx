@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import ReaderPanel from './ReaderPanel';
 
 export default function GuestReader({ bookId }: { bookId: string }) {
@@ -11,7 +12,7 @@ export default function GuestReader({ bookId }: { bookId: string }) {
       {/* Guest banner */}
       <div className="bg-[#1C2B35] text-white px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <span className="text-[#1B6B7B] text-lg">✦</span>
+          <Image src="/immerse-icon.png" alt="Immerse" width={28} height={28} className="rounded-lg" />
           <span className="font-semibold text-sm">Immerse</span>
         </div>
         <div className="flex items-center gap-3">
