@@ -1,0 +1,74 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import PanelSheet from './PanelSheet';
+
+interface NotePanelProps {
+  visible:       boolean;
+  onClose:       () => void;
+  selectionText: string;
+  onSave:        (content: string) => Promise<void>;
+}
+
+export default function NotePanel({ visible, onClose, selectionText, onSave }: NotePanelProps) {
+  const [content, setContent] = useState('');
+  const [saving, setSaving] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setContent('');
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [visible]);
+
+  async function handleSave() {
+    if (!content.trim()) return;
+    setSaving(true);
+    try {
+      await onSave(content.trim());
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <PanelSheet
+      visible={visible}
+      onClose={onClose}
+      title="Add Note"
+      footer={
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !content.trim()}
+            className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] text-white text-sm font-semibold hover:bg-[#155a68] transition-colors disabled:opacity-40"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      }
+    >
+      {/* Selection preview */}
+      <div className="mx-5 mt-4 mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+        <p className="text-xs text-gray-500 line-clamp-2 italic">"{selectionText}"</p>
+      </div>
+
+      {/* Note input */}
+      <div className="px-5 pb-4">
+        <textarea
+          ref={textareaRef}
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="Write your note…"
+          rows={5}
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
+        />
+      </div>
+    </PanelSheet>
+  );
+}

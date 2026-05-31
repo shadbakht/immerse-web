@@ -3,6 +3,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { ReaderTarget } from './AppShell';
+import TagPanel from './TagPanel';
+import NotePanel from './NotePanel';
+import XRefPanel from './XRefPanel';
+import AiPanel from './AiPanel';
 
 interface Passage {
   id: string;
@@ -72,6 +76,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [activeFootnote, setActiveFootnote] = useState<{ num: string; text: string } | null>(null);
   const [selectionBar, setSelectionBar] = useState<SelectionBar | null>(null);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
+  const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | null>(null);
+  const [isPro, setIsPro] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
@@ -82,6 +88,30 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     setSelectionBar(null);
     loadBook(target.bookId, target.passageId);
   }, [target?.bookId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from('profiles').select('is_pro').eq('id', userId).single()
+      .then(({ data }) => setIsPro(data?.is_pro ?? false));
+  }, [userId]);
+
+  async function createSelection(): Promise<string> {
+    if (!selectionBar || !target) throw new Error('No selection');
+    const { data, error } = await supabase
+      .from('selections')
+      .insert({
+        user_id:       userId,
+        passage_id:    selectionBar.startPassageId,
+        start_offset:  selectionBar.startOffset,
+        end_offset:    selectionBar.endOffset,
+        snapshot_text: selectionBar.text,
+        created_at:    new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  }
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -179,24 +209,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     });
   }, []);
 
-  async function createSelectionRecord(bar: SelectionBar) {
-    const { data, error } = await supabase
-      .from('selections')
-      .insert({
-        user_id:       userId,
-        passage_id:    bar.startPassageId,
-        start_offset:  bar.startOffset,
-        end_offset:    bar.endOffset,
-        snapshot_text: bar.text,
-        created_at:    new Date().toISOString(),
-      })
-      .select('id')
-      .single();
-    if (error) throw error;
-    return data.id;
-  }
-
-  async function handleCopy() {
+async function handleCopy() {
     if (!selectionBar) return;
     const passage = passages.find(p => p.id === selectionBar.startPassageId);
     const location = passage?.chapter_label || passage?.section_title || null;
@@ -209,43 +222,39 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     window.getSelection()?.removeAllRanges();
   }
 
-  async function handleAddTag() {
-    if (!selectionBar || !target) return;
-    setSavingAnnotation(true);
-    try {
-      const selId = await createSelectionRecord(selectionBar);
-      // Open tag panel — for now alert, full tag picker coming soon
-      alert(`Selection saved (id: ${selId}). Tag picker coming soon!`);
-    } catch (e: any) {
-      alert('Could not save selection: ' + e.message);
-    } finally {
-      setSavingAnnotation(false);
-      setSelectionBar(null);
-      window.getSelection()?.removeAllRanges();
-    }
+  function openPanel(panel: 'tag' | 'note' | 'xref' | 'ai') {
+    setActivePanel(panel);
+    window.getSelection()?.removeAllRanges();
   }
 
-  async function handleAddNote() {
-    if (!selectionBar || !target) return;
-    const noteText = prompt('Enter your note:');
-    if (!noteText?.trim()) return;
-    setSavingAnnotation(true);
-    try {
-      const selId = await createSelectionRecord(selectionBar);
-      await supabase.from('notes').insert({
-        user_id:      userId,
-        selection_id: selId,
-        content:      noteText.trim(),
-        created_at:   new Date().toISOString(),
-        updated_at:   new Date().toISOString(),
-      });
-    } catch (e: any) {
-      alert('Could not save note: ' + e.message);
-    } finally {
-      setSavingAnnotation(false);
-      setSelectionBar(null);
-      window.getSelection()?.removeAllRanges();
-    }
+  function closePanel() {
+    setActivePanel(null);
+    setSelectionBar(null);
+  }
+
+  async function handleTagSave(tagIds: string[]) {
+    const selId = await createSelection();
+    const now = new Date().toISOString();
+    await Promise.all(tagIds.map(tagId =>
+      supabase.from('selection_tags').insert({ selection_id: selId, tag_id: tagId, created_at: now })
+    ));
+  }
+
+  async function handleNoteSave(content: string) {
+    const selId = await createSelection();
+    const now = new Date().toISOString();
+    await supabase.from('notes').insert({ user_id: userId, selection_id: selId, content, created_at: now, updated_at: now });
+  }
+
+  async function handleXrefSave(targetPassageId: string, targetSnapshotText: string) {
+    const selIdA = await createSelection();
+    // Create selection B for the target passage
+    const { data: selB } = await supabase
+      .from('selections')
+      .insert({ user_id: userId, passage_id: targetPassageId, start_offset: 0, end_offset: targetSnapshotText.length, snapshot_text: targetSnapshotText, created_at: new Date().toISOString() })
+      .select('id').single();
+    if (!selB) throw new Error('Could not create target selection');
+    await supabase.from('xrefs').insert({ user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, created_at: new Date().toISOString() });
   }
 
   function scrollToPassage(passageId: string) {
@@ -324,10 +333,10 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
           style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
           {[
-            { label: 'Tag',  onClick: handleAddTag },
-            { label: 'Note', onClick: handleAddNote },
-            { label: 'Xref', onClick: () => alert('Xref coming soon') },
-            { label: 'AI',   onClick: () => alert('AI summary coming soon') },
+            { label: 'Tag',  onClick: () => openPanel('tag') },
+            { label: 'Note', onClick: () => openPanel('note') },
+            { label: 'Xref', onClick: () => openPanel('xref') },
+            { label: 'AI',   onClick: () => openPanel('ai') },
             { label: 'Copy', onClick: handleCopy },
           ].map(({ label, onClick }, i, arr) => (
             <div key={label} className="flex items-center">
@@ -412,6 +421,35 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
           </div>
         </>
       )}
+
+      {/* Annotation panels */}
+      <TagPanel
+        visible={activePanel === 'tag'}
+        onClose={closePanel}
+        userId={userId}
+        selectionText={selectionBar?.text ?? ''}
+        onSave={handleTagSave}
+      />
+      <NotePanel
+        visible={activePanel === 'note'}
+        onClose={closePanel}
+        selectionText={selectionBar?.text ?? ''}
+        onSave={handleNoteSave}
+      />
+      <XRefPanel
+        visible={activePanel === 'xref'}
+        onClose={closePanel}
+        selectionText={selectionBar?.text ?? ''}
+        onSave={handleXrefSave}
+      />
+      <AiPanel
+        visible={activePanel === 'ai'}
+        onClose={closePanel}
+        selectionText={selectionBar?.text ?? ''}
+        bookTitle={book?.title ?? ''}
+        authorName={book?.authorName ?? ''}
+        isPro={isPro}
+      />
     </div>
   );
 }
