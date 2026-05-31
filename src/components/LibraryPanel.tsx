@@ -35,7 +35,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
 
   const [traditions, setTraditions] = useState<Tradition[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [books, setBooks] = useState<Record<string, Book[]>>({});           // keyed by authorId
+  const [bookCounts, setBookCounts] = useState<Record<string, number>>({});  // keyed by authorId
+  const [books, setBooks] = useState<Record<string, Book[]>>({});            // keyed by authorId
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
   const [openAuthors, setOpenAuthors] = useState<Set<string>>(new Set());
   const [loadingBooks, setLoadingBooks] = useState<Set<string>>(new Set());
@@ -49,12 +50,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   async function load() {
     setLoading(true);
     try {
-      const [{ data: trad }, { data: auth }] = await Promise.all([
+      const [{ data: trad }, { data: auth }, { data: counts }] = await Promise.all([
         supabase.from('traditions').select('id, name, sort_order').order('sort_order').order('name'),
         supabase.from('authors').select('id, name, tradition_id, sort_order').order('sort_order').order('name'),
+        supabase.from('books').select('author_id').eq('is_user_imported', false),
       ]);
       setTraditions(trad ?? []);
       setAuthors(auth ?? []);
+      const countMap: Record<string, number> = {};
+      for (const b of counts ?? []) countMap[b.author_id] = (countMap[b.author_id] ?? 0) + 1;
+      setBookCounts(countMap);
     } finally {
       setLoading(false);
     }
@@ -150,7 +155,12 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                         className="w-full flex items-center justify-between pl-7 pr-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 bg-gray-50/50"
                       >
                         <span className="text-sm text-gray-700">{author.name}</span>
-                        <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isAuthorOpen ? 'rotate-90' : ''}`}>›</span>
+                        <div className="flex items-center gap-2">
+                          {(bookCounts[author.id] ?? 0) > 0 && (
+                            <span className="text-xs text-gray-400">{bookCounts[author.id]}</span>
+                          )}
+                          <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isAuthorOpen ? 'rotate-90' : ''}`}>›</span>
+                        </div>
                       </button>
 
                       {/* Books */}
