@@ -24,6 +24,16 @@ interface Book {
   authorId: string;
 }
 
+interface SearchResult {
+  passageId:   string;
+  bookId:      string;
+  bookTitle:   string;
+  authorName:  string;
+  chapterLabel: string | null;
+  sectionTitle: string | null;
+  content:     string;
+}
+
 interface LibraryPanelProps {
   activeTab:  NavTab;
   userId:     string;
@@ -41,6 +51,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   const [openAuthors, setOpenAuthors] = useState<Set<string>>(new Set());
   const [loadingBooks, setLoadingBooks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (activeTab !== 'library') return;
@@ -107,6 +121,66 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
     });
   }
 
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) { setSearchResults([]); return; }
+    const timer = setTimeout(() => doSearch(q), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  async function doSearch(q: string) {
+    setSearchLoading(true);
+    try {
+      const { data } = await supabase
+        .from('passages')
+        .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
+        .textSearch('content', q, { type: 'plain', config: 'english' })
+        .limit(40);
+
+      setSearchResults((data ?? []).map((p: any) => ({
+        passageId:    p.id,
+        bookId:       p.books?.id ?? '',
+        bookTitle:    p.books?.title ?? '',
+        authorName:   p.books?.authors?.name ?? '',
+        chapterLabel: p.chapter_label,
+        sectionTitle: p.section_title,
+        content:      p.content,
+      })));
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  function getSnippet(content: string, query: string): string {
+    const words = query.trim().split(/\s+/).filter(Boolean);
+    const lower = content.toLowerCase();
+    let bestIdx = -1;
+    for (const w of words) {
+      const idx = lower.indexOf(w.toLowerCase());
+      if (idx !== -1) { bestIdx = idx; break; }
+    }
+    if (bestIdx === -1) return content.slice(0, 200);
+    const start = Math.max(0, bestIdx - 80);
+    const end   = Math.min(content.length, bestIdx + 200);
+    return (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
+  }
+
+  function highlightQuery(text: string, query: string) {
+    const words = query.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return <span>{text}</span>;
+    const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+    const parts = text.split(pattern);
+    return (
+      <>
+        {parts.map((part, i) =>
+          pattern.test(part)
+            ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{part}</mark>
+            : <span key={i}>{part}</span>
+        )}
+      </>
+    );
+  }
+
   if (activeTab !== 'library') {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
@@ -115,15 +189,95 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
     );
   }
 
+  const isSearching = searchQuery.trim().length > 0;
+
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-4 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-900">Library</h2>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+        <h2 className="text-lg font-semibold text-gray-900 mb-3">Library</h2>
+        {/* Search input */}
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search all books…"
+            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); setSearchResults([]); }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading ? (
+      {loading && !isSearching ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : isSearching ? (
+        /* ── Search results ── */
+        <div className="flex-1 overflow-y-auto">
+          {searchLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-5 h-5 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : searchResults.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-10">No results for "{searchQuery}"</p>
+          ) : (
+            <div>
+              <p className="text-xs text-gray-400 px-4 py-2">{searchResults.length} results</p>
+              {searchResults.map(result => {
+                const isExpanded = expandedResults.has(result.passageId);
+                const snippet = getSnippet(result.content, searchQuery);
+                const location = result.chapterLabel || result.sectionTitle;
+                return (
+                  <div key={result.passageId} className="border-b border-gray-100">
+                    <button
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+                      onClick={() => {
+                        setExpandedResults(prev => {
+                          const next = new Set(prev);
+                          next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
+                          return next;
+                        });
+                      }}
+                      onDoubleClick={() => onOpenBook(result.bookId, result.passageId)}
+                    >
+                      <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
+                        {result.bookTitle}{location ? ` · ${location}` : ''}
+                      </p>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {highlightQuery(snippet, searchQuery)}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        {isExpanded ? 'Click to collapse · Double-click to open in reader' : 'Click to expand · Double-click to open in reader'}
+                      </p>
+                    </button>
+                    {isExpanded && (
+                      <div className="px-4 pb-3 bg-gray-50">
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {highlightQuery(result.content, searchQuery)}
+                        </p>
+                        <button
+                          onClick={() => onOpenBook(result.bookId, result.passageId)}
+                          className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+                        >
+                          Open in reader →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
@@ -192,3 +346,4 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
     </div>
   );
 }
+
