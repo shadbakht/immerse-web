@@ -328,7 +328,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
               <button
                 onClick={onClick}
                 disabled={savingAnnotation}
-                className="px-4 py-2 text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
+                className="px-[15px] py-[7px] text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
               >
                 {label}
               </button>
