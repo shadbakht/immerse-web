@@ -95,7 +95,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | 'signin' | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
-  const [annotatedPassageIds, setAnnotatedPassageIds] = useState<Set<string>>(new Set());
+  const [taggedPassageIds, setTaggedPassageIds]   = useState<Set<string>>(new Set());
+  const [notedPassageIds, setNotedPassageIds]     = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
@@ -266,13 +267,15 @@ async function handleCopy() {
     await Promise.all(tagIds.map(tagId =>
       supabase.from('selection_tags').insert({ selection_id: selId, tag_id: tagId, created_at: now })
     ));
-    if (bar) setAnnotatedPassageIds(prev => new Set(prev).add(bar.startPassageId));
+    if (bar) setTaggedPassageIds(prev => new Set(prev).add(bar.startPassageId));
   }
 
   async function handleNoteSave(content: string) {
+    const bar = pendingSelectionRef.current ?? selectionBar;
     const selId = await createSelection();
     const now = new Date().toISOString();
     await supabase.from('notes').insert({ user_id: userId, selection_id: selId, content, created_at: now, updated_at: now });
+    if (bar) setNotedPassageIds(prev => new Set(prev).add(bar.startPassageId));
   }
 
   async function handleXrefSave(targetPassageId: string, targetSnapshotText: string) {
@@ -411,9 +414,14 @@ async function handleCopy() {
                   </h3>
                 )}
                 <div className="relative">
-                  {annotatedPassageIds.has(passage.id) && (
+                  {(taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
-                      <span className="text-[#3B82F6] text-[32px] leading-none inline-block scale-x-[-1]" title="Tagged">🏷</span>
+                      {taggedPassageIds.has(passage.id) && (
+                        <span className="text-[32px] leading-none inline-block scale-x-[-1]" title="Tagged">🏷</span>
+                      )}
+                      {notedPassageIds.has(passage.id) && (
+                        <span className="text-[32px] leading-none inline-block" title="Note" style={{ filter: 'sepia(1) saturate(3) hue-rotate(5deg)' }}>📝</span>
+                      )}
                     </div>
                   )}
                   <p

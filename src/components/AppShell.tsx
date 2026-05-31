@@ -7,6 +7,7 @@ import LibraryPanel from './LibraryPanel';
 import ReaderPanel from './ReaderPanel';
 import HomePanel from './HomePanel';
 import SettingsPanel from './SettingsPanel';
+import NotesScreen from './NotesScreen';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
 
@@ -51,7 +52,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
           {activeTab === 'settings'  && user  && <SettingsPanel user={user} />}
           {activeTab === 'settings'  && !user && <ComingSoon label="Sign in to access settings" />}
           {activeTab === 'tags'      && <ComingSoon label="Tags" />}
-          {activeTab === 'notes'     && <ComingSoon label="Notes" />}
+          {activeTab === 'notes'     && <NotesScreen userId={userId} onOpenBook={openBook} />}
           {activeTab === 'xrefs'     && <ComingSoon label="Cross-References" />}
           {activeTab === 'community' && <ComingSoon label="Community" />}
         </div>
