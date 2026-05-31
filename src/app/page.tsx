@@ -2,11 +2,17 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import AppShell from '@/components/AppShell';
 
-export default async function Home() {
+interface Props {
+  searchParams: Promise<{ guest?: string }>;
+}
+
+export default async function Home({ searchParams }: Props) {
+  const { guest } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect('/login');
+  if (user)          return <AppShell user={user} />;
+  if (guest === '1') return <AppShell user={null} />;
 
-  return <AppShell user={user} />;
+  redirect('/login');
 }

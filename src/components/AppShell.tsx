@@ -13,7 +13,7 @@ export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'communit
 export type ReaderTarget = { bookId: string; passageId?: string } | null;
 
 interface AppShellProps {
-  user: User;
+  user:          User | null;
   initialBookId?: string;
 }
 
@@ -25,6 +25,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
 
   const fullWidthTabs: NavTab[] = ['home', 'settings'];
   const isFullWidth = fullWidthTabs.includes(activeTab);
+  const userId = user?.id ?? '';
 
   function openBook(bookId: string, passageId?: string) {
     setReaderTarget({ bookId, passageId });
@@ -38,16 +39,21 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
 
       {isFullWidth ? (
         <div className="flex-1 overflow-hidden">
-          {activeTab === 'home'     && <HomePanel userId={user.id} onOpenBook={openBook} />}
-          {activeTab === 'settings' && <SettingsPanel user={user} />}
+          {activeTab === 'home'     && <HomePanel userId={userId} onOpenBook={openBook} />}
+          {activeTab === 'settings' && user && <SettingsPanel user={user} />}
+          {activeTab === 'settings' && !user && (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+              Sign in to access settings.
+            </div>
+          )}
         </div>
       ) : (
         <>
           <div className="w-80 shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white">
-            <LibraryPanel activeTab={activeTab} userId={user.id} onOpenBook={openBook} />
+            <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} />
           </div>
           <div className="flex-1 overflow-hidden">
-            <ReaderPanel target={readerTarget} userId={user.id} />
+            <ReaderPanel target={readerTarget} userId={userId} />
           </div>
         </>
       )}

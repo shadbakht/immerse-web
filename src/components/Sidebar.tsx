@@ -17,7 +17,7 @@ const NAV_ITEMS: { tab: NavTab; label: string; icon: string }[] = [
 interface SidebarProps {
   activeTab:    NavTab;
   onTabChange:  (tab: NavTab) => void;
-  user:         User;
+  user:         User | null;
 }
 
 export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) {
@@ -30,7 +30,9 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
     router.refresh();
   }
 
-  const displayName = user.user_metadata?.full_name || user.email || 'Reader';
+  const displayName = user
+    ? (user.user_metadata?.full_name || user.email || 'Reader')
+    : 'Guest';
 
   return (
     <div className="w-56 shrink-0 flex flex-col bg-[#1C2B35] text-white h-full">
@@ -60,18 +62,29 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
 
       {/* Footer */}
       <div className="px-5 pb-6 pt-3 border-t border-white/10 flex items-center justify-between">
-        <button
-          onClick={() => onTabChange('settings')}
-          className="text-xs text-white/40 hover:text-white/70 transition-colors"
-        >
-          Settings
-        </button>
-        <button
-          onClick={handleSignOut}
-          className="text-xs text-white/40 hover:text-white/70 transition-colors"
-        >
-          Sign Out
-        </button>
+        {user ? (
+          <>
+            <button
+              onClick={() => onTabChange('settings')}
+              className="text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              Settings
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => router.push('/login')}
+            className="text-xs text-[#1B6B7B] hover:text-[#2a8fa3] transition-colors font-medium"
+          >
+            Sign In
+          </button>
+        )}
       </div>
     </div>
   );
