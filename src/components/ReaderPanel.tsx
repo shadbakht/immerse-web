@@ -198,7 +198,12 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
 
   async function handleCopy() {
     if (!selectionBar) return;
-    await navigator.clipboard.writeText(selectionBar.text);
+    const passage = passages.find(p => p.id === selectionBar.startPassageId);
+    const location = passage?.chapter_label || passage?.section_title || null;
+    const citationParts = [book?.authorName, book?.title, location].filter(Boolean);
+    const citation = citationParts.length ? `— ${citationParts.join(', ')}` : '';
+    const textToCopy = citation ? `"${selectionBar.text}"\n${citation}` : selectionBar.text;
+    await navigator.clipboard.writeText(textToCopy);
     setSelectionBar(null);
     window.getSelection()?.removeAllRanges();
   }
