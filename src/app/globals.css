@@ -24,3 +24,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ensure typed text is always visible in light inputs */
+input:not([class*="text-white"]),
+textarea:not([class*="text-white"]) {
+  color: #111827;
+}

@@ -291,7 +291,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={selectedBookIds.size > 0 ? `Search ${selectedBookIds.size} selected book${selectedBookIds.size !== 1 ? 's' : ''}…` : 'Search all books…'}
-            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
+            className="w-full pl-9 pr-8 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
           />
           {searchQuery && (
             <button

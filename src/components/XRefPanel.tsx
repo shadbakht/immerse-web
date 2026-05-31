@@ -120,7 +120,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search any passage…"
               autoFocus
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
             />
           </div>
 

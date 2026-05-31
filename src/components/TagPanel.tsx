@@ -185,7 +185,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             onChange={e => setNewTagName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
             placeholder="New tag name…"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
           />
           <button
             onClick={handleCreateTag}

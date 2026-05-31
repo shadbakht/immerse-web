@@ -66,7 +66,7 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
           onChange={e => setContent(e.target.value)}
           placeholder="Write your note…"
           rows={5}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
         />
       </div>
     </PanelSheet>
