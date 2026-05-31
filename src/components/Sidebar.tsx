@@ -6,11 +6,12 @@ import type { User } from '@supabase/supabase-js';
 import type { NavTab } from './AppShell';
 
 const NAV_ITEMS: { tab: NavTab; label: string; icon: string }[] = [
-  { tab: 'library',   label: 'Library',   icon: '📚' },
-  { tab: 'tags',      label: 'Tags',       icon: '🏷️' },
-  { tab: 'notes',     label: 'Notes',      icon: '📝' },
-  { tab: 'xrefs',     label: 'X-Refs',     icon: '🔗' },
-  { tab: 'community', label: 'Community',  icon: '🌐' },
+  { tab: 'home',      label: 'Home',       icon: '🏠' },
+  { tab: 'library',   label: 'Library',    icon: '📚' },
+  { tab: 'tags',      label: 'Tags',        icon: '🏷️' },
+  { tab: 'notes',     label: 'Notes',       icon: '📝' },
+  { tab: 'xrefs',     label: 'X-Refs',      icon: '🔗' },
+  { tab: 'community', label: 'Community',   icon: '🌐' },
 ];
 
 interface SidebarProps {
@@ -59,6 +60,12 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
 
       {/* Footer */}
       <div className="px-5 pb-6 pt-3 border-t border-white/10 flex items-center justify-between">
+        <button
+          onClick={() => onTabChange('settings')}
+          className="text-xs text-white/40 hover:text-white/70 transition-colors"
+        >
+          Settings
+        </button>
         <button
           onClick={handleSignOut}
           className="text-xs text-white/40 hover:text-white/70 transition-colors"
