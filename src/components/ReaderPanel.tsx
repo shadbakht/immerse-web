@@ -38,7 +38,7 @@ interface ReaderPanelProps {
 }
 
 function PassageContent({ text, onFootnoteClick }: { text: string; onFootnoteClick: (n: string) => void }) {
-  const parts = text.split(/(\[\d+\])/g);
+  const parts = text.replace(/\/\*[^*]*\*\//g, '').split(/(\[\d+\])/g);
   return (
     <>
       {parts.map((part, i) => {
@@ -314,8 +314,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
       {selectionBar && (
         <div
           ref={selectionBarRef}
-          className="absolute z-30 flex items-center bg-gray-900 rounded-xl px-1 py-1 shadow-xl"
-          style={{ left: Math.max(8, selectionBar.x - 120), top: Math.max(8, selectionBar.y) }}
+          className="absolute z-30 flex items-center bg-gray-900 rounded-2xl px-1.5 py-1.5 shadow-xl"
+          style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
           {[
             { label: 'Tag',  onClick: handleAddTag },
@@ -328,11 +328,11 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
               <button
                 onClick={onClick}
                 disabled={savingAnnotation}
-                className="px-3 py-1.5 text-xs text-white hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
               >
                 {label}
               </button>
-              {i < arr.length - 1 && <div className="w-px h-3.5 bg-white/20" />}
+              {i < arr.length - 1 && <div className="w-px h-4 bg-white/20" />}
             </div>
           ))}
         </div>
