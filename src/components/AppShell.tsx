@@ -10,6 +10,14 @@ import SettingsPanel from './SettingsPanel';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
 
+function ComingSoon({ label }: { label: string }) {
+  return (
+    <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+      {label} — coming soon
+    </div>
+  );
+}
+
 export type ReaderTarget = { bookId: string; passageId?: string } | null;
 
 interface AppShellProps {
@@ -23,8 +31,8 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     initialBookId ? { bookId: initialBookId } : null,
   );
 
-  const fullWidthTabs: NavTab[] = ['home', 'settings'];
-  const isFullWidth = fullWidthTabs.includes(activeTab);
+  // Library is the only split-panel tab; everything else is full-width
+  const isFullWidth = activeTab !== 'library';
   const userId = user?.id ?? '';
 
   function openBook(bookId: string, passageId?: string) {
@@ -39,13 +47,13 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
 
       {isFullWidth ? (
         <div className="flex-1 overflow-hidden">
-          {activeTab === 'home'     && <HomePanel userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'settings' && user && <SettingsPanel user={user} />}
-          {activeTab === 'settings' && !user && (
-            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-              Sign in to access settings.
-            </div>
-          )}
+          {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBook} />}
+          {activeTab === 'settings'  && user  && <SettingsPanel user={user} />}
+          {activeTab === 'settings'  && !user && <ComingSoon label="Sign in to access settings" />}
+          {activeTab === 'tags'      && <ComingSoon label="Tags" />}
+          {activeTab === 'notes'     && <ComingSoon label="Notes" />}
+          {activeTab === 'xrefs'     && <ComingSoon label="Cross-References" />}
+          {activeTab === 'community' && <ComingSoon label="Community" />}
         </div>
       ) : (
         <>
