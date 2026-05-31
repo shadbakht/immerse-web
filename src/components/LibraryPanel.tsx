@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
+import TagPanel from './TagPanel';
 
 interface Tradition {
   id: string;
@@ -55,6 +56,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
+  // Checkbox selection
+  const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
+  const [checkedResultIds, setCheckedResultIds] = useState<Set<string>>(new Set());
+  const [tagPanelVisible, setTagPanelVisible] = useState(false);
 
   useEffect(() => {
     if (activeTab !== 'library') return;
@@ -120,6 +125,87 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
       return next;
     });
   }
+
+  // ── Checkbox helpers ──────────────────────────────────────────────────────────
+
+  // Get all book IDs under an author
+  function bookIdsForAuthor(authorId: string): string[] {
+    return (books[authorId] ?? []).map(b => b.id);
+  }
+
+  // Get all book IDs under a tradition (only loaded authors)
+  function bookIdsForTradition(traditionId: string): string[] {
+    return authors
+      .filter(a => a.tradition_id === traditionId)
+      .flatMap(a => bookIdsForAuthor(a.id));
+  }
+
+  function checkStateFor(ids: string[]): 'checked' | 'indeterminate' | 'unchecked' {
+    if (ids.length === 0) return 'unchecked';
+    const n = ids.filter(id => selectedBookIds.has(id)).length;
+    if (n === ids.length) return 'checked';
+    if (n > 0) return 'indeterminate';
+    return 'unchecked';
+  }
+
+  function toggleBookIds(ids: string[]) {
+    if (ids.length === 0) return;
+    setSelectedBookIds(prev => {
+      const checkedCount = ids.filter(id => prev.has(id)).length;
+      const next = new Set(prev);
+      if (checkedCount === ids.length) {
+        ids.forEach(id => next.delete(id)); // all checked → uncheck
+      } else {
+        ids.forEach(id => next.add(id));    // partial or none → check all
+      }
+      return next;
+    });
+  }
+
+  function toggleSingleBook(bookId: string) {
+    setSelectedBookIds(prev => {
+      const next = new Set(prev);
+      next.has(bookId) ? next.delete(bookId) : next.add(bookId);
+      return next;
+    });
+  }
+
+  async function handleTagSelected() {
+    if (!userId) return;
+    // Gather a representative selection text from the first selected book/result
+    // For search results, use first checked result; otherwise use book IDs as targets
+    setTagPanelVisible(true);
+  }
+
+  async function handleTagSave(tagIds: string[]) {
+    if (!userId || tagIds.length === 0) return;
+    const now = new Date().toISOString();
+    // For each selected book, create selections for all its passages and tag them
+    // For simplicity, create one selection per book (first passage) and assign tags
+    const bookList = [...selectedBookIds];
+    for (const bookId of bookList) {
+      const { data: firstPassage } = await supabase
+        .from('passages')
+        .select('id, content')
+        .eq('book_id', bookId)
+        .order('sort_order')
+        .limit(1)
+        .single();
+      if (!firstPassage) continue;
+      const { data: sel } = await supabase
+        .from('selections')
+        .insert({ user_id: userId, passage_id: firstPassage.id, start_offset: 0, end_offset: firstPassage.content.length, snapshot_text: firstPassage.content.slice(0, 300), created_at: now })
+        .select('id').single();
+      if (!sel) continue;
+      await Promise.all(tagIds.map(tagId =>
+        supabase.from('selection_tags').insert({ selection_id: sel.id, tag_id: tagId, created_at: now })
+      ));
+    }
+    setSelectedBookIds(new Set());
+    setTagPanelVisible(false);
+  }
+
+  // ── Search ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -284,38 +370,58 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
           {traditions.map(tradition => {
             const tradAuthors = authors.filter(a => a.tradition_id === tradition.id);
             const isOpen = openTraditions.has(tradition.id);
+            const tradBookIds = bookIdsForTradition(tradition.id);
+            const tradState = checkStateFor(tradBookIds);
+
             return (
               <div key={tradition.id}>
                 {/* Tradition row */}
-                <button
-                  onClick={() => toggleTradition(tradition.id)}
-                  className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-50 transition-colors border-b border-gray-100"
-                >
-                  <span className="text-sm font-medium text-gray-800">{tradition.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{tradAuthors.length}</span>
-                    <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
-                  </div>
-                </button>
+                <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <Checkbox
+                    state={tradState}
+                    onChange={() => toggleBookIds(tradBookIds)}
+                    className="pl-3 pr-1 py-3.5 shrink-0"
+                  />
+                  <button
+                    onClick={() => toggleTradition(tradition.id)}
+                    className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left"
+                  >
+                    <span className="text-sm font-medium text-gray-800">{tradition.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">{tradAuthors.length}</span>
+                      <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    </div>
+                  </button>
+                </div>
 
                 {/* Authors */}
                 {isOpen && tradAuthors.map(author => {
                   const isAuthorOpen = openAuthors.has(author.id);
                   const authorBooks = books[author.id] ?? [];
+                  const authorBookIds = bookIdsForAuthor(author.id);
+                  const authorState = checkStateFor(authorBookIds);
+
                   return (
                     <div key={author.id}>
-                      <button
-                        onClick={() => toggleAuthor(author.id)}
-                        className="w-full flex items-center justify-between pl-7 pr-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 bg-gray-50/50"
-                      >
-                        <span className="text-sm text-gray-700">{author.name}</span>
-                        <div className="flex items-center gap-2">
-                          {(bookCounts[author.id] ?? 0) > 0 && (
-                            <span className="text-xs text-gray-400">{bookCounts[author.id]}</span>
-                          )}
-                          <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isAuthorOpen ? 'rotate-90' : ''}`}>›</span>
-                        </div>
-                      </button>
+                      <div className="flex items-center border-b border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                        <Checkbox
+                          state={authorState}
+                          onChange={() => toggleBookIds(authorBookIds)}
+                          className="pl-6 pr-1 py-3 shrink-0"
+                        />
+                        <button
+                          onClick={() => toggleAuthor(author.id)}
+                          className="flex-1 flex items-center justify-between pr-4 py-3 text-left"
+                        >
+                          <span className="text-sm text-gray-700">{author.name}</span>
+                          <div className="flex items-center gap-2">
+                            {(bookCounts[author.id] ?? 0) > 0 && (
+                              <span className="text-xs text-gray-400">{bookCounts[author.id]}</span>
+                            )}
+                            <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isAuthorOpen ? 'rotate-90' : ''}`}>›</span>
+                          </div>
+                        </button>
+                      </div>
 
                       {/* Books */}
                       {isAuthorOpen && (
@@ -324,15 +430,24 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                             <div className="flex justify-center py-3">
                               <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
                             </div>
-                          ) : authorBooks.map(book => (
-                            <button
-                              key={book.id}
-                              onClick={() => onOpenBook(book.id)}
-                              className="w-full text-left pl-11 pr-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                            >
-                              <div className="text-sm text-gray-800">{book.title}</div>
-                            </button>
-                          ))}
+                          ) : authorBooks.map(book => {
+                            const isBookChecked = selectedBookIds.has(book.id);
+                            return (
+                              <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <Checkbox
+                                  state={isBookChecked ? 'checked' : 'unchecked'}
+                                  onChange={() => toggleSingleBook(book.id)}
+                                  className="pl-9 pr-1 py-3 shrink-0"
+                                />
+                                <button
+                                  onClick={() => onOpenBook(book.id)}
+                                  className="flex-1 text-left pr-4 py-3"
+                                >
+                                  <div className="text-sm text-gray-800">{book.title}</div>
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -343,7 +458,57 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
           })}
         </div>
       )}
+
+      {/* Action bar */}
+      {selectedBookIds.size > 0 && (
+        <div className="border-t border-gray-200 px-4 py-3 bg-white flex items-center justify-between gap-3 shrink-0">
+          <button
+            onClick={() => setSelectedBookIds(new Set())}
+            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleTagSelected}
+            className="flex-1 bg-[#1B6B7B] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-[#155a68] transition-colors"
+          >
+            Tag ({selectedBookIds.size})
+          </button>
+        </div>
+      )}
+
+      <TagPanel
+        visible={tagPanelVisible}
+        onClose={() => setTagPanelVisible(false)}
+        userId={userId}
+        selectionText={`${selectedBookIds.size} book${selectedBookIds.size !== 1 ? 's' : ''} selected`}
+        onSave={handleTagSave}
+      />
     </div>
+  );
+}
+
+// ── Checkbox component ─────────────────────────────────────────────────────────
+
+function Checkbox({ state, onChange, className }: {
+  state: 'checked' | 'indeterminate' | 'unchecked';
+  onChange: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onChange(); }}
+      className={`flex items-center justify-center ${className}`}
+    >
+      <div className={`w-4.5 h-4.5 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+        state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
+        state === 'indeterminate' ? 'border-[#1B6B7B]' :
+                                    'border-gray-300'
+      }`}>
+        {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+        {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}
+      </div>
+    </button>
   );
 }
 
