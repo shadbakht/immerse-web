@@ -42,32 +42,27 @@ function XRefCard({ row, searchQuery, onOpenBook }: { row: XRefRow; searchQuery:
       <div className="grid grid-cols-2 divide-x divide-gray-100 cursor-pointer select-none hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(v => !v)}>
         {sides.map(side => (
-          <div key={side.key} className="px-4 py-4">
-            <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
+          <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
+            <p className="text-xs text-[#1B6B7B] font-medium leading-snug">
               <Highlight text={side.citation} q={searchQuery} />
             </p>
             <p className={`text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
+            {expanded && side.bookId && (
+              <button
+                onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId); }}
+                className="text-xs text-[#1B6B7B] font-medium hover:underline text-left"
+              >
+                Open in reader →
+              </button>
+            )}
           </div>
         ))}
       </div>
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-gray-100 flex items-center justify-between">
+      <div className="px-4 py-2 border-t border-gray-100">
         <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
-        {expanded && (
-          <div className="flex gap-3">
-            {sides.filter(s => s.bookId).map(side => (
-              <button
-                key={side.key}
-                onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId); }}
-                className="text-xs text-[#1B6B7B] font-medium hover:underline"
-              >
-                Open {side.key === 'a' ? 'left' : 'right'} →
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
