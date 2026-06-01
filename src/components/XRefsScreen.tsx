@@ -86,32 +86,35 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
               const isExpanded = expandedIds.has(row.id);
               return (
                 <div key={row.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <button className="w-full text-left px-5 py-4"
-                    onClick={() => setExpandedIds(prev => { const n = new Set(prev); n.has(row.id) ? n.delete(row.id) : n.add(row.id); return n; })}>
-                    <div className="flex items-start gap-3">
-                      <span className="text-[#10B981] text-base shrink-0 mt-0.5">⬡</span>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <p className="text-xs italic text-gray-700 leading-relaxed line-clamp-2">"<Highlight text={row.snapshotA} q={searchQuery} />"</p>
-                        <div className="flex items-center gap-2"><div className="flex-1 h-px bg-gray-100" /><span className="text-xs text-gray-300">↔</span><div className="flex-1 h-px bg-gray-100" /></div>
-                        <p className="text-xs italic text-gray-700 leading-relaxed line-clamp-2">"<Highlight text={row.snapshotB} q={searchQuery} />"</p>
-                      </div>
-                      <span className={`text-gray-400 text-lg transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>›</span>
-                    </div>
-                    <p className="text-xs text-gray-300 mt-2 text-right">{formatDate(row.created_at)}</p>
-                  </button>
-                  {isExpanded && (
-                    <div className="border-t border-gray-50">
-                      {[{ snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA }, { snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB }].map((side, i) => (
-                        <div key={i} className={`px-5 py-3 ${i === 0 ? 'border-b border-gray-50' : ''}`}>
-                          <p className="text-xs italic text-gray-700 leading-relaxed mb-1">"<Highlight text={side.snapshot} q={searchQuery} />"</p>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs text-[#1B6B7B]"><Highlight text={side.citation} q={searchQuery} /></p>
-                            {side.bookId && <button onClick={() => onOpenBook(side.bookId, side.passageId)} className="text-xs text-gray-400 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>}
-                          </div>
+                  {/* Two quotes side by side */}
+                  <div className="grid grid-cols-2 divide-x divide-gray-100">
+                    {[
+                      { snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
+                      { snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
+                    ].map((side, i) => (
+                      <div key={i} className="px-4 py-4 flex flex-col gap-2">
+                        <p className={`text-xs italic leading-relaxed ${isExpanded ? '' : 'line-clamp-4'} text-gray-700`}>
+                          "<Highlight text={side.snapshot} q={searchQuery} />"
+                        </p>
+                        <div className="mt-auto flex items-center justify-between gap-1">
+                          <p className="text-xs text-[#1B6B7B] leading-tight"><Highlight text={side.citation} q={searchQuery} /></p>
+                          {side.bookId && (
+                            <button onClick={() => onOpenBook(side.bookId, side.passageId)} className="text-xs text-gray-300 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Footer: date + expand toggle */}
+                  <div className="px-4 py-2 border-t border-gray-50 flex items-center justify-between">
+                    <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
+                    <button
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                      onClick={() => setExpandedIds(prev => { const n = new Set(prev); n.has(row.id) ? n.delete(row.id) : n.add(row.id); return n; })}
+                    >
+                      {isExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                  </div>
                 </div>
               );
             })}
