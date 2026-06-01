@@ -202,7 +202,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               <div className="px-5 py-4 flex items-center justify-between">
                 <span className="text-xs text-gray-400">Privacy Policy</span>
                 <a
-                  href="https://immerse-web.vercel.app/privacy"
+                  href="/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-[#1B6B7B] hover:underline"

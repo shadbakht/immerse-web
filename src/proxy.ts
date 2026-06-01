@@ -25,7 +25,7 @@ export async function proxy(request: NextRequest) {
 
   // Redirect unauthenticated users to /login (except on auth pages)
   const { pathname, searchParams } = request.nextUrl;
-  const publicPaths = ['/login', '/auth', '/read'];
+  const publicPaths = ['/login', '/auth', '/read', '/privacy'];
   const isPublic = publicPaths.some(p => pathname.startsWith(p))
     || (pathname === '/' && searchParams.get('guest') === '1');
 
