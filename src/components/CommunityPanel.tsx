@@ -97,7 +97,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
         .range(0, PAGE_SIZE - 1);
       if (currentTab === 'trending') query = (query as any).order('published_at', { ascending: false });
       const { data } = await query;
-      setTags((data ?? []) as CommunityTag[]);
+      setTags((data ?? []) as unknown as CommunityTag[]);
     } finally {
       setLoading(false);
     }
