@@ -31,6 +31,8 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [expandedQuotes, setExpandedQuotes] = useState<Record<string, boolean>>({});
+  const toggleQuote = (id: string) => setExpandedQuotes(prev => ({ ...prev, [id]: !prev[id] }));
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -81,27 +83,33 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(note => {
-              const isExpanded = !!expandedIds[note.noteId];
+              const quoteExpanded = !!expandedQuotes[note.noteId];
               return (
                 <div key={note.noteId} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <button className="w-full text-left px-5 py-4"
-                    onClick={() => setExpandedIds(prev => ({ ...prev, [note.noteId]: !prev[note.noteId] }))}>
-                    <p className="text-xs text-gray-400 italic mb-2 leading-relaxed line-clamp-2">
-                      {note.snapshotText ? `"${note.snapshotText}"` : ''}
+                  <div className="px-5 py-4">
+                    {/* Citation */}
+                    <p className="text-xs text-[#1B6B7B] font-medium mb-2 truncate">
+                      <Highlight text={note.citation} q={searchQuery} />
                     </p>
-                    <p className="text-sm text-gray-800 leading-relaxed mb-3 line-clamp-2">
+                    {/* Expandable quote */}
+                    {note.snapshotText && (
+                      <div className="cursor-pointer mb-3" onClick={() => toggleQuote(note.noteId)}>
+                        <p className={`text-sm italic text-gray-500 leading-relaxed ${quoteExpanded ? '' : 'line-clamp-3'}`}>
+                          "<Highlight text={note.snapshotText} q={searchQuery} />"
+                        </p>
+                      </div>
+                    )}
+                    {/* Note content */}
+                    <p className="text-sm text-gray-800 leading-relaxed mb-2">
                       <Highlight text={note.content} q={searchQuery} />
                     </p>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-[#1B6B7B] truncate"><Highlight text={note.citation} q={searchQuery} /></p>
-                      <p className="text-xs text-gray-300 shrink-0">{formatDate(note.updatedAt)}</p>
+                      <p className="text-xs text-gray-300">{formatDate(note.updatedAt)}</p>
+                      {quoteExpanded && note.bookId && (
+                        <button onClick={() => onOpenBook(note.bookId, note.passageId)} className="text-xs text-[#1B6B7B] font-medium hover:underline">Open in reader →</button>
+                      )}
                     </div>
-                  </button>
-                  {isExpanded && note.bookId && (
-                    <div className="px-5 pb-4 border-t border-gray-50 pt-3">
-                      <button onClick={() => onOpenBook(note.bookId, note.passageId)} className="text-xs text-[#1B6B7B] font-medium hover:underline">Open in reader →</button>
-                    </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

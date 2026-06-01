@@ -23,6 +23,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [tags, setTags] = useState<TagRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [expandedQuotes, setExpandedQuotes] = useState<Record<string, boolean>>({});
+  const toggleQuote = (id: string) => setExpandedQuotes(prev => ({ ...prev, [id]: !prev[id] }));
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -100,15 +102,27 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                     <div className="border-t border-gray-50 divide-y divide-gray-50">
                       {tag.selections.length === 0
                         ? <p className="px-5 py-3 text-xs text-gray-400">No passages tagged.</p>
-                        : tag.selections.map(sel => (
-                          <div key={sel.id} className="px-5 py-3">
-                            <p className="text-xs italic text-gray-700 leading-relaxed mb-1 line-clamp-3">"<Highlight text={sel.snapshot_text} q={searchQuery} />"</p>
-                            <div className="flex items-center justify-between gap-2 mt-1">
-                              <p className="text-xs text-[#1B6B7B]"><Highlight text={sel.citation} q={searchQuery} /></p>
-                              {sel.book_id && <button onClick={() => onOpenBook(sel.book_id, sel.passage_id)} className="text-xs text-gray-400 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>}
+                        : tag.selections.map(sel => {
+                          const quoteExpanded = !!expandedQuotes[sel.id];
+                          return (
+                            <div key={sel.id} className="px-5 py-3">
+                              <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate"><Highlight text={sel.citation} q={searchQuery} /></p>
+                              <div
+                                className="cursor-pointer"
+                                onClick={() => toggleQuote(sel.id)}
+                              >
+                                <p className={`text-sm text-gray-700 leading-relaxed ${quoteExpanded ? '' : 'line-clamp-3'}`}>
+                                  "<Highlight text={sel.snapshot_text} q={searchQuery} />"
+                                </p>
+                              </div>
+                              {quoteExpanded && sel.book_id && (
+                                <button onClick={() => onOpenBook(sel.book_id, sel.passage_id)} className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline">
+                                  Open in reader →
+                                </button>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   )}
                 </div>

@@ -34,6 +34,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   const [rows, setRows] = useState<XRefRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [expandedQuotes, setExpandedQuotes] = useState<Record<string, boolean>>({});
+  const toggleQuote = (id: string) => setExpandedQuotes(prev => ({ ...prev, [id]: !prev[id] }));
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -83,37 +85,35 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(row => {
-              const isExpanded = !!expandedIds[row.id];
               return (
                 <div key={row.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                   {/* Two quotes side by side */}
                   <div className="grid grid-cols-2 divide-x divide-gray-100">
                     {[
-                      { snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
-                      { snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
-                    ].map((side, i) => (
-                      <div key={i} className="px-4 py-4 flex flex-col gap-2">
-                        <p className={`text-xs italic leading-relaxed ${isExpanded ? '' : 'line-clamp-4'} text-gray-700`}>
-                          "<Highlight text={side.snapshot} q={searchQuery} />"
-                        </p>
-                        <div className="mt-auto flex items-center justify-between gap-1">
-                          <p className="text-xs text-[#1B6B7B] leading-tight"><Highlight text={side.citation} q={searchQuery} /></p>
-                          {side.bookId && (
-                            <button onClick={() => onOpenBook(side.bookId, side.passageId)} className="text-xs text-gray-300 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>
+                      { key: `${row.id}-a`, snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
+                      { key: `${row.id}-b`, snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
+                    ].map(side => {
+                      const quoteExpanded = !!expandedQuotes[side.key];
+                      return (
+                        <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
+                          <p className="text-xs text-[#1B6B7B] font-medium truncate"><Highlight text={side.citation} q={searchQuery} /></p>
+                          <div className="cursor-pointer" onClick={() => toggleQuote(side.key)}>
+                            <p className={`text-sm italic text-gray-700 leading-relaxed ${quoteExpanded ? '' : 'line-clamp-4'}`}>
+                              "<Highlight text={side.snapshot} q={searchQuery} />"
+                            </p>
+                          </div>
+                          {quoteExpanded && side.bookId && (
+                            <button onClick={() => onOpenBook(side.bookId, side.passageId)} className="text-xs text-[#1B6B7B] font-medium hover:underline mt-1">
+                              Open in reader →
+                            </button>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  {/* Footer: date + expand toggle */}
-                  <div className="px-4 py-2 border-t border-gray-50 flex items-center justify-between">
+                  {/* Footer: date */}
+                  <div className="px-4 py-2 border-t border-gray-50">
                     <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
-                    <button
-                      className="text-xs text-gray-400 hover:text-gray-600"
-                      onClick={() => setExpandedIds(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
-                    >
-                      {isExpanded ? 'Show less' : 'Show more'}
-                    </button>
                   </div>
                 </div>
               );
