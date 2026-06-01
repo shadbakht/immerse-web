@@ -29,13 +29,54 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function XRefCard({ row, searchQuery, onOpenBook }: { row: XRefRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const sides = [
+    { key: 'a', snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
+    { key: 'b', snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
+  ];
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Two quotes side by side — click either side to expand */}
+      <div className="grid grid-cols-2 divide-x divide-gray-100 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        onClick={() => setExpanded(v => !v)}>
+        {sides.map(side => (
+          <div key={side.key} className="px-4 py-4">
+            <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
+              <Highlight text={side.citation} q={searchQuery} />
+            </p>
+            <p className={`text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+              "<Highlight text={side.snapshot} q={searchQuery} />"
+            </p>
+          </div>
+        ))}
+      </div>
+      {/* Footer */}
+      <div className="px-4 py-2 border-t border-gray-100 flex items-center justify-between">
+        <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
+        {expanded && (
+          <div className="flex gap-3">
+            {sides.filter(s => s.bookId).map(side => (
+              <button
+                key={side.key}
+                onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId); }}
+                className="text-xs text-[#1B6B7B] font-medium hover:underline"
+              >
+                Open {side.key === 'a' ? 'left' : 'right'} →
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   const supabase = createClient();
   const [rows, setRows] = useState<XRefRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
-  const [expandedQuotes, setExpandedQuotes] = useState<Record<string, boolean>>({});
-  const toggleQuote = (id: string) => setExpandedQuotes(prev => ({ ...prev, [id]: !prev[id] }));
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -65,7 +106,10 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter(r => r.snapshotA.toLowerCase().includes(q) || r.snapshotB.toLowerCase().includes(q) || r.citationA.toLowerCase().includes(q) || r.citationB.toLowerCase().includes(q));
+    return rows.filter(r =>
+      r.snapshotA.toLowerCase().includes(q) || r.snapshotB.toLowerCase().includes(q) ||
+      r.citationA.toLowerCase().includes(q) || r.citationB.toLowerCase().includes(q)
+    );
   }, [rows, searchQuery]);
 
   return (
@@ -84,40 +128,9 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           <p className="text-sm text-gray-400 text-center py-16">{searchQuery ? 'No cross-references match your search.' : 'No cross-references yet. Select passages in the reader to link them.'}</p>
         ) : (
           <div className="space-y-3">
-            {filtered.map(row => {
-              return (
-                <div key={row.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  {/* Two quotes side by side */}
-                  <div className="grid grid-cols-2 divide-x divide-gray-100">
-                    {[
-                      { key: `${row.id}-a`, snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
-                      { key: `${row.id}-b`, snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
-                    ].map(side => {
-                      const quoteExpanded = !!expandedQuotes[side.key];
-                      return (
-                        <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
-                          <p className="text-xs text-[#1B6B7B] font-medium truncate"><Highlight text={side.citation} q={searchQuery} /></p>
-                          <div className="cursor-pointer" onClick={() => toggleQuote(side.key)}>
-                            <p className={`text-sm italic text-gray-700 leading-relaxed ${quoteExpanded ? '' : 'line-clamp-4'}`}>
-                              "<Highlight text={side.snapshot} q={searchQuery} />"
-                            </p>
-                          </div>
-                          {quoteExpanded && side.bookId && (
-                            <button onClick={() => onOpenBook(side.bookId, side.passageId)} className="text-xs text-[#1B6B7B] font-medium hover:underline mt-1">
-                              Open in reader →
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Footer: date */}
-                  <div className="px-4 py-2 border-t border-gray-50">
-                    <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
-                  </div>
-                </div>
-              );
-            })}
+            {filtered.map(row => (
+              <XRefCard key={row.id} row={row} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+            ))}
           </div>
         )}
       </div>

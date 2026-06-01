@@ -18,13 +18,66 @@ function Highlight({ text, q }: { text: string; q: string }) {
   return <>{text.split(pat).map((p, i) => pat.test(p) ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark> : <span key={i}>{p}</span>)}</>;
 }
 
+function PassageRow({ sel, searchQuery, onOpenBook }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="px-5 py-3 border-t border-gray-100">
+      <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
+        <Highlight text={sel.citation} q={searchQuery} />
+      </p>
+      <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
+        <p className={`text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+          "<Highlight text={sel.snapshot_text} q={searchQuery} />"
+        </p>
+      </div>
+      {expanded && sel.book_id && (
+        <button
+          onClick={() => onOpenBook(sel.book_id, sel.passage_id)}
+          className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+        >
+          Open in reader →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TagCard({ tag, searchQuery, onOpenBook }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div
+        className="px-5 py-4 flex items-center gap-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <span className="text-[#3B82F6] text-lg inline-block scale-x-[-1] shrink-0">🏷</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            <Highlight text={tag.name} q={searchQuery} />
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {tag.selections.length} passage{tag.selections.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <span className={`text-gray-400 text-xl shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} style={{ display: 'inline-block' }}>›</span>
+      </div>
+      {expanded && (
+        <div>
+          {tag.selections.length === 0
+            ? <p className="px-5 py-3 text-xs text-gray-400 border-t border-gray-100">No passages tagged.</p>
+            : tag.selections.map(sel => (
+                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+              ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const supabase = createClient();
   const [tags, setTags] = useState<TagRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
-  const [expandedQuotes, setExpandedQuotes] = useState<Record<string, boolean>>({});
-  const toggleQuote = (id: string) => setExpandedQuotes(prev => ({ ...prev, [id]: !prev[id] }));
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -42,10 +95,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
       const tagIds = tagList.map((t: any) => t.id);
       const selIds = Object.keys(selMap);
       const { data: stData } = await supabase
-        .from('selection_tags')
-        .select('tag_id, selection_id')
-        .in('tag_id', tagIds)
-        .in('selection_id', selIds);
+        .from('selection_tags').select('tag_id, selection_id')
+        .in('tag_id', tagIds).in('selection_id', selIds);
 
       const selsByTag: Record<string, SelRow[]> = {};
       for (const st of (stData ?? []) as any[]) {
@@ -53,7 +104,6 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         if (!s) continue;
         (selsByTag[st.tag_id] ??= []).push({ id: st.selection_id, ...s });
       }
-
       setTags((tagList as any[]).map(t => ({ ...t, selections: selsByTag[t.id] ?? [] })));
     } finally {
       setLoading(false);
@@ -85,49 +135,9 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           <p className="text-sm text-gray-400 text-center py-16">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
         ) : (
           <div className="space-y-3">
-            {filtered.map(tag => {
-              const isExpanded = !!expandedIds[tag.id];
-              return (
-                <div key={tag.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <button className="w-full text-left px-5 py-4 flex items-center gap-3"
-                    onClick={() => setExpandedIds(prev => ({ ...prev, [tag.id]: !prev[tag.id] }))}>
-                    <span className="text-[#3B82F6] text-lg inline-block scale-x-[-1] shrink-0">🏷</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate"><Highlight text={tag.name} q={searchQuery} /></p>
-                      <p className="text-xs text-gray-400 mt-0.5">{tag.selections.length} passage{tag.selections.length !== 1 ? 's' : ''}</p>
-                    </div>
-                    <span className={`text-gray-400 text-lg transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>›</span>
-                  </button>
-                  {isExpanded && (
-                    <div className="border-t border-gray-50 divide-y divide-gray-50">
-                      {tag.selections.length === 0
-                        ? <p className="px-5 py-3 text-xs text-gray-400">No passages tagged.</p>
-                        : tag.selections.map(sel => {
-                          const quoteExpanded = !!expandedQuotes[sel.id];
-                          return (
-                            <div key={sel.id} className="px-5 py-3">
-                              <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate"><Highlight text={sel.citation} q={searchQuery} /></p>
-                              <div
-                                className="cursor-pointer"
-                                onClick={() => toggleQuote(sel.id)}
-                              >
-                                <p className={`text-sm text-gray-700 leading-relaxed ${quoteExpanded ? '' : 'line-clamp-3'}`}>
-                                  "<Highlight text={sel.snapshot_text} q={searchQuery} />"
-                                </p>
-                              </div>
-                              {quoteExpanded && sel.book_id && (
-                                <button onClick={() => onOpenBook(sel.book_id, sel.passage_id)} className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline">
-                                  Open in reader →
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {filtered.map(tag => (
+              <TagCard key={tag.id} tag={tag} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+            ))}
           </div>
         )}
       </div>
