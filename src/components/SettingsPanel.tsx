@@ -23,6 +23,11 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [fontSize, setFontSize] = useState<FontSize>('Large');
   const [colorMode, setColorMode] = useState<ColorMode>('light');
   const [isPro, setIsPro] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [nameSaving, setNameSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,13 +45,17 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   async function loadProfile() {
     const { data } = await supabase
       .from('profiles')
-      .select('font_size, color_mode, is_pro')
+      .select('font_size, color_mode, is_pro, full_name, username')
       .eq('id', user.id)
       .single();
     if (data) {
       setFontSize((data.font_size as FontSize) ?? 'Large');
       setColorMode((data.color_mode as ColorMode) ?? 'light');
       setIsPro(data.is_pro ?? false);
+      const name = data.full_name || user.user_metadata?.full_name || '';
+      setFullName(name);
+      setNameInput(name);
+      setUsername(data.username || '');
     }
     setLoading(false);
   }
@@ -56,12 +65,21 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     await supabase.from('profiles').update({ font_size: size }).eq('id', user.id);
   }
 
+  async function handleSaveName() {
+    const trimmed = nameInput.trim();
+    if (!trimmed || trimmed === fullName) { setEditingName(false); return; }
+    setNameSaving(true);
+    await supabase.from('profiles').update({ full_name: trimmed }).eq('id', user.id);
+    setFullName(trimmed);
+    setEditingName(false);
+    setNameSaving(false);
+  }
+
   async function handleColorModeChange(mode: ColorMode) {
     setColorMode(mode);
     await supabase.from('profiles').update({ color_mode: mode }).eq('id', user.id);
   }
 
-  const displayName = user.user_metadata?.full_name || user.email || '';
   const previewSize = FONT_OPTIONS.find(f => f.key === fontSize)?.size ?? 18;
 
   return (
@@ -81,9 +99,42 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               <div className="px-5 py-3 border-b border-gray-100">
                 <span className="text-xs font-bold tracking-widest uppercase text-gray-400">Account</span>
               </div>
+
+              {/* Full Name */}
+              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
+                <span className="text-xs text-gray-400 w-24 shrink-0">Full Name</span>
+                {editingName ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      autoFocus
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setNameInput(fullName); } }}
+                      className="flex-1 text-sm text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+                    />
+                    <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] font-semibold hover:underline disabled:opacity-50">
+                      {nameSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 flex-1 justify-end">
+                    <span className="text-sm text-gray-700">{fullName || '—'}</span>
+                    <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] hover:underline">Edit</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Username */}
+              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
+                <span className="text-xs text-gray-400 w-24 shrink-0">Username</span>
+                <span className="text-sm text-gray-700">@{username || '—'}</span>
+              </div>
+
+              {/* Plan */}
               <div className="px-5 py-4 flex items-center justify-between">
-                <span className="text-sm text-gray-700">{displayName}</span>
-                <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-400'}`}>
+                <span className="text-xs text-gray-400 w-24 shrink-0">Plan</span>
+                <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-500'}`}>
                   {isPro ? 'Pro' : 'Free'}
                 </span>
               </div>
