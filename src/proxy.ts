@@ -24,9 +24,10 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Redirect unauthenticated users to /login (except on auth pages)
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
   const publicPaths = ['/login', '/auth', '/read'];
-  const isPublic = publicPaths.some(p => pathname.startsWith(p));
+  const isPublic = publicPaths.some(p => pathname.startsWith(p))
+    || (pathname === '/' && searchParams.get('guest') === '1');
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
