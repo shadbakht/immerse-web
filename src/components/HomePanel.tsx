@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import SignInPrompt from './SignInPrompt';
 
 interface Stats {
   tags: number;
@@ -119,7 +120,19 @@ export default function HomePanel({ userId, onOpenBook }: HomePanelProps) {
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
               Recently Read
             </h2>
-            {recentBooks.length === 0 ? (
+            {!userId ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-8 text-center">
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  Sign in to see your recently read books, annotations, and more across all your devices.
+                </p>
+                <a
+                  href="/login"
+                  className="inline-block bg-[#1B6B7B] text-white font-semibold py-2.5 px-6 rounded-xl hover:bg-[#155a68] transition-colors text-sm"
+                >
+                  Sign In or Create Account
+                </a>
+              </div>
+            ) : recentBooks.length === 0 ? (
               <p className="text-sm text-gray-400">No reading history yet. Open a book from the Library to get started.</p>
             ) : (
               <div className="space-y-2">

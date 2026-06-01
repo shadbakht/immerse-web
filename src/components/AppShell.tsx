@@ -8,6 +8,7 @@ import ReaderPanel from './ReaderPanel';
 import HomePanel from './HomePanel';
 import SettingsPanel from './SettingsPanel';
 import NotesScreen from './NotesScreen';
+import SignInPrompt from './SignInPrompt';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
 
@@ -50,10 +51,13 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
         <div className="flex-1 overflow-hidden">
           {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBook} />}
           {activeTab === 'settings'  && user  && <SettingsPanel user={user} />}
-          {activeTab === 'settings'  && !user && <ComingSoon label="Sign in to access settings" />}
-          {activeTab === 'tags'      && <ComingSoon label="Tags" />}
-          {activeTab === 'notes'     && <NotesScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'xrefs'     && <ComingSoon label="Cross-References" />}
+          {activeTab === 'settings'  && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'tags'      && user  && <ComingSoon label="Tags" />}
+          {activeTab === 'tags'      && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBook} />}
+          {activeTab === 'notes'     && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'xrefs'     && user  && <ComingSoon label="Cross-References" />}
+          {activeTab === 'xrefs'     && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
           {activeTab === 'community' && <ComingSoon label="Community" />}
         </div>
       ) : (
