@@ -431,8 +431,7 @@ async function handleCopy() {
                     <PassageContent
                       text={passage.content}
                       onFootnoteClick={n => {
-                        const text = footnoteMap[n];
-                        if (text) setActiveFootnote({ num: n, text });
+                        setActiveFootnote({ num: n, text: footnoteMap[n] ?? '' });
                       }}
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                     />
@@ -454,7 +453,9 @@ async function handleCopy() {
                 <span className="text-xs font-bold text-[#1B6B7B] uppercase tracking-widest mb-2 block">
                   Footnote {activeFootnote.num}
                 </span>
-                <p className="text-sm text-gray-700 leading-relaxed">{activeFootnote.text}</p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {activeFootnote.text || <span className="text-gray-400 italic">Footnote text not available in the web version.</span>}
+                </p>
               </div>
               <button
                 onClick={() => setActiveFootnote(null)}
