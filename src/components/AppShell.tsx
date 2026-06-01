@@ -36,7 +36,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
     initialBookId ? { bookId: initialBookId } : null,
   );
-  const [libraryCollapsed, setLibraryCollapsed] = useState(!!initialBookId);
+  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
 
   // Library is the only split-panel tab; everything else is full-width
   const isFullWidth = activeTab !== 'library';
@@ -49,11 +49,15 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     syncFollowedUsers(userId).catch(e => console.warn('[AppShell] syncFollowed error:', e));
   }, [userId]);
 
-  function openBook(bookId: string, passageId?: string, highlightQuery?: string) {
+  function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false) {
     setReaderTarget({ bookId, passageId, highlightQuery });
     setActiveTab('library');
-    setLibraryCollapsed(true);
+    setLibraryCollapsed(collapseLibrary);
     history.replaceState(null, '', `/read/${bookId}`);
+  }
+
+  function openBookFromHome(bookId: string, passageId?: string, highlightQuery?: string) {
+    openBook(bookId, passageId, highlightQuery, true);
   }
 
   function handleTabChange(tab: NavTab) {
@@ -68,7 +72,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
 
       {isFullWidth ? (
         <div className="flex-1 overflow-hidden">
-          {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBook} onTabChange={tab => setActiveTab(tab as NavTab)} />}
+          {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBookFromHome} onTabChange={tab => setActiveTab(tab as NavTab)} />}
           {activeTab === 'settings'  && <SettingsPanel user={user} />}
           {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBook} />}
           {activeTab === 'tags'      && !user && <SignInPrompt message="Create and organize quote compilations from across the library." />}
@@ -92,7 +96,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
             </div>
           ) : (
             <div className="w-[368px] shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white">
-              <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} />
+              <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} onCollapse={() => setLibraryCollapsed(true)} />
             </div>
           )}
           <div className="flex-1 overflow-hidden">

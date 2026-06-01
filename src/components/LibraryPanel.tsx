@@ -40,9 +40,10 @@ interface LibraryPanelProps {
   activeTab:  NavTab;
   userId:     string;
   onOpenBook: (bookId: string, passageId?: string, highlightQuery?: string) => void;
+  onCollapse?: () => void;
 }
 
-export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryPanelProps) {
+export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
 
   const [traditions, setTraditions] = useState<Tradition[]>([]);
@@ -402,7 +403,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">Library</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">Library</h2>
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-base"
+              title="Collapse Library"
+            >
+              ‹
+            </button>
+          )}
+        </div>
         {/* Search input */}
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
