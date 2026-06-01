@@ -190,6 +190,28 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
             </section>
 
+            {/* About */}
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400">About</span>
+              </div>
+              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
+                <span className="text-xs text-gray-400">Version</span>
+                <span className="text-sm text-gray-500">1.0.0</span>
+              </div>
+              <div className="px-5 py-4 flex items-center justify-between">
+                <span className="text-xs text-gray-400">Privacy Policy</span>
+                <a
+                  href="https://immerse-web.vercel.app/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[#1B6B7B] hover:underline"
+                >
+                  View →
+                </a>
+              </div>
+            </section>
+
           </div>
         )}
       </div>
