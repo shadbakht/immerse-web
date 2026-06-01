@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
@@ -28,7 +29,10 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const justUpgraded = searchParams.get('upgraded') === '1';
 
   useEffect(() => {
     loadProfile();
@@ -75,6 +79,22 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     setNameSaving(false);
   }
 
+  async function handleUpgrade() {
+    setStripeLoading(true);
+    const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+    else setStripeLoading(false);
+  }
+
+  async function handleManageSubscription() {
+    setStripeLoading(true);
+    const res = await fetch('/api/stripe/portal', { method: 'POST' });
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+    else setStripeLoading(false);
+  }
+
   async function handleColorModeChange(mode: ColorMode) {
     setColorMode(mode);
     await supabase.from('profiles').update({ color_mode: mode }).eq('id', user.id);
@@ -86,6 +106,13 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     <div className="h-full overflow-y-auto">
       <div className="max-w-lg mx-auto px-8 py-10">
         <h1 className="text-2xl font-semibold text-gray-900 mb-8">Settings</h1>
+
+        {justUpgraded && (
+          <div className="mb-6 bg-green-50 border border-green-200 text-green-800 text-sm rounded-2xl px-5 py-4 flex items-center gap-3">
+            <span className="text-xl">🎉</span>
+            <p><span className="font-semibold">Welcome to Pro!</span> Your subscription is now active.</p>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-16">
@@ -134,9 +161,28 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               {/* Plan */}
               <div className="px-5 py-4 flex items-center justify-between">
                 <span className="text-xs text-gray-400 w-24 shrink-0">Plan</span>
-                <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-500'}`}>
-                  {isPro ? 'Pro' : 'Free'}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-500'}`}>
+                    {isPro ? 'Pro' : 'Free'}
+                  </span>
+                  {isPro ? (
+                    <button
+                      onClick={handleManageSubscription}
+                      disabled={stripeLoading}
+                      className="text-xs text-gray-400 hover:text-gray-600 hover:underline disabled:opacity-50"
+                    >
+                      {stripeLoading ? 'Loading…' : 'Manage'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleUpgrade}
+                      disabled={stripeLoading}
+                      className="text-xs font-semibold bg-[#1B6B7B] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] transition-colors disabled:opacity-50"
+                    >
+                      {stripeLoading ? 'Loading…' : 'Upgrade — $0.99/mo'}
+                    </button>
+                  )}
+                </div>
               </div>
             </section>
 
