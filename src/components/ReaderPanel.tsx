@@ -340,7 +340,7 @@ async function handleCopy() {
       {tocOpen && (
         <>
           <div className="absolute inset-0 z-10" onClick={() => setTocOpen(false)} />
-          <div className="absolute top-12 right-4 z-20 w-72 max-h-96 overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-200">
+          <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-200">
             <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
               Table of Contents
             </div>
