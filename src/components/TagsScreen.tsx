@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 interface TagRow {
   id: string;
   name: string;
-  visibility: string;
   created_at: string;
   selections: SelectionRow[];
 }
@@ -51,37 +50,36 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   async function load() {
     setLoading(true);
     try {
-      // Step 1: fetch tags
-      const { data: tagData, error: tagErr } = await supabase
+      // 1. User's tags
+      const { data: tagData } = await supabase
         .from('tags')
-        .select('id, name, visibility, created_at')
+        .select('id, name, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-      if (tagErr) { console.error('tags error', tagErr); return; }
-
       const tagList = tagData ?? [];
       if (tagList.length === 0) { setTags([]); return; }
-
-      // Step 2: fetch all selection_tags for these tags, with full selection+passage+book data
       const tagIds = tagList.map((t: any) => t.id);
-      const { data: stData, error: stErr } = await supabase
-        .from('selection_tags')
-        .select(`
-          tag_id,
-          selections(
-            id, snapshot_text, passage_id, book_id,
-            passages(chapter_label, section_title, paragraph_number,
-              books(id, title, authors(name))
-            )
-          )
-        `)
-        .in('tag_id', tagIds);
-      if (stErr) console.error('selection_tags error', stErr);
 
-      // Group selections by tag_id
+      // 2. User's selections with passage data (user_id filter ensures RLS works)
+      const { data: selData } = await supabase
+        .from('selections')
+        .select('id, snapshot_text, passage_id, book_id, passages(chapter_label, section_title, paragraph_number, books(id, title, authors(name)))')
+        .eq('user_id', userId);
+      const selMap: Record<string, any> = {};
+      for (const s of (selData ?? []) as any[]) selMap[s.id] = s;
+
+      // 3. selection_tags via selection_id (avoids RLS issues on junction table)
+      const selIds = Object.keys(selMap);
+      const { data: stData } = await supabase
+        .from('selection_tags')
+        .select('tag_id, selection_id')
+        .in('selection_id', selIds)
+        .in('tag_id', tagIds);
+
+      // 4. Group in JS
       const selsByTag: Record<string, SelectionRow[]> = {};
       for (const st of (stData ?? []) as any[]) {
-        const sel     = st.selections;
+        const sel     = selMap[st.selection_id];
         const passage = sel?.passages;
         const book    = passage?.books;
         if (!sel) continue;
@@ -145,22 +143,16 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                     </div>
                     <span className={`text-gray-400 text-lg transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>›</span>
                   </button>
-
                   {isExpanded && (
                     <div className="border-t border-gray-50 divide-y divide-gray-50">
                       {tag.selections.length === 0
                         ? <p className="px-5 py-3 text-xs text-gray-400">No passages tagged.</p>
                         : tag.selections.map(sel => (
                           <div key={sel.id} className="px-5 py-3">
-                            <p className="text-xs italic text-gray-700 leading-relaxed mb-1 line-clamp-3">
-                              "<Highlight text={sel.snapshot_text} q={searchQuery} />"
-                            </p>
+                            <p className="text-xs italic text-gray-700 leading-relaxed mb-1 line-clamp-3">"<Highlight text={sel.snapshot_text} q={searchQuery} />"</p>
                             <div className="flex items-center justify-between gap-2 mt-1">
                               <p className="text-xs text-[#1B6B7B]"><Highlight text={sel.citation} q={searchQuery} /></p>
-                              {sel.book_id && (
-                                <button onClick={() => onOpenBook(sel.book_id, sel.passage_id)}
-                                  className="text-xs text-gray-400 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>
-                              )}
+                              {sel.book_id && <button onClick={() => onOpenBook(sel.book_id, sel.passage_id)} className="text-xs text-gray-400 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>}
                             </div>
                           </div>
                         ))}

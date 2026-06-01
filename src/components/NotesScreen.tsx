@@ -32,26 +32,32 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   async function load() {
     setLoading(true);
     try {
-      const { data } = await supabase
+      // 1. Fetch notes (user_id filter satisfies RLS)
+      const { data: noteData } = await supabase
         .from('notes')
-        .select(`
-          id, content, updated_at,
-          selections(
-            snapshot_text, passage_id,
-            passages(
-              chapter_label, section_title, paragraph_number,
-              books(id, title, authors(name))
-            )
-          )
-        `)
+        .select('id, content, updated_at, selection_id')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
+      const noteList = noteData ?? [];
+      if (noteList.length === 0) { setNotes([]); return; }
 
-      setNotes((data ?? []).map((n: any) => {
-        const sel = n.selections;
+      // 2. Fetch related selections via user_id (avoids cross-table RLS issues)
+      const { data: selData } = await supabase
+        .from('selections')
+        .select('id, snapshot_text, passage_id, book_id, passages(chapter_label, section_title, paragraph_number, books(id, title, authors(name)))')
+        .eq('user_id', userId);
+      const selMap: Record<string, any> = {};
+      for (const s of (selData ?? []) as any[]) selMap[s.id] = s;
+
+      setNotes((noteList as any[]).map((n: any) => {
+        const sel     = selMap[n.selection_id];
         const passage = sel?.passages;
-        const book = passage?.books;
-        const parts = [book?.authors?.name, book?.title, passage?.chapter_label || passage?.section_title, passage?.paragraph_number ? `p.${passage.paragraph_number}` : null].filter(Boolean);
+        const book    = passage?.books;
+        const parts   = [
+          (book?.authors as any)?.name, book?.title,
+          passage?.chapter_label || passage?.section_title,
+          passage?.paragraph_number ? `p.${passage.paragraph_number}` : null,
+        ].filter(Boolean);
         return {
           noteId:       n.id,
           content:      n.content,
@@ -59,7 +65,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           snapshotText: sel?.snapshot_text ?? '',
           citation:     parts.join(', '),
           passageId:    sel?.passage_id ?? '',
-          bookId:       book?.id ?? '',
+          bookId:       book?.id ?? sel?.book_id ?? '',
         };
       }));
     } finally {

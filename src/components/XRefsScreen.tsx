@@ -6,14 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 interface XRefRow {
   id: string;
   created_at: string;
-  snapshotA: string;
-  citationA: string;
-  bookIdA: string;
-  passageIdA: string;
-  snapshotB: string;
-  citationB: string;
-  bookIdB: string;
-  passageIdB: string;
+  snapshotA: string; citationA: string; bookIdA: string; passageIdA: string;
+  snapshotB: string; citationB: string; bookIdB: string; passageIdB: string;
 }
 
 interface XRefsScreenProps {
@@ -57,30 +51,20 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   async function load() {
     setLoading(true);
     try {
-      // Step 1: fetch xrefs with just the selection IDs
-      const { data: xrefData, error: xrefErr } = await supabase
+      // 1. User's xrefs
+      const { data: xrefData } = await supabase
         .from('xrefs')
         .select('id, created_at, selection_a_id, selection_b_id')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-      if (xrefErr) { console.error('xrefs error', xrefErr); return; }
-
       const xrefList = xrefData ?? [];
       if (xrefList.length === 0) { setRows([]); return; }
 
-      // Step 2: fetch all involved selections in one query
-      const selIds = [...new Set(xrefList.flatMap((x: any) => [x.selection_a_id, x.selection_b_id]))];
-      const { data: selData, error: selErr } = await supabase
+      // 2. All involved selections — via user_id to ensure RLS works
+      const { data: selData } = await supabase
         .from('selections')
-        .select(`
-          id, snapshot_text, passage_id, book_id,
-          passages(chapter_label, section_title, paragraph_number,
-            books(id, title, authors(name))
-          )
-        `)
-        .in('id', selIds);
-      if (selErr) console.error('selections error', selErr);
-
+        .select('id, snapshot_text, passage_id, book_id, passages(chapter_label, section_title, paragraph_number, books(id, title, authors(name)))')
+        .eq('user_id', userId);
       const selMap: Record<string, any> = {};
       for (const s of (selData ?? []) as any[]) selMap[s.id] = s;
 
@@ -89,27 +73,20 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         const passage = sel?.passages;
         const book    = passage?.books;
         return {
-          snapshot: sel?.snapshot_text ?? '',
-          citation: buildCitation(passage, book),
-          bookId:   book?.id ?? sel?.book_id ?? '',
+          snapshot:  sel?.snapshot_text ?? '',
+          citation:  buildCitation(passage, book),
+          bookId:    book?.id ?? sel?.book_id ?? '',
           passageId: sel?.passage_id ?? '',
         };
       }
 
-      setRows(xrefList.map((x: any) => {
+      setRows((xrefList as any[]).map(x => {
         const a = hydrate(x.selection_a_id);
         const b = hydrate(x.selection_b_id);
         return {
-          id:         x.id,
-          created_at: x.created_at,
-          snapshotA:  a.snapshot,
-          citationA:  a.citation,
-          bookIdA:    a.bookId,
-          passageIdA: a.passageId,
-          snapshotB:  b.snapshot,
-          citationB:  b.citation,
-          bookIdB:    b.bookId,
-          passageIdB: b.passageId,
+          id: x.id, created_at: x.created_at,
+          snapshotA: a.snapshot, citationA: a.citation, bookIdA: a.bookId, passageIdA: a.passageId,
+          snapshotB: b.snapshot, citationB: b.citation, bookIdB: b.bookId, passageIdB: b.passageId,
         };
       }));
     } finally {
@@ -158,16 +135,13 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                       <span className="text-[#10B981] text-base shrink-0 mt-0.5">⬡</span>
                       <div className="flex-1 min-w-0 space-y-2">
                         <p className="text-xs italic text-gray-700 leading-relaxed line-clamp-2">"<Highlight text={row.snapshotA} q={searchQuery} />"</p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-px bg-gray-100" /><span className="text-xs text-gray-300">↔</span><div className="flex-1 h-px bg-gray-100" />
-                        </div>
+                        <div className="flex items-center gap-2"><div className="flex-1 h-px bg-gray-100" /><span className="text-xs text-gray-300">↔</span><div className="flex-1 h-px bg-gray-100" /></div>
                         <p className="text-xs italic text-gray-700 leading-relaxed line-clamp-2">"<Highlight text={row.snapshotB} q={searchQuery} />"</p>
                       </div>
                       <span className={`text-gray-400 text-lg transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>›</span>
                     </div>
                     <p className="text-xs text-gray-300 mt-2 text-right">{formatDate(row.created_at)}</p>
                   </button>
-
                   {isExpanded && (
                     <div className="border-t border-gray-50">
                       {[
@@ -178,10 +152,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                           <p className="text-xs italic text-gray-700 leading-relaxed mb-1">"<Highlight text={side.snapshot} q={searchQuery} />"</p>
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs text-[#1B6B7B]"><Highlight text={side.citation} q={searchQuery} /></p>
-                            {side.bookId && (
-                              <button onClick={() => onOpenBook(side.bookId, side.passageId)}
-                                className="text-xs text-gray-400 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>
-                            )}
+                            {side.bookId && <button onClick={() => onOpenBook(side.bookId, side.passageId)} className="text-xs text-gray-400 hover:text-[#1B6B7B] shrink-0 hover:underline">Open →</button>}
                           </div>
                         </div>
                       ))}
