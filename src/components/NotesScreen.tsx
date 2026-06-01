@@ -30,7 +30,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -81,11 +81,11 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(note => {
-              const isExpanded = expandedIds.has(note.noteId);
+              const isExpanded = !!expandedIds[note.noteId];
               return (
                 <div key={note.noteId} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                   <button className="w-full text-left px-5 py-4"
-                    onClick={() => setExpandedIds(prev => { const n = new Set(prev); n.has(note.noteId) ? n.delete(note.noteId) : n.add(note.noteId); return n; })}>
+                    onClick={() => setExpandedIds(prev => ({ ...prev, [note.noteId]: !prev[note.noteId] }))}>
                     <p className="text-xs text-gray-400 italic mb-2 leading-relaxed line-clamp-2">
                       {note.snapshotText ? `"${note.snapshotText}"` : ''}
                     </p>

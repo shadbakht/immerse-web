@@ -22,7 +22,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const supabase = createClient();
   const [tags, setTags] = useState<TagRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -84,11 +84,11 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(tag => {
-              const isExpanded = expandedIds.has(tag.id);
+              const isExpanded = !!expandedIds[tag.id];
               return (
                 <div key={tag.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                   <button className="w-full text-left px-5 py-4 flex items-center gap-3"
-                    onClick={() => setExpandedIds(prev => { const n = new Set(prev); n.has(tag.id) ? n.delete(tag.id) : n.add(tag.id); return n; })}>
+                    onClick={() => setExpandedIds(prev => ({ ...prev, [tag.id]: !prev[tag.id] }))}>
                     <span className="text-[#3B82F6] text-lg inline-block scale-x-[-1] shrink-0">🏷</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate"><Highlight text={tag.name} q={searchQuery} /></p>

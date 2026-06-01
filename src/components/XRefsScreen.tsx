@@ -33,7 +33,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   const supabase = createClient();
   const [rows, setRows] = useState<XRefRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -83,7 +83,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(row => {
-              const isExpanded = expandedIds.has(row.id);
+              const isExpanded = !!expandedIds[row.id];
               return (
                 <div key={row.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                   {/* Two quotes side by side */}
@@ -110,7 +110,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                     <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
                     <button
                       className="text-xs text-gray-400 hover:text-gray-600"
-                      onClick={() => setExpandedIds(prev => { const n = new Set(prev); n.has(row.id) ? n.delete(row.id) : n.add(row.id); return n; })}
+                      onClick={() => setExpandedIds(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
                     >
                       {isExpanded ? 'Show less' : 'Show more'}
                     </button>
