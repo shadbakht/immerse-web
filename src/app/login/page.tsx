@@ -11,7 +11,7 @@ function LoginPageInner() {
   const redirectTo = searchParams.get('redirect') ?? '/';
   const supabase = createClient();
 
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -22,9 +22,8 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Real-time username validation
   useEffect(() => {
-    if (mode !== 'signup') return;
+    if (!isSignUp) return;
     const raw = username.toLowerCase().trim();
     if (!raw) { setUsernameStatus(null); return; }
     if (!/^[a-z0-9_]{3,20}$/.test(raw)) { setUsernameStatus('invalid'); return; }
@@ -35,34 +34,33 @@ function LoginPageInner() {
       setUsernameStatus(data ? 'taken' : 'available');
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [username, mode]);
+  }, [username, isSignUp]);
 
-  function switchMode(next: 'signin' | 'signup') {
-    setMode(next);
+  function switchMode() {
+    setIsSignUp(v => !v);
     setError('');
     setSuccess('');
     setUsername('');
     setUsernameStatus(null);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     setError('');
-    setSuccess('');
+    if (!email || !password) { setError('Please enter email and password.'); return; }
 
-    if (mode === 'signup') {
+    if (isSignUp) {
       const raw = username.toLowerCase().trim();
       if (!raw || !/^[a-z0-9_]{3,20}$/.test(raw)) {
         setError('Username must be 3–20 characters: letters, numbers, underscores only.');
         return;
       }
-      if (usernameStatus === 'taken') { setError('Username is already taken.'); return; }
+      if (usernameStatus === 'taken')     { setError('Username is already taken.'); return; }
       if (usernameStatus !== 'available') { setError('Please wait for username validation.'); return; }
     }
 
     setLoading(true);
     try {
-      if (mode === 'signin') {
+      if (!isSignUp) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         router.push(redirectTo);
@@ -71,12 +69,7 @@ function LoginPageInner() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName || email,
-              username:  username.toLowerCase().trim(),
-            },
-          },
+          options: { data: { full_name: fullName || email, username: username.toLowerCase().trim() } },
         });
         if (error) throw error;
         setSuccess(`Check your email — we sent a confirmation link to ${email}`);
@@ -105,46 +98,40 @@ function LoginPageInner() {
             <div className="text-4xl">📬</div>
             <p className="text-white font-semibold text-lg">Check your email</p>
             <p className="text-gray-400 text-sm leading-relaxed">{success}</p>
-            <button
-              onClick={() => { setSuccess(''); setMode('signin'); }}
-              className="text-[#1B6B7B] text-sm hover:underline"
-            >
+            <button onClick={() => { setSuccess(''); setIsSignUp(false); }} className="text-[#1B6B7B] text-sm hover:underline">
               Back to Sign In
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === 'signup' && (
+          <div className="space-y-3">
+            {/* Sign-up only fields */}
+            {isSignUp && (
               <>
-                {/* Username */}
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Username"
                     value={username}
                     onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                    required
                     autoCapitalize="none"
                     autoCorrect="off"
                     className={`w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] ${
-                      usernameStatus === 'taken' ? 'ring-2 ring-red-500' :
+                      usernameStatus === 'taken'     ? 'ring-2 ring-red-500'   :
                       usernameStatus === 'available' ? 'ring-2 ring-green-500' : ''
                     }`}
                   />
                   {usernameStatus && (
                     <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
-                      usernameStatus === 'checking'  ? 'text-gray-400' :
                       usernameStatus === 'available' ? 'text-green-400' :
-                      usernameStatus === 'taken'     ? 'text-red-400' : 'text-red-400'
+                      usernameStatus === 'taken'     ? 'text-red-400'   :
+                      usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400'
                     }`}>
-                      {usernameStatus === 'checking'  ? '…' :
-                       usernameStatus === 'available' ? '✓ Available' :
-                       usernameStatus === 'taken'     ? '✗ Taken' : '3–20 chars'}
+                      {usernameStatus === 'checking'  ? '…'            :
+                       usernameStatus === 'available' ? '✓ Available'  :
+                       usernameStatus === 'taken'     ? '✗ Taken'      : '3–20 chars'}
                     </span>
                   )}
                 </div>
-
-                {/* Full Name */}
                 <input
                   type="text"
                   placeholder="Full Name"
@@ -160,41 +147,39 @@ function LoginPageInner() {
               placeholder="Email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              required
               className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
             />
             <input
               type="password"
-              placeholder="Password"
+              placeholder={isSignUp ? 'Create Password' : 'Password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              required
+              onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
               className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
             />
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
 
             <button
-              type="submit"
+              onClick={handleSubmit}
               disabled={loading}
               className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
             >
-              {loading ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+              {loading ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
             </button>
 
-            <div className="flex items-center gap-3 my-2">
+            <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/10" />
             </div>
 
             <button
-              type="button"
-              onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+              onClick={switchMode}
               className="w-full border border-[#1B6B7B] text-[#1B6B7B] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 transition"
             >
-              {mode === 'signin' ? 'Sign Up' : 'Sign In'}
+              {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>
 
-            <div className="flex items-center gap-3 my-2">
+            <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/10" />
               <span className="text-xs text-gray-600">or</span>
               <div className="flex-1 h-px bg-white/10" />
@@ -206,7 +191,7 @@ function LoginPageInner() {
             >
               Continue as Guest
             </a>
-          </form>
+          </div>
         )}
       </div>
     </div>
