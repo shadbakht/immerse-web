@@ -23,6 +23,7 @@ interface Book {
   title: string;
   authorName: string;
   authorId: string;
+  category: string | null;
 }
 
 interface SearchResult {
@@ -51,6 +52,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
   const [books, setBooks] = useState<Record<string, Book[]>>({});              // keyed by authorId (lazy titles)
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
   const [openAuthors, setOpenAuthors] = useState<Set<string>>(new Set());
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [loadingBooks, setLoadingBooks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,7 +99,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
     try {
       const { data } = await supabase
         .from('books')
-        .select('id, title, author_id')
+        .select('id, title, author_id, category')
         .eq('author_id', authorId)
         .eq('is_user_imported', false)
         .order('sort_order')
@@ -105,7 +107,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
       const authorName = authors.find(a => a.id === authorId)?.name ?? '';
       setBooks(prev => ({
         ...prev,
-        [authorId]: (data ?? []).map(b => ({ id: b.id, title: b.title, authorName, authorId: b.author_id })),
+        [authorId]: (data ?? []).map(b => ({ id: b.id, title: b.title, authorName, authorId: b.author_id, category: b.category ?? null })),
       }));
     } finally {
       setLoadingBooks(prev => { const next = new Set(prev); next.delete(authorId); return next; });
@@ -129,6 +131,15 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
         next.add(id);
         loadBooks(id);
       }
+      return next;
+    });
+  }
+
+  function toggleCategory(authorId: string, category: string) {
+    const key = `${authorId}||${category}`;
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   }
@@ -539,31 +550,68 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook }: LibraryP
                         </button>
                       </div>
 
-                      {/* Books */}
+                      {/* Books (grouped by category if present) */}
                       {isAuthorOpen && (
                         <div className="bg-white">
                           {loadingBooks.has(author.id) ? (
                             <div className="flex justify-center py-3">
                               <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
                             </div>
-                          ) : authorBooks.map(book => {
-                            const isBookChecked = selectedBookIds.has(book.id);
-                            return (
-                              <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                <Checkbox
-                                  state={isBookChecked ? 'checked' : 'unchecked'}
-                                  onChange={() => toggleSingleBook(book.id)}
-                                  className="pl-9 pr-1 py-3 shrink-0"
-                                />
-                                <button
-                                  onClick={() => onOpenBook(book.id)}
-                                  className="flex-1 text-left pr-4 py-3"
-                                >
-                                  <div className="text-sm text-gray-800">{book.title}</div>
-                                </button>
-                              </div>
-                            );
-                          })}
+                          ) : (() => {
+                            const hasCats = authorBooks.some(b => b.category);
+                            if (!hasCats) {
+                              return authorBooks.map(book => {
+                                const isBookChecked = selectedBookIds.has(book.id);
+                                return (
+                                  <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                    <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-9 pr-1 py-3 shrink-0" />
+                                    <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
+                                      <div className="text-sm text-gray-800">{book.title}</div>
+                                    </button>
+                                  </div>
+                                );
+                              });
+                            }
+                            // Group books by category, preserving order
+                            const groups: { category: string; books: Book[] }[] = [];
+                            for (const book of authorBooks) {
+                              const cat = book.category ?? '';
+                              const existing = groups.find(g => g.category === cat);
+                              if (existing) existing.books.push(book);
+                              else groups.push({ category: cat, books: [book] });
+                            }
+                            return groups.map(({ category, books: catBooks }) => {
+                              const catKey = `${author.id}||${category}`;
+                              const isCatOpen = openCategories.has(catKey);
+                              const catBookIds = catBooks.map(b => b.id);
+                              const catState = checkStateFor(catBookIds);
+                              return (
+                                <div key={category}>
+                                  <div className="flex items-center border-b border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition-colors">
+                                    <Checkbox state={catState} onChange={() => toggleBookIds(catBookIds)} className="pl-9 pr-1 py-3 shrink-0" />
+                                    <button onClick={() => toggleCategory(author.id, category)} className="flex-1 flex items-center justify-between pr-4 py-3 text-left">
+                                      <span className="text-sm text-gray-600">{category}</span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">{catBooks.length}</span>
+                                        <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isCatOpen ? 'rotate-90' : ''}`}>›</span>
+                                      </div>
+                                    </button>
+                                  </div>
+                                  {isCatOpen && catBooks.map(book => {
+                                    const isBookChecked = selectedBookIds.has(book.id);
+                                    return (
+                                      <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                        <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-12 pr-1 py-3 shrink-0" />
+                                        <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
+                                          <div className="text-sm text-gray-800">{book.title}</div>
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       )}
                     </div>

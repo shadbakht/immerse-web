@@ -66,12 +66,20 @@ function LoginPageInner() {
         router.push(redirectTo);
         router.refresh();
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName || email, username: username.toLowerCase().trim() } },
         });
         if (error) throw error;
+        // Create profiles row immediately so Settings screen shows the right info on first login
+        if (signUpData?.user?.id) {
+          supabase.from('profiles').insert({
+            id:         signUpData.user.id,
+            username:   username.toLowerCase().trim(),
+            full_name:  fullName || email,
+          }).then(() => {}); // best-effort; doesn't block the signup flow
+        }
         setSuccess(`Check your email — we sent a confirmation link to ${email}`);
       }
     } catch (err: any) {

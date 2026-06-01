@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { syncSubscribedTags, syncFollowedUsers } from '@/lib/communitySync';
 import type { User } from '@supabase/supabase-js';
 import Sidebar from './Sidebar';
 import LibraryPanel from './LibraryPanel';
@@ -35,39 +36,65 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
     initialBookId ? { bookId: initialBookId } : null,
   );
+  const [libraryCollapsed, setLibraryCollapsed] = useState(!!initialBookId);
 
   // Library is the only split-panel tab; everything else is full-width
   const isFullWidth = activeTab !== 'library';
   const userId = user?.id ?? '';
 
+  // Silently sync subscribed and followed community tags on every page load
+  useEffect(() => {
+    if (!userId) return;
+    syncSubscribedTags(userId).catch(e => console.warn('[AppShell] syncSubscribed error:', e));
+    syncFollowedUsers(userId).catch(e => console.warn('[AppShell] syncFollowed error:', e));
+  }, [userId]);
+
   function openBook(bookId: string, passageId?: string, highlightQuery?: string) {
     setReaderTarget({ bookId, passageId, highlightQuery });
     setActiveTab('library');
+    setLibraryCollapsed(true);
     history.replaceState(null, '', `/read/${bookId}`);
+  }
+
+  function handleTabChange(tab: NavTab) {
+    // Expanding the library panel when user explicitly clicks the Library tab
+    if (tab === 'library') setLibraryCollapsed(false);
+    setActiveTab(tab as NavTab);
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8F7F4]">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} user={user} />
+      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} user={user} />
 
       {isFullWidth ? (
         <div className="flex-1 overflow-hidden">
           {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBook} onTabChange={tab => setActiveTab(tab as NavTab)} />}
-          {activeTab === 'settings'  && user  && <SettingsPanel user={user} />}
-          {activeTab === 'settings'  && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'settings'  && <SettingsPanel user={user} />}
           {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'tags'      && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'tags'      && !user && <SignInPrompt message="Create and organize quote compilations from across the library." />}
           {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'notes'     && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'notes'     && !user && <SignInPrompt message="Attach personal notes to any passage you've highlighted." />}
           {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'xrefs'     && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
+          {activeTab === 'xrefs'     && !user && <SignInPrompt message="Link passages across different books and traditions." />}
           {activeTab === 'community' && <CommunityPanel user={user} />}
         </div>
       ) : (
         <>
-          <div className="w-[368px] shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white">
-            <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} />
-          </div>
+          {libraryCollapsed ? (
+            <div className="w-10 shrink-0 border-r border-gray-200 flex flex-col items-center bg-white">
+              <button
+                onClick={() => setLibraryCollapsed(false)}
+                className="mt-4 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-lg font-medium"
+                title="Expand Library"
+              >
+                ›
+              </button>
+            </div>
+          ) : (
+            <div className="w-[368px] shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white">
+              <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} />
+            </div>
+          )}
           <div className="flex-1 overflow-hidden">
             <ReaderPanel target={readerTarget} userId={userId} />
           </div>

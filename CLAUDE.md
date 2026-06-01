@@ -11,6 +11,34 @@ This is the **web version of Immerse** — a Next.js 16 (App Router) app that mi
 - **Deployment**: Vercel — auto-deploys on every push to `main` branch of `shadbakht/immerse-web`
 - **Live URL**: `https://immerse-two.vercel.app`
 
+## User Tiers
+
+Three tiers gate features. Use `profile.is_pro` and guest session state to enforce access.
+
+| # | Feature | Guest | Standard | Pro |
+|---|---------|-------|----------|-----|
+| 1 | Read & search entire library | ✓ | ✓ | ✓ |
+| 2 | Share quotes | ✓ | ✓ | ✓ |
+| 3 | Tags (create compilations) | — | ✓ | ✓ |
+| 4 | Notes (comments on quotes) | — | ✓ | ✓ |
+| 5 | X-refs (cross-referenced quotes) | — | ✓ | ✓ |
+| 6 | Quick tag from search results | — | ✓ | ✓ |
+| 7 | Recently Viewed / reading progress | — | ✓ | ✓ |
+| 8 | Sync across devices | — | ✓ | ✓ |
+| 9 | Share Tags (PDF, DOCX, IMM, CSV, MD) | — | ✓ | ✓ |
+| 10 | AI summary | — | — | ✓ |
+| 11 | Import (ePub, PDF, DOCX, TXT) | — | — | ✓ |
+| 12 | Community (view/share/import/subscribe) | — | — | ✓ |
+
+**Guest**: no login required. **Standard**: free, login required. **Pro**: $0.99/mo, login required.
+
+> Import caveat: DOCX with images/unusual formatting, non-text PDFs, and some other formats may not import or may import unreliably.
+
+**Gating pattern:**
+- Features 3–12: user must be logged in (not guest)
+- Features 10–12: `profile.is_pro === true`
+- Never show a Pro gate to a guest — show a sign-in prompt first
+
 ## Deployment Workflow
 
 Always commit and push — Vercel redeploys automatically:

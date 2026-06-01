@@ -15,11 +15,12 @@ const FONT_OPTIONS: { key: FontSize; size: number }[] = [
 ];
 
 interface SettingsPanelProps {
-  user: User;
+  user: User | null;
 }
 
 export default function SettingsPanel({ user }: SettingsPanelProps) {
   const supabase = createClient();
+  const isGuest = !user;
   const [fontSize, setFontSize] = useState<FontSize>('Large');
   const [colorMode, setColorMode] = useState<ColorMode>('light');
   const [isPro, setIsPro] = useState(false);
@@ -29,15 +30,22 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [nameInput, setNameInput] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isGuest);
   const [justUpgraded, setJustUpgraded] = useState(false);
 
   useEffect(() => {
-    loadProfile();
+    if (!isGuest) {
+      loadProfile();
+    } else if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('immerse_font_size') as FontSize | null;
+      if (saved) setFontSize(saved);
+      const savedColor = localStorage.getItem('immerse_color_mode');
+      if (savedColor) setColorMode(savedColor as ColorMode);
+    }
     if (typeof window !== 'undefined') {
       setJustUpgraded(new URLSearchParams(window.location.search).get('upgraded') === '1');
     }
-  }, [user.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -48,6 +56,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   }, [colorMode]);
 
   async function loadProfile() {
+    if (!user) return;
     const { data } = await supabase
       .from('profiles')
       .select('font_size, is_pro, full_name, username')
@@ -59,9 +68,13 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       const name = data.full_name || user.user_metadata?.full_name || '';
       setFullName(name);
       setNameInput(name);
-      setUsername(data.username || '');
+      setUsername(data.username || user.user_metadata?.username || '');
+    } else {
+      const name = user.user_metadata?.full_name || '';
+      setFullName(name);
+      setNameInput(name);
+      setUsername(user.user_metadata?.username || '');
     }
-    // color_mode is not in the DB — read from localStorage
     const saved = typeof window !== 'undefined' ? localStorage.getItem('immerse_color_mode') : null;
     if (saved) setColorMode(saved as ColorMode);
     setLoading(false);
@@ -69,10 +82,15 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
 
   async function handleFontChange(size: FontSize) {
     setFontSize(size);
-    await supabase.from('profiles').update({ font_size: size }).eq('id', user.id);
+    if (user) {
+      await supabase.from('profiles').update({ font_size: size }).eq('id', user.id);
+    } else {
+      if (typeof window !== 'undefined') localStorage.setItem('immerse_font_size', size);
+    }
   }
 
   async function handleSaveName() {
+    if (!user) return;
     const trimmed = nameInput.trim();
     if (!trimmed || trimmed === fullName) { setEditingName(false); return; }
     setNameSaving(true);
@@ -130,45 +148,49 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 <span className="text-xs font-bold tracking-widest uppercase text-gray-400">Account</span>
               </div>
 
-              {/* Full Name */}
-              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
-                <span className="text-xs text-gray-400 w-24 shrink-0">Full Name</span>
-                {editingName ? (
-                  <div className="flex items-center gap-2 flex-1">
-                    <input
-                      autoFocus
-                      value={nameInput}
-                      onChange={e => setNameInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setNameInput(fullName); } }}
-                      className="flex-1 text-sm text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
-                    />
-                    <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] font-semibold hover:underline disabled:opacity-50">
-                      {nameSaving ? 'Saving…' : 'Save'}
-                    </button>
-                    <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              {!isGuest && (
+                <>
+                  {/* Full Name */}
+                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
+                    <span className="text-xs text-gray-400 w-24 shrink-0">Full Name</span>
+                    {editingName ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          autoFocus
+                          value={nameInput}
+                          onChange={e => setNameInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setNameInput(fullName); } }}
+                          className="flex-1 text-sm text-gray-900 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+                        />
+                        <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] font-semibold hover:underline disabled:opacity-50">
+                          {nameSaving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 flex-1 justify-end">
+                        <span className="text-sm text-gray-700">{fullName || '—'}</span>
+                        <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] hover:underline">Edit</button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex items-center gap-3 flex-1 justify-end">
-                    <span className="text-sm text-gray-700">{fullName || '—'}</span>
-                    <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] hover:underline">Edit</button>
-                  </div>
-                )}
-              </div>
 
-              {/* Username */}
-              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
-                <span className="text-xs text-gray-400 w-24 shrink-0">Username</span>
-                <span className="text-sm text-gray-700">@{username || '—'}</span>
-              </div>
+                  {/* Username */}
+                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
+                    <span className="text-xs text-gray-400 w-24 shrink-0">Username</span>
+                    <span className="text-sm text-gray-700">@{username || '—'}</span>
+                  </div>
+                </>
+              )}
 
               {/* Plan */}
               <div className="px-5 py-4 flex items-center justify-between">
                 <span className="text-xs text-gray-400 w-24 shrink-0">Plan</span>
                 <div className="flex items-center gap-3">
                   <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-500'}`}>
-                    {isPro ? 'Pro' : 'Free'}
+                    {isGuest ? 'Guest' : isPro ? 'Pro' : 'Standard'}
                   </span>
-                  {isPro ? (
+                  {!isGuest && (isPro ? (
                     <button
                       onClick={handleManageSubscription}
                       disabled={stripeLoading}
@@ -184,6 +206,14 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     >
                       {stripeLoading ? 'Loading…' : 'Upgrade — $0.99/mo'}
                     </button>
+                  ))}
+                  {isGuest && (
+                    <a
+                      href="/login"
+                      className="text-xs font-semibold bg-[#1B6B7B] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] transition-colors"
+                    >
+                      Sign In or Create Account
+                    </a>
                   )}
                 </div>
               </div>

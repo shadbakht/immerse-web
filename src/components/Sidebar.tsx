@@ -62,29 +62,18 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
 
       {/* Footer */}
       <div className="px-5 pb-6 pt-3 border-t border-white/10 flex items-center justify-between">
-        {user ? (
-          <>
-            <button
-              onClick={handleSignOut}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors"
-            >
-              Sign Out
-            </button>
-            <button
-              onClick={() => onTabChange('settings')}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors"
-            >
-              Settings
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={() => router.push('/login')}
-            className="w-full bg-[#1B6B7B] hover:bg-[#155a68] transition-colors text-white font-semibold text-sm py-2.5 rounded-xl"
-          >
-            Sign In or Create Account
-          </button>
-        )}
+        <button
+          onClick={user ? handleSignOut : () => router.push('/login')}
+          className="text-xs text-white/40 hover:text-white/70 transition-colors"
+        >
+          {user ? 'Sign Out' : 'Sign In / Create Account'}
+        </button>
+        <button
+          onClick={() => onTabChange('settings')}
+          className="text-xs text-white/40 hover:text-white/70 transition-colors"
+        >
+          Settings
+        </button>
       </div>
     </div>
   );
