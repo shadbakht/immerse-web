@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
@@ -31,11 +30,13 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [nameSaving, setNameSaving] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const searchParams = useSearchParams();
-  const justUpgraded = searchParams.get('upgraded') === '1';
+  const [justUpgraded, setJustUpgraded] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    if (typeof window !== 'undefined') {
+      setJustUpgraded(new URLSearchParams(window.location.search).get('upgraded') === '1');
+    }
   }, [user.id]);
 
   useEffect(() => {
