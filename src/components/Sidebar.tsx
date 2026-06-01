@@ -65,16 +65,16 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
         {user ? (
           <>
             <button
-              onClick={() => onTabChange('settings')}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors"
-            >
-              Settings
-            </button>
-            <button
               onClick={handleSignOut}
               className="text-xs text-white/40 hover:text-white/70 transition-colors"
             >
               Sign Out
+            </button>
+            <button
+              onClick={() => onTabChange('settings')}
+              className="text-xs text-white/40 hover:text-white/70 transition-colors"
+            >
+              Settings
             </button>
           </>
         ) : (
