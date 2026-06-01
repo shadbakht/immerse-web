@@ -3,15 +3,25 @@
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
+import type { ReactNode } from 'react';
 import type { NavTab } from './AppShell';
+import {
+  HomeIcon,
+  LibraryIcon,
+  TagIcon,
+  NoteIcon,
+  XRefIcon,
+  CommunityIcon,
+  SettingsIcon,
+} from './Icons';
 
-const NAV_ITEMS: { tab: NavTab; label: string; icon: string; mirror?: boolean }[] = [
-  { tab: 'home',      label: 'Home',       icon: '🏠' },
-  { tab: 'library',   label: 'Library',    icon: '📚' },
-  { tab: 'tags',      label: 'Tags',        icon: '🏷️', mirror: true },
-  { tab: 'notes',     label: 'Notes',       icon: '📝' },
-  { tab: 'xrefs',     label: 'X-Refs',      icon: '🔗' },
-  { tab: 'community', label: 'Community',   icon: '🌐' },
+const NAV_ITEMS: { tab: NavTab; label: string; icon: ReactNode }[] = [
+  { tab: 'home',      label: 'Home',      icon: <HomeIcon      size={20} /> },
+  { tab: 'library',   label: 'Library',   icon: <LibraryIcon   size={20} /> },
+  { tab: 'tags',      label: 'Tags',      icon: <TagIcon       size={18} /> },
+  { tab: 'notes',     label: 'Notes',     icon: <NoteIcon      size={18} /> },
+  { tab: 'xrefs',     label: 'X-Refs',    icon: <XRefIcon      size={18} /> },
+  { tab: 'community', label: 'Community', icon: <CommunityIcon size={20} /> },
 ];
 
 interface SidebarProps {
@@ -44,7 +54,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
 
       {/* Nav items */}
       <nav className="flex-1 py-3">
-        {NAV_ITEMS.map(({ tab, label, icon, mirror }) => (
+        {NAV_ITEMS.map(({ tab, label, icon }) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
@@ -54,7 +64,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <span className={`text-base inline-block${mirror ? ' scale-x-[-1]' : ''}`}>{icon}</span>
+            <span className="w-5 flex items-center justify-center shrink-0">{icon}</span>
             {label}
           </button>
         ))}
@@ -70,8 +80,9 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
         </button>
         <button
           onClick={() => onTabChange('settings')}
-          className="text-xs text-white/40 hover:text-white/70 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
         >
+          <SettingsIcon size={14} color="currentColor" />
           Settings
         </button>
       </div>
