@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, Suspense } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -12,37 +12,80 @@ function LoginPageInner() {
   const supabase = createClient();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const pendingModeRef = useRef<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<null | 'checking' | 'available' | 'taken' | 'invalid'>(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Real-time username validation
+  useEffect(() => {
+    if (mode !== 'signup') return;
+    const raw = username.toLowerCase().trim();
+    if (!raw) { setUsernameStatus(null); return; }
+    if (!/^[a-z0-9_]{3,20}$/.test(raw)) { setUsernameStatus('invalid'); return; }
+    setUsernameStatus('checking');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const { data } = await supabase.from('profiles').select('id').eq('username', raw).maybeSingle();
+      setUsernameStatus(data ? 'taken' : 'available');
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [username, mode]);
+
+  function switchMode(next: 'signin' | 'signup') {
+    setMode(next);
+    setError('');
+    setSuccess('');
+    setUsername('');
+    setUsernameStatus(null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setSuccess('');
+
+    if (mode === 'signup') {
+      const raw = username.toLowerCase().trim();
+      if (!raw || !/^[a-z0-9_]{3,20}$/.test(raw)) {
+        setError('Username must be 3–20 characters: letters, numbers, underscores only.');
+        return;
+      }
+      if (usernameStatus === 'taken') { setError('Username is already taken.'); return; }
+      if (usernameStatus !== 'available') { setError('Please wait for username validation.'); return; }
+    }
+
     setLoading(true);
     try {
-      if (pendingModeRef.current === 'signin') {
+      if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        router.push(redirectTo);
+        router.refresh();
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName || email,
+              username:  username.toLowerCase().trim(),
+            },
+          },
+        });
         if (error) throw error;
+        setSuccess(`Check your email — we sent a confirmation link to ${email}`);
       }
-      router.push(redirectTo);
-      router.refresh();
     } catch (err: any) {
       setError(err.message ?? 'Something went wrong.');
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleGuest() {
-    // Append ?guest=1 so the destination page knows to show guest view
-    const sep = redirectTo.includes('?') ? '&' : '?';
-    router.push(`${redirectTo}${sep}guest=1`);
   }
 
   return (
@@ -57,57 +100,114 @@ function LoginPageInner() {
           <p className="text-sm text-gray-400 mt-2">Sacred texts from all traditions</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
-          />
+        {success ? (
+          <div className="text-center space-y-4">
+            <div className="text-4xl">📬</div>
+            <p className="text-white font-semibold text-lg">Check your email</p>
+            <p className="text-gray-400 text-sm leading-relaxed">{success}</p>
+            <button
+              onClick={() => { setSuccess(''); setMode('signin'); }}
+              className="text-[#1B6B7B] text-sm hover:underline"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {mode === 'signup' && (
+              <>
+                {/* Username */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    className={`w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] ${
+                      usernameStatus === 'taken' ? 'ring-2 ring-red-500' :
+                      usernameStatus === 'available' ? 'ring-2 ring-green-500' : ''
+                    }`}
+                  />
+                  {usernameStatus && (
+                    <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
+                      usernameStatus === 'checking'  ? 'text-gray-400' :
+                      usernameStatus === 'available' ? 'text-green-400' :
+                      usernameStatus === 'taken'     ? 'text-red-400' : 'text-red-400'
+                    }`}>
+                      {usernameStatus === 'checking'  ? '…' :
+                       usernameStatus === 'available' ? '✓ Available' :
+                       usernameStatus === 'taken'     ? '✗ Taken' : '3–20 chars'}
+                    </span>
+                  )}
+                </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+                {/* Full Name */}
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+                />
+              </>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            onClick={() => { pendingModeRef.current = 'signin'; }}
-            className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
-          >
-            {loading && pendingModeRef.current === 'signin' ? 'Please wait…' : 'Sign In'}
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            onClick={() => { pendingModeRef.current = 'signup'; }}
-            className="w-full border border-[#1B6B7B] text-[#1B6B7B] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 transition disabled:opacity-50"
-          >
-            {loading && pendingModeRef.current === 'signup' ? 'Please wait…' : 'Sign Up'}
-          </button>
-        </form>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+            />
 
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-xs text-gray-600">or</span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
+            {error && <p className="text-red-400 text-sm">{error}</p>}
 
-        <button
-          onClick={handleGuest}
-          className="w-full border border-white/15 text-white/70 font-medium py-3.5 rounded-xl hover:bg-white/5 hover:text-white transition"
-        >
-          Continue as Guest
-        </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
+            >
+              {loading ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+            </button>
 
+            <div className="flex items-center gap-3 my-2">
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+              className="w-full border border-[#1B6B7B] text-[#1B6B7B] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 transition"
+            >
+              {mode === 'signin' ? 'Sign Up' : 'Sign In'}
+            </button>
+
+            <div className="flex items-center gap-3 my-2">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-xs text-gray-600">or</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            <a
+              href="/?guest=1"
+              className="block w-full text-center border border-white/15 text-white/70 font-medium py-3.5 rounded-xl hover:bg-white/5 hover:text-white transition"
+            >
+              Continue as Guest
+            </a>
+          </form>
+        )}
       </div>
     </div>
   );
