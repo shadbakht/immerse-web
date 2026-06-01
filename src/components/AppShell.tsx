@@ -9,6 +9,7 @@ import HomePanel from './HomePanel';
 import SettingsPanel from './SettingsPanel';
 import NotesScreen from './NotesScreen';
 import SignInPrompt from './SignInPrompt';
+import CommunityPanel from './CommunityPanel';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
 
@@ -58,7 +59,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
           {activeTab === 'notes'     && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
           {activeTab === 'xrefs'     && user  && <ComingSoon label="Cross-References" />}
           {activeTab === 'xrefs'     && !user && <SignInPrompt message="Sign in to tag, annotate, and save passages across all your devices." />}
-          {activeTab === 'community' && <ComingSoon label="Community" />}
+          {activeTab === 'community' && <CommunityPanel user={user} />}
         </div>
       ) : (
         <>
