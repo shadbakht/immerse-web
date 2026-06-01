@@ -49,18 +49,20 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   async function loadProfile() {
     const { data } = await supabase
       .from('profiles')
-      .select('font_size, color_mode, is_pro, full_name, username')
+      .select('font_size, is_pro, full_name, username')
       .eq('id', user.id)
       .single();
     if (data) {
       setFontSize((data.font_size as FontSize) ?? 'Large');
-      setColorMode((data.color_mode as ColorMode) ?? 'light');
       setIsPro(data.is_pro ?? false);
       const name = data.full_name || user.user_metadata?.full_name || '';
       setFullName(name);
       setNameInput(name);
       setUsername(data.username || '');
     }
+    // color_mode is not in the DB — read from localStorage
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('immerse_color_mode') : null;
+    if (saved) setColorMode(saved as ColorMode);
     setLoading(false);
   }
 
@@ -95,9 +97,9 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     else setStripeLoading(false);
   }
 
-  async function handleColorModeChange(mode: ColorMode) {
+  function handleColorModeChange(mode: ColorMode) {
     setColorMode(mode);
-    await supabase.from('profiles').update({ color_mode: mode }).eq('id', user.id);
+    localStorage.setItem('immerse_color_mode', mode);
   }
 
   const previewSize = FONT_OPTIONS.find(f => f.key === fontSize)?.size ?? 18;
