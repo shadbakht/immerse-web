@@ -18,11 +18,12 @@ interface RecentBook {
 }
 
 interface HomePanelProps {
-  userId:     string;
-  onOpenBook: (bookId: string) => void;
+  userId:      string;
+  onOpenBook:  (bookId: string) => void;
+  onTabChange: (tab: string) => void;
 }
 
-export default function HomePanel({ userId, onOpenBook }: HomePanelProps) {
+export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanelProps) {
   const supabase = createClient();
   const [stats, setStats] = useState<Stats>({ tags: 0, notes: 0, xrefs: 0 });
   const [recentBooks, setRecentBooks] = useState<RecentBook[]>([]);
@@ -88,9 +89,9 @@ export default function HomePanel({ userId, onOpenBook }: HomePanelProps) {
   }
 
   const statItems = [
-    { label: 'Tags',   count: stats.tags,  color: '#3B82F6' },
-    { label: 'Notes',  count: stats.notes, color: '#F59E0B' },
-    { label: 'X-Refs', count: stats.xrefs, color: '#10B981' },
+    { label: 'Tags',   count: stats.tags,  color: '#3B82F6', tab: 'tags'  },
+    { label: 'Notes',  count: stats.notes, color: '#F59E0B', tab: 'notes' },
+    { label: 'X-Refs', count: stats.xrefs, color: '#10B981', tab: 'xrefs' },
   ];
 
   return (
@@ -106,13 +107,17 @@ export default function HomePanel({ userId, onOpenBook }: HomePanelProps) {
           <>
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 mb-10">
-              {statItems.map(({ label, count, color }) => (
-                <div key={label} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              {statItems.map(({ label, count, color, tab }) => (
+                <button
+                  key={label}
+                  onClick={() => onTabChange(tab)}
+                  className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-left hover:border-[#1B6B7B]/30 hover:shadow-md transition-all"
+                >
                   <div className="text-5xl font-light text-gray-900 mb-1">{count}</div>
                   <div className="text-xs font-bold tracking-widest uppercase" style={{ color }}>
                     {label}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
