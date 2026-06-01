@@ -80,9 +80,9 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
         ) : (
           <button
             onClick={() => router.push('/login')}
-            className="text-xs text-[#1B6B7B] hover:text-[#2a8fa3] transition-colors font-medium"
+            className="w-full bg-[#1B6B7B] hover:bg-[#155a68] transition-colors text-white font-semibold text-sm py-2.5 rounded-xl"
           >
-            Sign In
+            Sign In or Create Account
           </button>
         )}
       </div>
