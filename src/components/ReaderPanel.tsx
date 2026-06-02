@@ -119,15 +119,30 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   async function createSelection(): Promise<string> {
     const bar = pendingSelectionRef.current ?? selectionBar;
     if (!bar || !target) throw new Error('No selection');
+    const now = new Date().toISOString();
+
+    // Resolve mobile-compatible passage data-pid and book slug via mapping tables
+    const [{ data: pidRow }, { data: bookRow }] = await Promise.all([
+      supabase.from('passage_pid_map').select('pid').eq('passage_id', bar.startPassageId).maybeSingle(),
+      supabase.from('book_slug_map').select('local_id').eq('book_id', target.bookId ?? '').maybeSingle(),
+    ]);
+    const mobilePid    = pidRow?.pid    ?? null;   // data-pid hex string, or null if unmapped
+    const bookLocalId  = bookRow?.local_id ?? null; // corpus slug, or null if unmapped
+
     const { data, error } = await supabase
       .from('selections')
       .insert({
-        user_id:       userId,
-        passage_id:    bar.startPassageId,
-        start_offset:  bar.startOffset,
-        end_offset:    bar.endOffset,
-        snapshot_text: bar.text,
-        created_at:    new Date().toISOString(),
+        user_id:               userId,
+        passage_id:            bar.startPassageId,
+        start_pid:             mobilePid,
+        end_pid:               mobilePid,
+        book_local_id:         bookLocalId,
+        anchor_schema_version: 1,
+        start_offset:          bar.startOffset,
+        end_offset:            bar.endOffset,
+        snapshot_text:         bar.text,
+        created_at:            now,
+        updated_at:            now,
       })
       .select('id')
       .single();
