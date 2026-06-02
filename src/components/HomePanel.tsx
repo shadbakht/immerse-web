@@ -15,6 +15,7 @@ interface RecentBook {
   title: string;
   authorName: string;
   updatedAt: string;
+  fraction: number;
 }
 
 interface HomePanelProps {
@@ -47,7 +48,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
         supabase.from('xrefs').select('id', { count: 'exact', head: true }).eq('user_id', userId),
         supabase
           .from('reading_progress')
-          .select('book_id, updated_at')
+          .select('book_id, updated_at, fraction')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(8),
@@ -71,6 +72,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
               title:      bookMap[p.book_id].title,
               authorName: (bookMap[p.book_id].authors as any)?.name ?? '',
               updatedAt:  p.updated_at,
+              fraction:   p.fraction ?? 0,
             })),
         );
       }
@@ -141,23 +143,36 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
               <p className="text-sm text-gray-400">No reading history yet. Open a book from the Library to get started.</p>
             ) : (
               <div className="space-y-2">
-                {recentBooks.map(book => (
-                  <button
-                    key={book.bookId}
-                    onClick={() => onOpenBook(book.bookId)}
-                    className="w-full text-left bg-white rounded-xl px-5 py-4 shadow-sm border border-gray-100 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{book.title}</div>
-                        {book.authorName && (
-                          <div className="text-xs text-gray-400 mt-0.5">{book.authorName}</div>
-                        )}
+                {recentBooks.map(book => {
+                  const pct = Math.min(100, Math.max(0, Math.round(book.fraction * 100)));
+                  return (
+                    <button
+                      key={book.bookId}
+                      onClick={() => onOpenBook(book.bookId)}
+                      className="w-full text-left bg-white rounded-xl px-5 py-4 shadow-sm border border-gray-100 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{book.title}</div>
+                          {book.authorName && (
+                            <div className="text-xs text-gray-400 mt-0.5">{book.authorName}</div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <div className="text-xs font-medium text-[#1B6B7B]">{pct}%</div>
+                          <div className="text-xs text-gray-300 mt-0.5">{formatDate(book.updatedAt)}</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-300 shrink-0 ml-4">{formatDate(book.updatedAt)}</div>
-                    </div>
-                  </button>
-                ))}
+                      {/* Progress bar */}
+                      <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#1B6B7B] rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </>
