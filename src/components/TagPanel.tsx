@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { pushTag, pushSelectionTag } from '@/lib/annotationSync';
 import PanelSheet from './PanelSheet';
 
 interface Tag {
@@ -59,12 +60,20 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
           depth:      parent ? parent.depth + 1 : 0,
           sort_order: 0,
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select('id, name, parent_id, depth, sort_order')
         .single();
       if (data) {
         setTags(prev => [...prev, data]);
         setChecked(prev => new Set(prev).add(data.id));
+        // Push to sync service
+        await pushTag({
+          id: data.id,
+          user_id: userId,
+          name: data.name,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
       }
       setNewTagName('');
       setNewTagParentId(null);
@@ -76,6 +85,15 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
   async function handleSave() {
     setSaving(true);
     try {
+      // Push each selection_tag to sync service
+      for (const tagId of checked) {
+        await pushSelectionTag({
+          tag_id: tagId,
+          selection_id: '', // Will be set by onSave callback
+          user_id: userId,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
       await onSave([...checked]);
       onClose();
     } finally {

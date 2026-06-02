@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { pushNote, pushXref } from '@/lib/annotationSync';
 import type { ReaderTarget } from './AppShell';
 import PanelSheet from './PanelSheet';
 import TagPanel from './TagPanel';
@@ -289,19 +290,66 @@ async function handleCopy() {
     const bar = pendingSelectionRef.current ?? selectionBar;
     const selId = await createSelection();
     const now = new Date().toISOString();
-    await supabase.from('notes').insert({ user_id: userId, selection_id: selId, content, created_at: now, updated_at: now });
+    // Insert note
+    const { data: noteData } = await supabase.from('notes').insert({ user_id: userId, selection_id: selId, content, created_at: now, updated_at: now }).select('id').single();
+    // Push to sync service
+    if (noteData) {
+      await pushNote({
+        id: noteData.id,
+        user_id: userId,
+        selection_id: selId,
+        content,
+        updated_at: now,
+      }).catch(() => {});
+    }
     if (bar) setNotedPassageIds(prev => new Set(prev).add(bar.startPassageId));
   }
 
   async function handleXrefSave(targetPassageId: string, targetSnapshotText: string) {
     const selIdA = await createSelection();
-    // Create selection B for the target passage
+    const now = new Date().toISOString();
+
+    // Resolve mobile-compatible anchor for the target passage (parallel fetches)
+    const [{ data: targetPidRow }, { data: targetPassageData }] = await Promise.all([
+      supabase.from('passage_pid_map').select('pid').eq('passage_id', targetPassageId).maybeSingle(),
+      supabase.from('passages').select('book_id').eq('id', targetPassageId).maybeSingle(),
+    ]);
+    const targetMobilePid = targetPidRow?.pid ?? null;
+    const { data: targetBookRow } = targetPassageData?.book_id
+      ? await supabase.from('book_slug_map').select('local_id').eq('book_id', targetPassageData.book_id).maybeSingle()
+      : { data: null };
+    const targetBookLocalId = targetBookRow?.local_id ?? null;
+
+    // Create selection B for the target passage (with full mobile-compatible anchor)
     const { data: selB } = await supabase
       .from('selections')
-      .insert({ user_id: userId, passage_id: targetPassageId, start_offset: 0, end_offset: targetSnapshotText.length, snapshot_text: targetSnapshotText, created_at: new Date().toISOString() })
+      .insert({
+        user_id:               userId,
+        passage_id:            targetPassageId,
+        start_pid:             targetMobilePid,
+        end_pid:               targetMobilePid,
+        book_local_id:         targetBookLocalId,
+        anchor_schema_version: 1,
+        start_offset:          0,
+        end_offset:            targetSnapshotText.length,
+        snapshot_text:         targetSnapshotText,
+        created_at:            now,
+        updated_at:            now,
+      })
       .select('id').single();
     if (!selB) throw new Error('Could not create target selection');
-    await supabase.from('xrefs').insert({ user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, created_at: new Date().toISOString() });
+    // Create xref
+    const { data: xrefData } = await supabase.from('xrefs').insert({ user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, created_at: now, updated_at: now }).select('id').single();
+    // Push xref to sync service
+    if (xrefData) {
+      await pushXref({
+        id: xrefData.id,
+        user_id: userId,
+        selection_a_id: selIdA,
+        selection_b_id: selB.id,
+        updated_at: now,
+      }).catch(() => {});
+    }
   }
 
   function scrollToPassage(passageId: string) {

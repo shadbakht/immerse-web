@@ -3,8 +3,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
+import { pushTag, deleteRemote } from '@/lib/annotationSync';
+import { ContextMenu, type MenuOption } from './ContextMenu';
 
-interface TagRow { id: string; name: string; created_at: string; selections: SelRow[]; }
+interface TagRow { id: string; name: string; created_at: string; is_public: boolean; selections: SelRow[]; }
 interface SelRow  { id: string; snapshot_text: string; passage_id: string; book_id: string; citation: string; }
 
 interface TagsScreenProps {
@@ -42,10 +44,60 @@ function PassageRow({ sel, searchQuery, onOpenBook }: { sel: SelRow; searchQuery
   );
 }
 
-function TagCard({ tag, searchQuery, onOpenBook }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void; onToggleVisibility: (id: string, isPublic: boolean) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState(tag.name);
+
+  const menuOptions: MenuOption[] = [
+    {
+      label: 'Rename',
+      icon: '✏️',
+      onClick: () => setRenaming(true),
+    },
+    {
+      label: tag.is_public ? 'Set Private' : 'Set Public',
+      icon: tag.is_public ? '🔓' : '🔒',
+      onClick: () => onToggleVisibility(tag.id, !tag.is_public),
+    },
+    {
+      label: 'Delete',
+      icon: '🗑️',
+      color: 'danger',
+      onClick: () => {
+        if (confirm(`Delete tag "${tag.name}"?`)) onDelete(tag.id);
+      },
+    },
+  ];
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {renaming && (
+        <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center" onClick={() => setRenaming(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Rename Tag</h2>
+            <input
+              autoFocus
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  onRename(tag.id, newName);
+                  setRenaming(false);
+                } else if (e.key === 'Escape') {
+                  setRenaming(false);
+                  setNewName(tag.name);
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setRenaming(false); setNewName(tag.name); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={() => { onRename(tag.id, newName); setRenaming(false); }} className="px-4 py-2 text-sm bg-[#1B6B7B] text-white rounded-lg hover:bg-[#1B6B7B]/90">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         className="px-5 py-4 flex items-center gap-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(v => !v)}
@@ -60,6 +112,9 @@ function TagCard({ tag, searchQuery, onOpenBook }: { tag: TagRow; searchQuery: s
           </p>
         </div>
         <span className={`text-gray-400 text-xl shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} style={{ display: 'inline-block' }}>›</span>
+        <div onClick={e => e.stopPropagation()}>
+          <ContextMenu options={menuOptions} />
+        </div>
       </div>
       {expanded && (
         <div>
@@ -86,7 +141,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     setLoading(true);
     try {
       const [{ data: tagData }, selMap] = await Promise.all([
-        supabase.from('tags').select('id, name, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('tags').select('id, name, created_at, is_public').eq('user_id', userId).order('created_at', { ascending: false }),
         fetchSelectionsByUser(userId),
       ]);
       const tagList = tagData ?? [];
@@ -104,9 +159,44 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         if (!s) continue;
         (selsByTag[st.tag_id] ??= []).push({ id: st.selection_id, ...s });
       }
-      setTags((tagList as any[]).map(t => ({ ...t, selections: selsByTag[t.id] ?? [] })));
+      setTags((tagList as any[]).map(t => ({ ...t, selections: selsByTag[t.id] ?? [], is_public: t.is_public ?? false })));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDeleteTag(id: string) {
+    await deleteRemote('tags', id).catch(() => {});
+    setTags(tags.filter(t => t.id !== id));
+  }
+
+  async function handleRenameTag(id: string, newName: string) {
+    if (newName.trim()) {
+      const tag = tags.find(t => t.id === id);
+      if (tag) {
+        await pushTag({
+          id: tag.id,
+          user_id: userId,
+          name: newName.trim(),
+          is_public: tag.is_public,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+        setTags(tags.map(t => t.id === id ? { ...t, name: newName.trim() } : t));
+      }
+    }
+  }
+
+  async function handleToggleVisibility(id: string, isPublic: boolean) {
+    const tag = tags.find(t => t.id === id);
+    if (tag) {
+      await pushTag({
+        id: tag.id,
+        user_id: userId,
+        name: tag.name,
+        is_public: isPublic,
+        updated_at: new Date().toISOString(),
+      }).catch(() => {});
+      setTags(tags.map(t => t.id === id ? { ...t, is_public: isPublic } : t));
     }
   }
 
@@ -136,7 +226,15 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(tag => (
-              <TagCard key={tag.id} tag={tag} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+              <TagCard
+                key={tag.id}
+                tag={tag}
+                searchQuery={searchQuery}
+                onOpenBook={onOpenBook}
+                onDelete={handleDeleteTag}
+                onRename={handleRenameTag}
+                onToggleVisibility={handleToggleVisibility}
+              />
             ))}
           </div>
         )}

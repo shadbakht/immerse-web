@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
+import { pushNote, deleteRemote } from '@/lib/annotationSync';
+import { ContextMenu, type MenuOption } from './ContextMenu';
 
 interface NoteRow {
   noteId: string; content: string; updatedAt: string;
@@ -20,7 +22,7 @@ function Highlight({ text, q }: { text: string; q: string }) {
   return <>{text.split(pat).map((p, i) => pat.test(p) ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark> : <span key={i}>{p}</span>)}</>;
 }
 
-function NoteCard({ note, searchQuery, onOpenBook }: { note: NoteRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+function NoteCard({ note, searchQuery, onOpenBook, onDelete, onEdit }: { note: NoteRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onEdit: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
 
   function formatDate(iso: string) {
@@ -31,29 +33,50 @@ function NoteCard({ note, searchQuery, onOpenBook }: { note: NoteRow; searchQuer
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  const menuOptions: MenuOption[] = [
+    {
+      label: 'Edit',
+      icon: '✏️',
+      onClick: () => onEdit(note.noteId),
+    },
+    {
+      label: 'Delete',
+      icon: '🗑️',
+      color: 'danger',
+      onClick: () => {
+        if (confirm('Delete this note?')) onDelete(note.noteId);
+      },
+    },
+  ];
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div
-        className="px-5 py-4 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        className="px-5 py-4 cursor-pointer select-none hover:bg-gray-50 transition-colors flex items-start gap-3 justify-between"
         onClick={() => setExpanded(v => !v)}
       >
-        {/* Citation */}
-        {note.citation && (
-          <p className="text-xs text-[#1B6B7B] font-medium mb-2 truncate">
-            <Highlight text={note.citation} q={searchQuery} />
+        <div className="flex-1 min-w-0">
+          {/* Citation */}
+          {note.citation && (
+            <p className="text-xs text-[#1B6B7B] font-medium mb-2 truncate">
+              <Highlight text={note.citation} q={searchQuery} />
+            </p>
+          )}
+          {/* Quote */}
+          {note.snapshotText && (
+            <p className={`text-sm italic text-gray-500 leading-relaxed mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
+              "<Highlight text={note.snapshotText} q={searchQuery} />"
+            </p>
+          )}
+          {/* Note content */}
+          <p className={`text-sm text-gray-800 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+            <Highlight text={note.content} q={searchQuery} />
           </p>
-        )}
-        {/* Quote */}
-        {note.snapshotText && (
-          <p className={`text-sm italic text-gray-500 leading-relaxed mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
-            "<Highlight text={note.snapshotText} q={searchQuery} />"
-          </p>
-        )}
-        {/* Note content */}
-        <p className={`text-sm text-gray-800 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
-          <Highlight text={note.content} q={searchQuery} />
-        </p>
-        <p className="text-xs text-gray-300 mt-2">{formatDate(note.updatedAt)}</p>
+          <p className="text-xs text-gray-300 mt-2">{formatDate(note.updatedAt)}</p>
+        </div>
+        <div className="shrink-0" onClick={e => e.stopPropagation()}>
+          <ContextMenu options={menuOptions} />
+        </div>
       </div>
       {expanded && note.bookId && (
         <div className="px-5 pb-4 border-t border-gray-100 pt-3">
@@ -74,6 +97,8 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -93,6 +118,37 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     }
   }
 
+  async function handleDeleteNote(id: string) {
+    await deleteRemote('notes', id).catch(() => {});
+    setNotes(notes.filter(n => n.noteId !== id));
+  }
+
+  async function handleEditNote(id: string) {
+    const note = notes.find(n => n.noteId === id);
+    if (note) {
+      setEditingId(id);
+      setEditContent(note.content);
+    }
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (editContent.trim()) {
+      const note = notes.find(n => n.noteId === id);
+      if (note) {
+        await pushNote({
+          id: note.noteId,
+          user_id: userId,
+          selection_id: '', // We don't have this from the note row alone
+          content: editContent.trim(),
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+        setNotes(notes.map(n => n.noteId === id ? { ...n, content: editContent.trim() } : n));
+      }
+      setEditingId(null);
+      setEditContent('');
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return notes;
@@ -103,6 +159,23 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
 
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
+      {editingId && (
+        <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center" onClick={() => { setEditingId(null); setEditContent(''); }}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit Note</h2>
+            <textarea
+              autoFocus
+              value={editContent}
+              onChange={e => setEditContent(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4 min-h-32 resize-none"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => { setEditingId(null); setEditContent(''); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={() => handleSaveEdit(editingId)} className="px-4 py-2 text-sm bg-[#1B6B7B] text-white rounded-lg hover:bg-[#1B6B7B]/90">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="px-6 pt-8 pb-4 shrink-0">
         <h1 className="text-2xl font-semibold text-gray-900 mb-4">Notes</h1>
         <div className="relative">
@@ -118,7 +191,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(note => (
-              <NoteCard key={note.noteId} note={note} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+              <NoteCard key={note.noteId} note={note} searchQuery={searchQuery} onOpenBook={onOpenBook} onDelete={handleDeleteNote} onEdit={handleEditNote} />
             ))}
           </div>
         )}

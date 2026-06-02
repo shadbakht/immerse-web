@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
+import { deleteRemote } from '@/lib/annotationSync';
+import { ContextMenu, type MenuOption } from './ContextMenu';
 
 interface XRefRow {
   id: string; created_at: string;
@@ -29,11 +31,22 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function XRefCard({ row, searchQuery, onOpenBook }: { row: XRefRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+function XRefCard({ row, searchQuery, onOpenBook, onDelete }: { row: XRefRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const sides = [
     { key: 'a', snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
     { key: 'b', snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
+  ];
+
+  const menuOptions: MenuOption[] = [
+    {
+      label: 'Delete',
+      icon: '🗑️',
+      color: 'danger',
+      onClick: () => {
+        if (confirm('Delete this cross-reference?')) onDelete(row.id);
+      },
+    },
   ];
 
   return (
@@ -61,8 +74,11 @@ function XRefCard({ row, searchQuery, onOpenBook }: { row: XRefRow; searchQuery:
         ))}
       </div>
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-gray-100">
+      <div className="px-4 py-2 border-t border-gray-100 flex items-center justify-between">
         <p className="text-xs text-gray-300">{formatDate(row.created_at)}</p>
+        <div onClick={e => e.stopPropagation()}>
+          <ContextMenu options={menuOptions} />
+        </div>
       </div>
     </div>
   );
@@ -98,6 +114,11 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     }
   }
 
+  async function handleDeleteXRef(id: string) {
+    await deleteRemote('xrefs', id).catch(() => {});
+    setRows(rows.filter(r => r.id !== id));
+  }
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
@@ -124,7 +145,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         ) : (
           <div className="space-y-3">
             {filtered.map(row => (
-              <XRefCard key={row.id} row={row} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+              <XRefCard key={row.id} row={row} searchQuery={searchQuery} onOpenBook={onOpenBook} onDelete={handleDeleteXRef} />
             ))}
           </div>
         )}
