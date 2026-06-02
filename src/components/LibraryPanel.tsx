@@ -570,59 +570,64 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                               <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
                             </div>
                           ) : (() => {
-                            const hasCats = authorBooks.some(b => b.category);
-                            if (!hasCats) {
-                              return authorBooks.map(book => {
-                                const isBookChecked = selectedBookIds.has(book.id);
-                                return (
-                                  <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                    <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-9 pr-1 py-3 shrink-0" />
-                                    <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
-                                      <div className="text-sm text-gray-800">{book.title}</div>
-                                    </button>
-                                  </div>
-                                );
-                              });
-                            }
-                            // Group books by category, preserving order
+                            // Split: uncategorized books render flat, categorized books render as folders
+                            const uncategorized = authorBooks.filter(b => !b.category);
+                            const categorized   = authorBooks.filter(b => b.category);
+
                             const groups: { category: string; books: Book[] }[] = [];
-                            for (const book of authorBooks) {
-                              const cat = book.category ?? '';
+                            for (const book of categorized) {
+                              const cat = book.category!;
                               const existing = groups.find(g => g.category === cat);
                               if (existing) existing.books.push(book);
                               else groups.push({ category: cat, books: [book] });
                             }
-                            return groups.map(({ category, books: catBooks }) => {
-                              const catKey = `${author.id}||${category}`;
-                              const isCatOpen = openCategories.has(catKey);
-                              const catBookIds = catBooks.map(b => b.id);
-                              const catState = checkStateFor(catBookIds);
-                              return (
-                                <div key={category}>
-                                  <div className="flex items-center border-b border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition-colors">
-                                    <Checkbox state={catState} onChange={() => toggleBookIds(catBookIds)} className="pl-9 pr-1 py-3 shrink-0" />
-                                    <button onClick={() => toggleCategory(author.id, category)} className="flex-1 flex items-center justify-between pr-4 py-3 text-left">
-                                      <span className="text-sm text-gray-600">{category}</span>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">{catBooks.length}</span>
-                                        <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isCatOpen ? 'rotate-90' : ''}`}>›</span>
-                                      </div>
-                                    </button>
-                                  </div>
-                                  {isCatOpen && catBooks.map(book => {
-                                    const isBookChecked = selectedBookIds.has(book.id);
-                                    return (
-                                      <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                        <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-12 pr-1 py-3 shrink-0" />
-                                        <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
-                                          <div className="text-sm text-gray-800">{book.title}</div>
+
+                            return (
+                              <>
+                                {uncategorized.map(book => {
+                                  const isBookChecked = selectedBookIds.has(book.id);
+                                  return (
+                                    <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                      <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-9 pr-1 py-3 shrink-0" />
+                                      <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
+                                        <div className="text-sm text-gray-800">{book.title}</div>
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                                {groups.map(({ category, books: catBooks }) => {
+                                  const catKey = `${author.id}||${category}`;
+                                  const isCatOpen = openCategories.has(catKey);
+                                  const catBookIds = catBooks.map(b => b.id);
+                                  const catState = checkStateFor(catBookIds);
+                                  return (
+                                    <div key={category}>
+                                      <div className="flex items-center border-b border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition-colors">
+                                        <Checkbox state={catState} onChange={() => toggleBookIds(catBookIds)} className="pl-9 pr-1 py-3 shrink-0" />
+                                        <button onClick={() => toggleCategory(author.id, category)} className="flex-1 flex items-center justify-between pr-4 py-3 text-left">
+                                          <span className="text-sm text-gray-600">{category}</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-400">{catBooks.length}</span>
+                                            <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isCatOpen ? 'rotate-90' : ''}`}>›</span>
+                                          </div>
                                         </button>
                                       </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            });
+                                      {isCatOpen && catBooks.map(book => {
+                                        const isBookChecked = selectedBookIds.has(book.id);
+                                        return (
+                                          <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                            <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-12 pr-1 py-3 shrink-0" />
+                                            <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
+                                              <div className="text-sm text-gray-800">{book.title}</div>
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
+                              </>
+                            );
                           })()}
                         </div>
                       )}
