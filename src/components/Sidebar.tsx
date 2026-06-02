@@ -11,7 +11,6 @@ import {
   TagIcon,
   NoteIcon,
   XRefIcon,
-  CommunityIcon,
   SettingsIcon,
 } from './Icons';
 
@@ -21,7 +20,7 @@ const NAV_ITEMS: { tab: NavTab; label: string; icon: ReactNode }[] = [
   { tab: 'tags',      label: 'Tags',      icon: <TagIcon       size={18} /> },
   { tab: 'notes',     label: 'Notes',     icon: <NoteIcon      size={18} /> },
   { tab: 'xrefs',     label: 'X-Refs',    icon: <XRefIcon      size={18} /> },
-  { tab: 'community', label: 'Community', icon: <CommunityIcon size={20} /> },
+  { tab: 'community', label: 'Community', icon: <span className="text-base">🌐</span> },
 ];
 
 interface SidebarProps {
