@@ -190,6 +190,44 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     };
   }, [passages, userId, saveProgress]);
 
+  // Fetch annotation state for current passages — shared by initial load + Realtime handler.
+  const loadAnnotations = useCallback(async (passageIds: string[]) => {
+    if (!userId || passageIds.length === 0) return;
+    const tagged = new Set<string>();
+    const noted  = new Set<string>();
+    const BATCH  = 200;
+    for (let i = 0; i < passageIds.length; i += BATCH) {
+      const ids = passageIds.slice(i, i + BATCH);
+      const { data } = await supabase
+        .from('selections')
+        .select('passage_id, selection_tags(id), notes(id)')
+        .eq('user_id', userId)
+        .in('passage_id', ids);
+      for (const row of data ?? []) {
+        if ((row.selection_tags as any[])?.length > 0) tagged.add(row.passage_id);
+        if ((row.notes        as any[])?.length > 0) noted.add(row.passage_id);
+      }
+    }
+    setTaggedPassageIds(tagged);
+    setNotedPassageIds(noted);
+  }, [userId]);
+
+  // Realtime: refresh annotation indicators when selections change for this user.
+  // Catches annotations created on mobile while this web session is open.
+  useEffect(() => {
+    if (!userId || passages.length === 0) return;
+    const passageIds = passages.map(p => p.id);
+    const channel = supabase
+      .channel(`reader-annot-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'selections', filter: `user_id=eq.${userId}` },
+        () => { loadAnnotations(passageIds).catch(() => {}); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, passages, loadAnnotations]);
+
   async function createSelection(): Promise<string> {
     const bar = pendingSelectionRef.current ?? selectionBar;
     if (!bar || !target) throw new Error('No selection');
@@ -261,27 +299,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
       setPassages(ps);
 
       // Load existing annotations asynchronously so the book renders immediately.
-      // Batches of 200 passage IDs to stay within URL-length limits.
-      if (userId && ps.length > 0) {
-        (async () => {
-          const tagged = new Set<string>();
-          const noted  = new Set<string>();
-          const BATCH  = 200;
-          for (let i = 0; i < ps.length; i += BATCH) {
-            const ids = ps.slice(i, i + BATCH).map(p => p.id);
-            const { data } = await supabase
-              .from('selections')
-              .select('passage_id, selection_tags(id), notes(id)')
-              .eq('user_id', userId)
-              .in('passage_id', ids);
-            for (const row of data ?? []) {
-              if ((row.selection_tags as any[])?.length > 0) tagged.add(row.passage_id);
-              if ((row.notes        as any[])?.length > 0) noted.add(row.passage_id);
-            }
-          }
-          setTaggedPassageIds(tagged);
-          setNotedPassageIds(noted);
-        })().catch(() => {/* annotations are non-critical — silent fail */});
+      if (ps.length > 0) {
+        loadAnnotations(ps.map(p => p.id)).catch(() => {});
       }
 
       // Build TOC from first passage of each unique chapter/section
