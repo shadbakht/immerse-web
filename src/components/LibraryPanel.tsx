@@ -1,39 +1,40 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
 
-interface Tradition {
+// ── Catalog types (mirrors corpus.json structure) ─────────────────────────────
+
+interface CatalogCategory {
   id: string;
+  parentId: string | null;
   name: string;
-  sort_order: number;
+  sortOrder: number;
+  kind: 'tradition' | 'collection' | 'imported' | null;
 }
 
-interface Author {
-  id: string;
-  name: string;
-  tradition_id: string;
-  sort_order: number;
-}
-
-interface Book {
-  id: string;
+interface CatalogBook {
+  id: string;          // corpus slug, e.g. "bible-kjv-genesis"
+  categoryId: string;
   title: string;
-  authorName: string;
-  authorId: string;
-  category: string | null;
+}
+
+interface Catalog {
+  version: string;
+  categories: CatalogCategory[];
+  books: CatalogBook[];
 }
 
 interface SearchResult {
-  passageId:   string;
-  bookId:      string;
-  bookTitle:   string;
-  authorName:  string;
+  passageId:    string;
+  bookId:       string;   // Supabase UUID
+  bookTitle:    string;
+  authorName:   string;
   chapterLabel: string | null;
   sectionTitle: string | null;
-  content:     string;
+  content:      string;
 }
 
 interface LibraryPanelProps {
@@ -43,180 +44,123 @@ interface LibraryPanelProps {
   onCollapse?: () => void;
 }
 
+// Catalog is tiny (75 KB) — cache it for the session so we only fetch once.
+const CORPUS_VERSION = '947b54af95c21dd0';
+const CATALOG_URL = `https://github.com/shadbakht/immerse-corpus/releases/download/corpus-${CORPUS_VERSION}/catalog.json`;
+let _catalogCache: Catalog | null = null;
+let _slugMapCache: Map<string, string> | null = null; // slug → Supabase UUID
+
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
 
-  const [traditions, setTraditions] = useState<Tradition[]>([]);
-  const [authors, setAuthors] = useState<Author[]>([]);
-  const [bookCounts, setBookCounts] = useState<Record<string, number>>({});    // keyed by authorId
-  const [allBookIds, setAllBookIds] = useState<Record<string, string[]>>({});  // authorId -> bookIds (upfront)
-  const [books, setBooks] = useState<Record<string, Book[]>>({});              // keyed by authorId (lazy titles)
-  const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
-  const [openAuthors, setOpenAuthors] = useState<Set<string>>(new Set());
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
-  const [loadingBooks, setLoadingBooks] = useState<Set<string>>(new Set());
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [slugMap, setSlugMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Expand state
+  const [openRoots, setOpenRoots]       = useState<Set<string>>(new Set());
+  const [openChildren, setOpenChildren] = useState<Set<string>>(new Set());
+
+  // Checkbox selection (slugs)
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+
+  // Search
+  const [searchQuery, setSearchQuery]       = useState('');
+  const [searchResults, setSearchResults]   = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading]   = useState(false);
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
-  // Checkbox selection
-  const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
   const [checkedResultIds, setCheckedResultIds] = useState<Set<string>>(new Set());
-  const [tagPanelVisible, setTagPanelVisible] = useState(false);
+  const [tagPanelVisible, setTagPanelVisible]   = useState(false);
+
+  // ── Load catalog + slug map ──────────────────────────────────────────────────
 
   useEffect(() => {
     if (activeTab !== 'library') return;
-    load();
+    loadCatalog();
   }, [activeTab]);
 
-  async function load() {
+  async function loadCatalog() {
     setLoading(true);
     try {
-      const [{ data: trad }, { data: auth }, { data: bookData }] = await Promise.all([
-        supabase.from('traditions').select('id, name, sort_order').order('sort_order').order('name'),
-        supabase.from('authors').select('id, name, tradition_id, sort_order').order('sort_order').order('name'),
-        supabase.from('books').select('id, author_id').eq('is_user_imported', false),
-      ]);
-      setTraditions(trad ?? []);
-      setAuthors(auth ?? []);
-      const countMap: Record<string, number> = {};
-      const idMap: Record<string, string[]> = {};
-      for (const b of bookData ?? []) {
-        countMap[b.author_id] = (countMap[b.author_id] ?? 0) + 1;
-        if (!idMap[b.author_id]) idMap[b.author_id] = [];
-        idMap[b.author_id].push(b.id);
+      // Catalog
+      if (!_catalogCache) {
+        const res = await fetch(CATALOG_URL);
+        _catalogCache = await res.json() as Catalog;
       }
-      setBookCounts(countMap);
-      setAllBookIds(idMap);
+
+      // Slug → UUID map (book_slug_map table, 527 rows, ~30 KB)
+      if (!_slugMapCache) {
+        const { data } = await supabase
+          .from('book_slug_map')
+          .select('local_id, book_id');
+        _slugMapCache = new Map((data ?? []).map((r: any) => [r.local_id, r.book_id]));
+      }
+
+      setCatalog(_catalogCache);
+      setSlugMap(_slugMapCache);
+    } catch (err) {
+      console.error('[LibraryPanel] Failed to load catalog:', err);
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadBooks(authorId: string) {
-    if (books[authorId] || loadingBooks.has(authorId)) return;
-    setLoadingBooks(prev => new Set(prev).add(authorId));
-    try {
-      const { data } = await supabase
-        .from('books')
-        .select('id, title, author_id, category')
-        .eq('author_id', authorId)
-        .eq('is_user_imported', false)
-        .order('sort_order')
-        .order('title');
-      const authorName = authors.find(a => a.id === authorId)?.name ?? '';
-      setBooks(prev => ({
-        ...prev,
-        [authorId]: (data ?? []).map(b => ({ id: b.id, title: b.title, authorName, authorId: b.author_id, category: b.category ?? null })),
-      }));
-    } finally {
-      setLoadingBooks(prev => { const next = new Set(prev); next.delete(authorId); return next; });
-    }
+  // Translate a corpus slug to a Supabase UUID for the reader
+  function uuidForSlug(slug: string): string {
+    return slugMap.get(slug) ?? slug; // fall back to slug if not found
   }
 
-  function toggleTradition(id: string) {
-    setOpenTraditions(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  // ── Tree helpers ─────────────────────────────────────────────────────────────
+
+  const roots = (catalog?.categories ?? [])
+    .filter(c => c.parentId === null && c.kind !== 'imported')
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+
+  function childrenOf(parentId: string): CatalogCategory[] {
+    return (catalog?.categories ?? [])
+      .filter(c => c.parentId === parentId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   }
 
-  function toggleAuthor(id: string) {
-    setOpenAuthors(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        loadBooks(id);
-      }
-      return next;
-    });
+  function booksInCategory(catId: string): CatalogBook[] {
+    return (catalog?.books ?? [])
+      .filter(b => b.categoryId === catId)
+      .sort((a, b) => a.title.localeCompare(b.title));
   }
 
-  function toggleCategory(authorId: string, category: string) {
-    const key = `${authorId}||${category}`;
-    setOpenCategories(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+  // ── Checkbox helpers ─────────────────────────────────────────────────────────
+
+  function slugsUnderRoot(rootId: string): string[] {
+    const direct = booksInCategory(rootId).map(b => b.id);
+    const childSlugs = childrenOf(rootId).flatMap(c => booksInCategory(c.id).map(b => b.id));
+    return [...direct, ...childSlugs];
   }
 
-  // ── Checkbox helpers ──────────────────────────────────────────────────────────
-
-  // Get all book IDs under an author (from upfront-loaded map)
-  function bookIdsForAuthor(authorId: string): string[] {
-    return allBookIds[authorId] ?? [];
+  function slugsUnderChild(childId: string): string[] {
+    return booksInCategory(childId).map(b => b.id);
   }
 
-  // Get all book IDs under a tradition
-  function bookIdsForTradition(traditionId: string): string[] {
-    return authors
-      .filter(a => a.tradition_id === traditionId)
-      .flatMap(a => allBookIds[a.id] ?? []);
-  }
-
-  function checkStateFor(ids: string[]): 'checked' | 'indeterminate' | 'unchecked' {
-    if (ids.length === 0) return 'unchecked';
-    const n = ids.filter(id => selectedBookIds.has(id)).length;
-    if (n === ids.length) return 'checked';
+  function checkState(slugs: string[]): 'checked' | 'indeterminate' | 'unchecked' {
+    if (slugs.length === 0) return 'unchecked';
+    const n = slugs.filter(s => selectedSlugs.has(s)).length;
+    if (n === slugs.length) return 'checked';
     if (n > 0) return 'indeterminate';
     return 'unchecked';
   }
 
-  function toggleBookIds(ids: string[]) {
-    if (ids.length === 0) return;
-    setSelectedBookIds(prev => {
-      const checkedCount = ids.filter(id => prev.has(id)).length;
+  function toggleSlugs(slugs: string[]) {
+    if (slugs.length === 0) return;
+    setSelectedSlugs(prev => {
+      const allChecked = slugs.every(s => prev.has(s));
       const next = new Set(prev);
-      if (checkedCount === ids.length) {
-        ids.forEach(id => next.delete(id)); // all checked → uncheck
-      } else {
-        ids.forEach(id => next.add(id));    // partial or none → check all
-      }
+      if (allChecked) slugs.forEach(s => next.delete(s));
+      else slugs.forEach(s => next.add(s));
       return next;
     });
   }
 
-  function toggleSingleBook(bookId: string) {
-    setSelectedBookIds(prev => {
-      const next = new Set(prev);
-      next.has(bookId) ? next.delete(bookId) : next.add(bookId);
-      return next;
-    });
-  }
+  // ── Search ───────────────────────────────────────────────────────────────────
 
-  async function handleTagSelected() {
-    if (!userId) return;
-    // Gather a representative selection text from the first selected book/result
-    // For search results, use first checked result; otherwise use book IDs as targets
-    setTagPanelVisible(true);
-  }
-
-  async function handleTagSave(tagIds: string[]) {
-    if (!userId || tagIds.length === 0) return;
-    const now = new Date().toISOString();
-    const checkedResults = searchResults.filter(r => checkedResultIds.has(r.passageId));
-    for (const result of checkedResults) {
-      const { data: sel } = await supabase
-        .from('selections')
-        .insert({ user_id: userId, passage_id: result.passageId, start_offset: 0, end_offset: result.content.length, snapshot_text: result.content.slice(0, 300), created_at: now })
-        .select('id').single();
-      if (!sel) continue;
-      await Promise.all(tagIds.map(tagId =>
-        supabase.from('selection_tags').insert({ selection_id: sel.id, tag_id: tagId, created_at: now })
-      ));
-    }
-    setCheckedResultIds(new Set());
-    setTagPanelVisible(false);
-  }
-
-  // ── Search ────────────────────────────────────────────────────────────────────
-
-  // Cross-tradition synonyms: matches mobile app's SYNONYM_GROUPS
   const SYNONYM_GROUPS = [
     ['god', 'allah', 'lord', 'creator'],
     ['prayer', 'supplication', 'invocation'],
@@ -239,7 +183,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   }
 
   function expandSynonyms(q: string): string {
-    // Don't expand if user typed explicit operators
     if (/\b(AND|OR|NOT)\b/.test(q) || q.includes('"') || q.includes('*')) return q;
     return q.trim().split(/\s+/).map(token => {
       const group = synonymMap.get(token.toLowerCase());
@@ -247,24 +190,24 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).join(' & ');
   }
 
+  // Scope search to Supabase UUIDs of selected slugs
+  function selectedUUIDs(): string[] {
+    return [...selectedSlugs].map(s => slugMap.get(s)).filter(Boolean) as string[];
+  }
+
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) { setSearchResults([]); return; }
     const timer = setTimeout(() => doSearch(q), 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedBookIds]);
+  }, [searchQuery, selectedSlugs]);
 
   async function doSearch(q: string) {
     setSearchLoading(true);
     try {
-      const scope = selectedBookIds.size > 0 ? [...selectedBookIds] : null;
+      const scope = selectedSlugs.size > 0 ? selectedUUIDs() : null;
       const results = await runFtsSearch(q, scope);
-      if (results.length > 0) {
-        setSearchResults(results);
-      } else {
-        // Fuzzy LIKE fallback
-        setSearchResults(await runFuzzySearch(q, scope));
-      }
+      setSearchResults(results.length > 0 ? results : await runFuzzySearch(q, scope));
     } finally {
       setSearchLoading(false);
     }
@@ -272,10 +215,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   async function runFtsSearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
     const expanded = expandSynonyms(q);
-    // Build websearch query with prefix wildcards for each plain word
     const hasOps = /[|&!()"]/.test(expanded);
     const tsQuery = hasOps ? expanded : q.trim().split(/\s+/).filter(Boolean).map(t => `${t}:*`).join(' & ');
-
     let query = supabase
       .from('passages')
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
@@ -287,10 +228,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
-    // ILIKE fallback: each word must appear somewhere in the passage
     const words = q.trim().split(/\s+/).filter(w => w.length >= 2);
     if (words.length === 0) return [];
-    // Use the first word for a Supabase ILIKE call, then filter client-side for extra words
     let query = supabase
       .from('passages')
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
@@ -335,8 +274,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .map(w => w.replace(/[*":()&|]/g, '').trim())
       .filter(w => w.length >= 2);
     if (!words.length) return <span>{text}</span>;
-
-    // Build ranges using diacritic-normalized matching
     const normText = normalize(text);
     const ranges: { start: number; end: number }[] = [];
     for (const w of words) {
@@ -346,7 +283,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         ranges.push({ start: idx, end: idx + normW.length });
         idx = normText.indexOf(normW, idx + 1);
       }
-      // Also try synonym group members
       const group = synonymMap.get(w.toLowerCase());
       if (group) {
         for (const syn of group) {
@@ -360,16 +296,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       }
     }
     if (!ranges.length) return <span>{text}</span>;
-
     ranges.sort((a, b) => a.start - b.start);
-    // Merge overlapping
     const merged = [ranges[0]];
     for (let i = 1; i < ranges.length; i++) {
       const last = merged[merged.length - 1];
       if (ranges[i].start <= last.end) last.end = Math.max(last.end, ranges[i].end);
       else merged.push({ ...ranges[i] });
     }
-
     const parts: { t: string; hi: boolean }[] = [];
     let pos = 0;
     for (const { start, end } of merged) {
@@ -378,7 +311,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       pos = end;
     }
     if (pos < text.length) parts.push({ t: text.slice(pos), hi: false });
-
     return (
       <>
         {parts.map((p, i) =>
@@ -389,6 +321,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       </>
     );
   }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   if (activeTab !== 'library') {
     return (
@@ -402,6 +336,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900">Library</h2>
@@ -415,7 +350,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             </button>
           )}
         </div>
-        {/* Search input */}
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -423,7 +357,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={selectedBookIds.size > 0 ? `Search ${selectedBookIds.size} selected book${selectedBookIds.size !== 1 ? 's' : ''}…` : 'Search all books…'}
+            placeholder={selectedSlugs.size > 0 ? `Search ${selectedSlugs.size} selected book${selectedSlugs.size !== 1 ? 's' : ''}…` : 'Search all books…'}
             className="w-full pl-9 pr-8 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
           />
           {searchQuery && (
@@ -437,6 +371,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         </div>
       </div>
 
+      {/* Body */}
       {loading && !isSearching ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
@@ -455,9 +390,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               <p className="text-xs text-gray-400 px-4 py-2">{searchResults.length} results</p>
               {searchResults.map(result => {
                 const isExpanded = expandedResults.has(result.passageId);
-                const isChecked = checkedResultIds.has(result.passageId);
-                const snippet = getSnippet(result.content, searchQuery);
-                const location = result.chapterLabel || result.sectionTitle;
+                const isChecked  = checkedResultIds.has(result.passageId);
+                const snippet    = getSnippet(result.content, searchQuery);
+                const location   = result.chapterLabel || result.sectionTitle;
                 return (
                   <div key={result.passageId} className={`border-b border-gray-100 ${isChecked ? 'bg-[#1B6B7B]/5' : ''}`}>
                     <div className="flex items-start">
@@ -470,7 +405,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         })}
                         className="pl-3 pr-1 pt-3.5 shrink-0"
                       />
-                      {/* Use div — avoids invalid button-in-button */}
                       <div
                         className="flex-1 text-left pr-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
                         onClick={() => setExpandedResults(prev => {
@@ -505,135 +439,87 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           )}
         </div>
       ) : (
+        /* ── Library tree (from catalog.json) ── */
         <div className="flex-1 overflow-y-auto">
-          {traditions.map(tradition => {
-            const tradAuthors = authors.filter(a => a.tradition_id === tradition.id);
-            const isOpen = openTraditions.has(tradition.id);
-            const tradBookIds = bookIdsForTradition(tradition.id);
-            const tradState = checkStateFor(tradBookIds);
+          {roots.map(root => {
+            const isRootOpen  = openRoots.has(root.id);
+            const rootSlugs   = slugsUnderRoot(root.id);
+            const rootState   = checkState(rootSlugs);
+            const children    = childrenOf(root.id);
+            const directBooks = booksInCategory(root.id);
+            const totalBooks  = rootSlugs.length;
 
             return (
-              <div key={tradition.id}>
+              <div key={root.id}>
                 {/* Tradition row */}
                 <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <Checkbox
-                    state={tradState}
-                    onChange={() => toggleBookIds(tradBookIds)}
-                    className="pl-3 pr-1 py-3.5 shrink-0"
-                  />
+                  <Checkbox state={rootState} onChange={() => toggleSlugs(rootSlugs)} className="pl-3 pr-1 py-3.5 shrink-0" />
                   <button
-                    onClick={() => toggleTradition(tradition.id)}
+                    onClick={() => setOpenRoots(prev => { const n = new Set(prev); n.has(root.id) ? n.delete(root.id) : n.add(root.id); return n; })}
                     className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left"
                   >
-                    <span className="text-sm font-medium text-gray-800">{tradition.name}</span>
+                    <span className="text-sm font-medium text-gray-800">{root.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">{tradAuthors.length}</span>
-                      <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                      <span className="text-xs text-gray-400">{totalBooks}</span>
+                      <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isRootOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>
                 </div>
 
-                {/* Authors */}
-                {isOpen && tradAuthors.map(author => {
-                  const isAuthorOpen = openAuthors.has(author.id);
-                  const authorBooks = books[author.id] ?? [];
-                  const authorBookIds = bookIdsForAuthor(author.id);
-                  const authorState = checkStateFor(authorBookIds);
+                {isRootOpen && (
+                  <>
+                    {/* Child categories (author / collection) */}
+                    {children.map(child => {
+                      const isChildOpen  = openChildren.has(child.id);
+                      const childSlugs   = slugsUnderChild(child.id);
+                      const childState   = checkState(childSlugs);
+                      const childBooks   = booksInCategory(child.id);
 
-                  return (
-                    <div key={author.id}>
-                      <div className="flex items-center border-b border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                        <Checkbox
-                          state={authorState}
-                          onChange={() => toggleBookIds(authorBookIds)}
-                          className="pl-6 pr-1 py-3 shrink-0"
-                        />
-                        <button
-                          onClick={() => toggleAuthor(author.id)}
-                          className="flex-1 flex items-center justify-between pr-4 py-3 text-left"
-                        >
-                          <span className="text-sm text-gray-700">{author.name}</span>
-                          <div className="flex items-center gap-2">
-                            {(bookCounts[author.id] ?? 0) > 0 && (
-                              <span className="text-xs text-gray-400">{bookCounts[author.id]}</span>
-                            )}
-                            <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isAuthorOpen ? 'rotate-90' : ''}`}>›</span>
+                      return (
+                        <div key={child.id}>
+                          <div className="flex items-center border-b border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                            <Checkbox state={childState} onChange={() => toggleSlugs(childSlugs)} className="pl-6 pr-1 py-3 shrink-0" />
+                            <button
+                              onClick={() => setOpenChildren(prev => { const n = new Set(prev); n.has(child.id) ? n.delete(child.id) : n.add(child.id); return n; })}
+                              className="flex-1 flex items-center justify-between pr-4 py-3 text-left"
+                            >
+                              <span className="text-sm text-gray-700">{child.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">{childSlugs.length}</span>
+                                <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isChildOpen ? 'rotate-90' : ''}`}>›</span>
+                              </div>
+                            </button>
                           </div>
-                        </button>
-                      </div>
 
-                      {/* Books (grouped by category if present) */}
-                      {isAuthorOpen && (
-                        <div className="bg-white">
-                          {loadingBooks.has(author.id) ? (
-                            <div className="flex justify-center py-3">
-                              <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
-                            </div>
-                          ) : (() => {
-                            // Split: uncategorized books render flat, categorized books render as folders
-                            const uncategorized = authorBooks.filter(b => !b.category);
-                            const categorized   = authorBooks.filter(b => b.category);
-
-                            const groups: { category: string; books: Book[] }[] = [];
-                            for (const book of categorized) {
-                              const cat = book.category!;
-                              const existing = groups.find(g => g.category === cat);
-                              if (existing) existing.books.push(book);
-                              else groups.push({ category: cat, books: [book] });
-                            }
-
+                          {isChildOpen && childBooks.map(book => {
+                            const isChecked = selectedSlugs.has(book.id);
                             return (
-                              <>
-                                {uncategorized.map(book => {
-                                  const isBookChecked = selectedBookIds.has(book.id);
-                                  return (
-                                    <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                      <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-9 pr-1 py-3 shrink-0" />
-                                      <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
-                                        <div className="text-sm text-gray-800">{book.title}</div>
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                                {groups.map(({ category, books: catBooks }) => {
-                                  const catKey = `${author.id}||${category}`;
-                                  const isCatOpen = openCategories.has(catKey);
-                                  const catBookIds = catBooks.map(b => b.id);
-                                  const catState = checkStateFor(catBookIds);
-                                  return (
-                                    <div key={category}>
-                                      <div className="flex items-center border-b border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition-colors">
-                                        <Checkbox state={catState} onChange={() => toggleBookIds(catBookIds)} className="pl-9 pr-1 py-3 shrink-0" />
-                                        <button onClick={() => toggleCategory(author.id, category)} className="flex-1 flex items-center justify-between pr-4 py-3 text-left">
-                                          <span className="text-sm text-gray-600">{category}</span>
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-400">{catBooks.length}</span>
-                                            <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isCatOpen ? 'rotate-90' : ''}`}>›</span>
-                                          </div>
-                                        </button>
-                                      </div>
-                                      {isCatOpen && catBooks.map(book => {
-                                        const isBookChecked = selectedBookIds.has(book.id);
-                                        return (
-                                          <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                            <Checkbox state={isBookChecked ? 'checked' : 'unchecked'} onChange={() => toggleSingleBook(book.id)} className="pl-12 pr-1 py-3 shrink-0" />
-                                            <button onClick={() => onOpenBook(book.id)} className="flex-1 text-left pr-4 py-3">
-                                              <div className="text-sm text-gray-800">{book.title}</div>
-                                            </button>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                })}
-                              </>
+                              <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <Checkbox state={isChecked ? 'checked' : 'unchecked'} onChange={() => toggleSlugs([book.id])} className="pl-9 pr-1 py-3 shrink-0" />
+                                <button onClick={() => onOpenBook(uuidForSlug(book.id))} className="flex-1 text-left pr-4 py-3">
+                                  <div className="text-sm text-gray-800">{book.title}</div>
+                                </button>
+                              </div>
                             );
-                          })()}
+                          })}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+
+                    {/* Books directly under the root (no child category) */}
+                    {directBooks.map(book => {
+                      const isChecked = selectedSlugs.has(book.id);
+                      return (
+                        <div key={book.id} className="flex items-center border-b border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                          <Checkbox state={isChecked ? 'checked' : 'unchecked'} onChange={() => toggleSlugs([book.id])} className="pl-6 pr-1 py-3 shrink-0" />
+                          <button onClick={() => onOpenBook(uuidForSlug(book.id))} className="flex-1 text-left pr-4 py-3">
+                            <div className="text-sm text-gray-800">{book.title}</div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             );
           })}
@@ -663,7 +549,23 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         onClose={() => setTagPanelVisible(false)}
         userId={userId}
         selectionText={searchResults.filter(r => checkedResultIds.has(r.passageId)).map(r => r.content.slice(0, 80)).join(' · ')}
-        onSave={handleTagSave}
+        onSave={async (tagIds: string[]) => {
+          if (!userId || tagIds.length === 0) return;
+          const now = new Date().toISOString();
+          const checkedResults = searchResults.filter(r => checkedResultIds.has(r.passageId));
+          for (const result of checkedResults) {
+            const { data: sel } = await supabase
+              .from('selections')
+              .insert({ user_id: userId, passage_id: result.passageId, start_offset: 0, end_offset: result.content.length, snapshot_text: result.content.slice(0, 300), created_at: now })
+              .select('id').single();
+            if (!sel) continue;
+            await Promise.all(tagIds.map(tagId =>
+              supabase.from('selection_tags').insert({ selection_id: sel.id, tag_id: tagId, created_at: now })
+            ));
+          }
+          setCheckedResultIds(new Set());
+          setTagPanelVisible(false);
+        }}
       />
     </div>
   );
@@ -681,7 +583,7 @@ function Checkbox({ state, onChange, className }: {
       onClick={e => { e.stopPropagation(); onChange(); }}
       className={`flex items-center justify-center ${className}`}
     >
-      <div className={`w-4.5 h-4.5 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+      <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
         state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
         state === 'indeterminate' ? 'border-[#1B6B7B]' :
                                     'border-gray-300'
@@ -692,4 +594,3 @@ function Checkbox({ state, onChange, className }: {
     </button>
   );
 }
-
