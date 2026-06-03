@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { pushTag, pushSelectionTag } from '@/lib/annotationSync';
+import { pushTag } from '@/lib/annotationSync';
 import PanelSheet from './PanelSheet';
 
 interface Tag {
@@ -85,15 +85,6 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
   async function handleSave() {
     setSaving(true);
     try {
-      // Push each selection_tag to sync service
-      for (const tagId of checked) {
-        await pushSelectionTag({
-          tag_id: tagId,
-          selection_id: '', // Will be set by onSave callback
-          user_id: userId,
-          updated_at: new Date().toISOString(),
-        }).catch(() => {});
-      }
       await onSave([...checked]);
       onClose();
     } finally {
