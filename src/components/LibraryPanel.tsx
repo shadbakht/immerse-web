@@ -44,9 +44,9 @@ interface LibraryPanelProps {
   onCollapse?: () => void;
 }
 
-// Catalog is tiny (75 KB) — cache it for the session so we only fetch once.
-const CORPUS_VERSION = '947b54af95c21dd0';
-const CATALOG_URL = `https://github.com/shadbakht/immerse-corpus/releases/download/corpus-${CORPUS_VERSION}/catalog.json`;
+// Catalog is tiny (75 KB) — served from public/ (same-origin, no CORS issues).
+// Update public/catalog.json in this repo whenever the corpus version changes.
+const CATALOG_URL = '/catalog.json';
 let _catalogCache: Catalog | null = null;
 let _slugMapCache: Map<string, string> | null = null; // slug → Supabase UUID
 
