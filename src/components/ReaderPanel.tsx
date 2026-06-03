@@ -281,14 +281,31 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     setNotedPassageIds(new Set());
     lastSavedPidRef.current = null;
     try {
-      const [{ data: bookData }, { data: passageData }] = await Promise.all([
+      // Fetch book metadata and all passages in parallel.
+      // Passages are fetched in batches of 1000 to bypass the PostgREST server-side
+      // row cap (default 1000). We keep fetching until a batch returns fewer than 1000 rows.
+      const BATCH = 1000;
+      const fetchAllPassages = async () => {
+        const all: any[] = [];
+        let from = 0;
+        while (true) {
+          const { data: batch, error } = await supabase
+            .from('passages')
+            .select('id, content, chapter_label, section_title, paragraph_number, sort_order')
+            .eq('book_id', bookId)
+            .order('sort_order')
+            .range(from, from + BATCH - 1);
+          if (error || !batch || batch.length === 0) break;
+          all.push(...batch);
+          if (batch.length < BATCH) break; // last page
+          from += BATCH;
+        }
+        return all;
+      };
+
+      const [{ data: bookData }, passageData] = await Promise.all([
         supabase.from('books').select('title, authors(name), footnotes').eq('id', bookId).single(),
-        supabase
-          .from('passages')
-          .select('id, content, chapter_label, section_title, paragraph_number, sort_order')
-          .eq('book_id', bookId)
-          .order('sort_order')
-          .limit(15000),
+        fetchAllPassages(),
       ]);
 
       if (bookData) {
