@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { pushNote, pushXref } from '@/lib/annotationSync';
 import type { ReaderTarget } from './AppShell';
@@ -103,6 +103,9 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const selectionBarRef = useRef<HTMLDivElement>(null);
   // Persists the selection data while a panel is open (selectionBar state gets cleared by mousedown listener)
   const pendingSelectionRef = useRef<SelectionBar | null>(null);
+  // Reading progress tracking
+  const progressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedPidRef   = useRef<string | null>(null);
 
   useEffect(() => {
     if (!target?.bookId) return;
@@ -116,6 +119,76 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     supabase.from('profiles').select('is_pro').eq('id', userId).single()
       .then(({ data }) => setIsPro(data?.is_pro ?? false));
   }, [userId]);
+
+  // Pre-compute max sort_order once passages load (for fraction calculation)
+  const maxSortOrder = useMemo(
+    () => passages.length > 0 ? passages[passages.length - 1].sort_order : 1,
+    [passages],
+  );
+
+  // Save reading progress to Supabase (debounced — called by IntersectionObserver)
+  const saveProgress = useCallback(async (passageId: string) => {
+    if (!userId || !target?.bookId) return;
+    const passage = passages.find(p => p.id === passageId);
+    const fraction = passage ? passage.sort_order / Math.max(maxSortOrder, 1) : 0;
+    await supabase.from('reading_progress').upsert(
+      {
+        user_id:            userId,
+        book_id:            target.bookId,
+        passage_id:         passageId,
+        passage_sort_order: passage?.sort_order ?? 0,
+        fraction,
+        updated_at:         new Date().toISOString(),
+      },
+      { onConflict: 'user_id,book_id' },
+    );
+    lastSavedPidRef.current = passageId;
+  }, [userId, target?.bookId, passages, maxSortOrder]);
+
+  // Track topmost visible passage with IntersectionObserver; debounce saves by 3s
+  useEffect(() => {
+    if (!userId || passages.length === 0) return;
+
+    // Track which passages are currently intersecting
+    const visible = new Map<string, number>(); // passageId → boundingRect.top
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const pid = (entry.target as HTMLElement).dataset.pid;
+          if (!pid) continue;
+          if (entry.isIntersecting) {
+            visible.set(pid, entry.boundingClientRect.top);
+          } else {
+            visible.delete(pid);
+          }
+        }
+        // Find topmost visible passage
+        if (visible.size === 0) return;
+        const topmost = [...visible.entries()]
+          .sort((a, b) => a[1] - b[1])[0][0];
+
+        if (topmost === lastSavedPidRef.current) return;
+
+        // Debounce: wait 3s of stability before writing
+        if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+        progressTimerRef.current = setTimeout(() => {
+          saveProgress(topmost).catch(() => {});
+        }, 3000);
+      },
+      { threshold: 0.1 },
+    );
+
+    passages.forEach(p => {
+      const el = document.getElementById(`p-${p.id}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => {
+      observer.disconnect();
+      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+    };
+  }, [passages, userId, saveProgress]);
 
   async function createSelection(): Promise<string> {
     const bar = pendingSelectionRef.current ?? selectionBar;
@@ -168,6 +241,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     setBook(null);
     setTaggedPassageIds(new Set());
     setNotedPassageIds(new Set());
+    lastSavedPidRef.current = null;
     try {
       const [{ data: bookData }, { data: passageData }] = await Promise.all([
         supabase.from('books').select('title, authors(name), footnotes').eq('id', bookId).single(),
@@ -222,12 +296,25 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
       }
       setToc(tocEntries);
 
-      if (scrollToId) {
+      // Resolve scroll target: explicit passageId > saved cloud progress > top
+      let resolvedScrollId = scrollToId;
+      if (!resolvedScrollId && userId) {
+        const { data: saved } = await supabase
+          .from('reading_progress')
+          .select('passage_id')
+          .eq('user_id', userId)
+          .eq('book_id', bookId)
+          .maybeSingle();
+        if (saved?.passage_id) resolvedScrollId = saved.passage_id;
+      }
+
+      if (resolvedScrollId) {
+        lastSavedPidRef.current = resolvedScrollId;
         setTimeout(() => {
-          document.getElementById(`p-${scrollToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          document.getElementById(`p-${resolvedScrollId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
         if (target?.highlightQuery) {
-          setSearchHighlight({ passageId: scrollToId, query: target.highlightQuery });
+          setSearchHighlight({ passageId: resolvedScrollId, query: target.highlightQuery });
           setTimeout(() => setSearchHighlight(null), 5000);
         }
       } else {

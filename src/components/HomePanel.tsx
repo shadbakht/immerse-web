@@ -11,16 +11,17 @@ interface Stats {
 }
 
 interface RecentBook {
-  bookId: string;
-  title: string;
+  bookId:    string;
+  passageId: string | null;
+  title:     string;
   authorName: string;
   updatedAt: string;
-  fraction: number;
+  fraction:  number;
 }
 
 interface HomePanelProps {
   userId:      string;
-  onOpenBook:  (bookId: string) => void;
+  onOpenBook:  (bookId: string, passageId?: string) => void;
   onTabChange: (tab: string) => void;
 }
 
@@ -48,7 +49,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
         supabase.from('xrefs').select('id', { count: 'exact', head: true }).eq('user_id', userId),
         supabase
           .from('reading_progress')
-          .select('book_id, updated_at, fraction')
+          .select('book_id, passage_id, updated_at, fraction')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(8),
@@ -69,6 +70,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
             .filter(p => bookMap[p.book_id])
             .map(p => ({
               bookId:     p.book_id,
+              passageId:  p.passage_id ?? null,
               title:      bookMap[p.book_id].title,
               authorName: (bookMap[p.book_id].authors as any)?.name ?? '',
               updatedAt:  p.updated_at,
@@ -148,7 +150,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                   return (
                     <button
                       key={book.bookId}
-                      onClick={() => onOpenBook(book.bookId)}
+                      onClick={() => onOpenBook(book.bookId, book.passageId ?? undefined)}
                       className="w-full text-left bg-white rounded-xl px-5 py-4 shadow-sm border border-gray-100 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-2">
