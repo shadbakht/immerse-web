@@ -166,6 +166,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     setLoading(true);
     setPassages([]);
     setBook(null);
+    setTaggedPassageIds(new Set());
+    setNotedPassageIds(new Set());
     try {
       const [{ data: bookData }, { data: passageData }] = await Promise.all([
         supabase.from('books').select('title, authors(name), footnotes').eq('id', bookId).single(),
@@ -183,6 +185,30 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
 
       const ps: Passage[] = passageData ?? [];
       setPassages(ps);
+
+      // Load existing annotations asynchronously so the book renders immediately.
+      // Batches of 200 passage IDs to stay within URL-length limits.
+      if (userId && ps.length > 0) {
+        (async () => {
+          const tagged = new Set<string>();
+          const noted  = new Set<string>();
+          const BATCH  = 200;
+          for (let i = 0; i < ps.length; i += BATCH) {
+            const ids = ps.slice(i, i + BATCH).map(p => p.id);
+            const { data } = await supabase
+              .from('selections')
+              .select('passage_id, selection_tags(id), notes(id)')
+              .eq('user_id', userId)
+              .in('passage_id', ids);
+            for (const row of data ?? []) {
+              if ((row.selection_tags as any[])?.length > 0) tagged.add(row.passage_id);
+              if ((row.notes        as any[])?.length > 0) noted.add(row.passage_id);
+            }
+          }
+          setTaggedPassageIds(tagged);
+          setNotedPassageIds(noted);
+        })().catch(() => {/* annotations are non-critical — silent fail */});
+      }
 
       // Build TOC from first passage of each unique chapter/section
       const seen = new Set<string>();
