@@ -127,7 +127,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
     // Padding: 12px base + 12px per level for categories; extra 24px for books
     const catPadLeft  = 12 + level * 14;
-    const bookPadLeft = catPadLeft + 24;
+    const bookPadLeft = catPadLeft; // books at same indent as sibling sub-categories
 
     return (
       <>

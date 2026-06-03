@@ -287,7 +287,8 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
           .from('passages')
           .select('id, content, chapter_label, section_title, paragraph_number, sort_order')
           .eq('book_id', bookId)
-          .order('sort_order'),
+          .order('sort_order')
+          .limit(15000),
       ]);
 
       if (bookData) {
