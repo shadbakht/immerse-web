@@ -4,28 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
-
-// ── Catalog types (mirrors corpus.json structure) ─────────────────────────────
-
-interface CatalogCategory {
-  id: string;
-  parentId: string | null;
-  name: string;
-  sortOrder: number;
-  kind: 'tradition' | 'collection' | 'imported' | null;
-}
-
-interface CatalogBook {
-  id: string;       // corpus slug, e.g. "bible-kjv-genesis"
-  categoryId: string;
-  title: string;
-}
-
-interface Catalog {
-  version: string;
-  categories: CatalogCategory[];
-  books: CatalogBook[];
-}
+import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
+import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 
 interface SearchResult {
   passageId:    string;
@@ -44,9 +24,7 @@ interface LibraryPanelProps {
   onCollapse?: () => void;
 }
 
-// Session-level cache so catalog is only fetched once per page load.
-let _catalogCache: Catalog | null = null;
-let _slugMapCache: Map<string, string> | null = null; // corpus slug → Supabase UUID
+// (Caching is handled by src/lib/catalog.ts)
 
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
@@ -69,22 +47,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   useEffect(() => {
     if (activeTab !== 'library') return;
-    loadCatalog();
+    load();
   }, [activeTab]);
 
-  async function loadCatalog() {
+  async function load() {
     setLoading(true);
     try {
-      if (!_catalogCache) {
-        const res = await fetch('/catalog.json');
-        _catalogCache = await res.json() as Catalog;
-      }
-      if (!_slugMapCache) {
-        const { data } = await supabase.from('book_slug_map').select('local_id, book_id');
-        _slugMapCache = new Map((data ?? []).map((r: any) => [r.local_id as string, r.book_id as string]));
-      }
-      setCatalog(_catalogCache);
-      setSlugMap(_slugMapCache);
+      const [cat, { slugToUuid }] = await Promise.all([
+        loadCatalog(),
+        loadSlugMaps(supabase),
+      ]);
+      setCatalog(cat);
+      setSlugMap(slugToUuid);
     } catch (err) {
       console.error('[LibraryPanel] Failed to load catalog:', err);
     } finally {
@@ -158,9 +132,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     return (
       <>
         {children.map(child => {
-          const childSlugs = allSlugsUnder(child.id);
-          const isOpen     = openNodes.has(child.id);
-          const state      = checkState(childSlugs);
+          const childSlugs     = allSlugsUnder(child.id);
+          const childImmediate = childrenOf(child.id).length + booksInCategory(child.id).length;
+          const isOpen         = openNodes.has(child.id);
+          const state          = checkState(childSlugs);
 
           return (
             <div key={child.id}>
@@ -181,7 +156,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     {child.name}
                   </span>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span className="text-xs text-gray-400">{childSlugs.length}</span>
+                    <span className="text-xs text-gray-400">{childImmediate}</span>
                     <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
@@ -490,7 +465,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         /* ── Library tree ── */
         <div className="flex-1 overflow-y-auto">
           {roots.map(root => {
-            const rootSlugs = allSlugsUnder(root.id);
+            const rootSlugs    = allSlugsUnder(root.id);
+            const immediateCount = childrenOf(root.id).length + booksInCategory(root.id).length;
             const isOpen    = openNodes.has(root.id);
             const state     = checkState(rootSlugs);
 
@@ -504,7 +480,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   >
                     <span className="text-sm font-medium text-gray-800 truncate">{root.name}</span>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-xs text-gray-400">{rootSlugs.length}</span>
+                      <span className="text-xs text-gray-400">{immediateCount}</span>
                       <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import SignInPrompt from './SignInPrompt';
+import { loadCatalog, loadSlugMaps, collectionName } from '@/lib/catalog';
+import type { Catalog } from '@/lib/catalog';
 
 interface Stats {
   tags: number;
@@ -11,12 +12,12 @@ interface Stats {
 }
 
 interface RecentBook {
-  bookId:    string;
-  passageId: string | null;
-  title:     string;
-  authorName: string;
-  updatedAt: string;
-  fraction:  number;
+  bookId:     string;   // Supabase UUID (for opening the reader)
+  passageId:  string | null;
+  title:      string;
+  subtitle:   string;
+  updatedAt:  string;
+  fraction:   number;
 }
 
 interface HomePanelProps {
@@ -27,9 +28,9 @@ interface HomePanelProps {
 
 export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanelProps) {
   const supabase = createClient();
-  const [stats, setStats] = useState<Stats>({ tags: 0, notes: 0, xrefs: 0 });
+  const [stats, setStats]           = useState<Stats>({ tags: 0, notes: 0, xrefs: 0 });
   const [recentBooks, setRecentBooks] = useState<RecentBook[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
     load();
@@ -43,6 +44,8 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
         { count: noteCount },
         { count: xrefCount },
         { data: progressData },
+        catalog,
+        { uuidToSlug },
       ] = await Promise.all([
         supabase.from('tags').select('id', { count: 'exact', head: true }).eq('user_id', userId),
         supabase.from('notes').select('id', { count: 'exact', head: true }).eq('user_id', userId),
@@ -53,30 +56,33 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
           .limit(8),
+        loadCatalog(),
+        loadSlugMaps(supabase),
       ]);
 
       setStats({ tags: tagCount ?? 0, notes: noteCount ?? 0, xrefs: xrefCount ?? 0 });
 
       if (progressData?.length) {
-        const bookIds = progressData.map(p => p.book_id);
-        const { data: bookData } = await supabase
-          .from('books')
-          .select('id, title, authors(name)')
-          .in('id', bookIds);
+        const catalogBookMap = new Map(catalog.books.map(b => [b.id, b]));
 
-        const bookMap = Object.fromEntries((bookData ?? []).map(b => [b.id, b]));
-        setRecentBooks(
-          progressData
-            .filter(p => bookMap[p.book_id])
-            .map(p => ({
-              bookId:     p.book_id,
-              passageId:  p.passage_id ?? null,
-              title:      bookMap[p.book_id].title,
-              authorName: (bookMap[p.book_id].authors as any)?.name ?? '',
-              updatedAt:  p.updated_at,
-              fraction:   p.fraction ?? 0,
-            })),
-        );
+        const recent: RecentBook[] = progressData.map(p => {
+          // Prefer catalog title/subtitle (matches iOS exactly)
+          const slug = uuidToSlug.get(p.book_id);
+          const catBook = slug ? catalogBookMap.get(slug) : null;
+          const title    = catBook?.title ?? '—';
+          const subtitle = catBook ? collectionName(catalog, catBook.categoryId) : '';
+
+          return {
+            bookId:    p.book_id,
+            passageId: p.passage_id ?? null,
+            title,
+            subtitle,
+            updatedAt: p.updated_at,
+            fraction:  p.fraction ?? 0,
+          };
+        }).filter(b => b.title !== '—');
+
+        setRecentBooks(recent);
       }
     } finally {
       setLoading(false);
@@ -86,8 +92,8 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
   function formatDate(iso: string) {
     const d = new Date(iso);
     const diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
@@ -154,18 +160,17 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                       className="w-full text-left bg-white rounded-xl px-5 py-4 shadow-sm border border-gray-100 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{book.title}</div>
-                          {book.authorName && (
-                            <div className="text-xs text-gray-400 mt-0.5">{book.authorName}</div>
+                        <div className="min-w-0 mr-4">
+                          <div className="text-sm font-medium text-gray-900 truncate">{book.title}</div>
+                          {book.subtitle && (
+                            <div className="text-xs text-gray-400 mt-0.5 truncate">{book.subtitle}</div>
                           )}
                         </div>
-                        <div className="text-right shrink-0 ml-4">
+                        <div className="text-right shrink-0">
                           <div className="text-xs font-medium text-[#1B6B7B]">{pct}%</div>
                           <div className="text-xs text-gray-300 mt-0.5">{formatDate(book.updatedAt)}</div>
                         </div>
                       </div>
-                      {/* Progress bar */}
                       <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-[#1B6B7B] rounded-full transition-all"
