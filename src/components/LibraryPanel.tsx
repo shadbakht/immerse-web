@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
@@ -16,7 +16,7 @@ interface CatalogCategory {
 }
 
 interface CatalogBook {
-  id: string;          // corpus slug, e.g. "bible-kjv-genesis"
+  id: string;       // corpus slug, e.g. "bible-kjv-genesis"
   categoryId: string;
   title: string;
 }
@@ -44,35 +44,28 @@ interface LibraryPanelProps {
   onCollapse?: () => void;
 }
 
-// Catalog is tiny (75 KB) — served from public/ (same-origin, no CORS issues).
-// Update public/catalog.json in this repo whenever the corpus version changes.
-const CATALOG_URL = '/catalog.json';
+// Session-level cache so catalog is only fetched once per page load.
 let _catalogCache: Catalog | null = null;
-let _slugMapCache: Map<string, string> | null = null; // slug → Supabase UUID
+let _slugMapCache: Map<string, string> | null = null; // corpus slug → Supabase UUID
 
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
 
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [slugMap, setSlugMap] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
-
-  // Expand state
-  const [openRoots, setOpenRoots]       = useState<Set<string>>(new Set());
-  const [openChildren, setOpenChildren] = useState<Set<string>>(new Set());
-
-  // Checkbox selection (slugs)
+  const [catalog, setCatalog]   = useState<Catalog | null>(null);
+  const [slugMap, setSlugMap]   = useState<Map<string, string>>(new Map());
+  const [loading, setLoading]   = useState(true);
+  const [openNodes, setOpenNodes] = useState<Set<string>>(new Set());
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
 
   // Search
-  const [searchQuery, setSearchQuery]       = useState('');
-  const [searchResults, setSearchResults]   = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading]   = useState(false);
-  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
-  const [checkedResultIds, setCheckedResultIds] = useState<Set<string>>(new Set());
-  const [tagPanelVisible, setTagPanelVisible]   = useState(false);
+  const [searchQuery,       setSearchQuery]       = useState('');
+  const [searchResults,     setSearchResults]     = useState<SearchResult[]>([]);
+  const [searchLoading,     setSearchLoading]     = useState(false);
+  const [expandedResults,   setExpandedResults]   = useState<Set<string>>(new Set());
+  const [checkedResultIds,  setCheckedResultIds]  = useState<Set<string>>(new Set());
+  const [tagPanelVisible,   setTagPanelVisible]   = useState(false);
 
-  // ── Load catalog + slug map ──────────────────────────────────────────────────
+  // ── Load ──────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (activeTab !== 'library') return;
@@ -82,20 +75,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   async function loadCatalog() {
     setLoading(true);
     try {
-      // Catalog
       if (!_catalogCache) {
-        const res = await fetch(CATALOG_URL);
+        const res = await fetch('/catalog.json');
         _catalogCache = await res.json() as Catalog;
       }
-
-      // Slug → UUID map (book_slug_map table, 527 rows, ~30 KB)
       if (!_slugMapCache) {
-        const { data } = await supabase
-          .from('book_slug_map')
-          .select('local_id, book_id');
-        _slugMapCache = new Map((data ?? []).map((r: any) => [r.local_id, r.book_id]));
+        const { data } = await supabase.from('book_slug_map').select('local_id, book_id');
+        _slugMapCache = new Map((data ?? []).map((r: any) => [r.local_id as string, r.book_id as string]));
       }
-
       setCatalog(_catalogCache);
       setSlugMap(_slugMapCache);
     } catch (err) {
@@ -105,40 +92,28 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }
   }
 
-  // Translate a corpus slug to a Supabase UUID for the reader
-  function uuidForSlug(slug: string): string {
-    return slugMap.get(slug) ?? slug; // fall back to slug if not found
-  }
-
   // ── Tree helpers ─────────────────────────────────────────────────────────────
 
-  const roots = (catalog?.categories ?? [])
-    .filter(c => c.parentId === null && c.kind !== 'imported')
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-
-  function childrenOf(parentId: string): CatalogCategory[] {
+  const childrenOf = useCallback((parentId: string): CatalogCategory[] => {
     return (catalog?.categories ?? [])
       .filter(c => c.parentId === parentId)
       .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-  }
+  }, [catalog]);
 
-  function booksInCategory(catId: string): CatalogBook[] {
+  const booksInCategory = useCallback((catId: string): CatalogBook[] => {
     return (catalog?.books ?? [])
       .filter(b => b.categoryId === catId)
       .sort((a, b) => a.title.localeCompare(b.title));
-  }
+  }, [catalog]);
+
+  // Recursively collect all book slugs under a category at any depth
+  const allSlugsUnder = useCallback((catId: string): string[] => {
+    const direct = booksInCategory(catId).map(b => b.id);
+    const nested = childrenOf(catId).flatMap(c => allSlugsUnder(c.id));
+    return [...direct, ...nested];
+  }, [booksInCategory, childrenOf]);
 
   // ── Checkbox helpers ─────────────────────────────────────────────────────────
-
-  function slugsUnderRoot(rootId: string): string[] {
-    const direct = booksInCategory(rootId).map(b => b.id);
-    const childSlugs = childrenOf(rootId).flatMap(c => booksInCategory(c.id).map(b => b.id));
-    return [...direct, ...childSlugs];
-  }
-
-  function slugsUnderChild(childId: string): string[] {
-    return booksInCategory(childId).map(b => b.id);
-  }
 
   function checkState(slugs: string[]): 'checked' | 'indeterminate' | 'unchecked' {
     if (slugs.length === 0) return 'unchecked';
@@ -157,6 +132,94 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       else slugs.forEach(s => next.add(s));
       return next;
     });
+  }
+
+  function toggleNode(id: string) {
+    setOpenNodes(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // ── Recursive tree renderer ───────────────────────────────────────────────────
+  // level 0 = root traditions (rendered as top-level section rows)
+  // level 1+ = sub-categories and books, indented by level
+
+  function renderChildren(parentId: string, level: number) {
+    const children  = childrenOf(parentId);
+    const books     = booksInCategory(parentId);
+    if (children.length === 0 && books.length === 0) return null;
+
+    // Padding: 12px base + 12px per level for categories; extra 24px for books
+    const catPadLeft  = 12 + level * 14;
+    const bookPadLeft = catPadLeft + 24;
+
+    return (
+      <>
+        {children.map(child => {
+          const childSlugs = allSlugsUnder(child.id);
+          const isOpen     = openNodes.has(child.id);
+          const state      = checkState(childSlugs);
+
+          return (
+            <div key={child.id}>
+              <div
+                className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                style={{ paddingLeft: catPadLeft }}
+              >
+                <Checkbox
+                  state={state}
+                  onChange={() => toggleSlugs(childSlugs)}
+                  className="pr-1 py-3 shrink-0"
+                />
+                <button
+                  onClick={() => toggleNode(child.id)}
+                  className="flex-1 flex items-center justify-between pr-4 py-3 text-left min-w-0"
+                >
+                  <span className={`truncate ${level === 0 ? 'text-sm font-medium text-gray-800' : 'text-sm text-gray-700'}`}>
+                    {child.name}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <span className="text-xs text-gray-400">{childSlugs.length}</span>
+                    <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                  </div>
+                </button>
+              </div>
+              {isOpen && (
+                <div className={level === 0 ? 'bg-gray-50/30' : ''}>
+                  {renderChildren(child.id, level + 1)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {books.map(book => {
+          const isChecked = selectedSlugs.has(book.id);
+          const uuid = slugMap.get(book.id) ?? book.id;
+          return (
+            <div
+              key={book.id}
+              className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors"
+              style={{ paddingLeft: bookPadLeft }}
+            >
+              <Checkbox
+                state={isChecked ? 'checked' : 'unchecked'}
+                onChange={() => toggleSlugs([book.id])}
+                className="pr-1 py-2.5 shrink-0"
+              />
+              <button
+                onClick={() => onOpenBook(uuid)}
+                className="flex-1 text-left pr-4 py-2.5 min-w-0"
+              >
+                <div className="text-sm text-gray-800 truncate">{book.title}</div>
+              </button>
+            </div>
+          );
+        })}
+      </>
+    );
   }
 
   // ── Search ───────────────────────────────────────────────────────────────────
@@ -190,7 +253,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).join(' & ');
   }
 
-  // Scope search to Supabase UUIDs of selected slugs
   function selectedUUIDs(): string[] {
     return [...selectedSlugs].map(s => slugMap.get(s)).filter(Boolean) as string[];
   }
@@ -279,19 +341,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     for (const w of words) {
       const normW = normalize(w);
       let idx = normText.indexOf(normW);
-      while (idx >= 0) {
-        ranges.push({ start: idx, end: idx + normW.length });
-        idx = normText.indexOf(normW, idx + 1);
-      }
+      while (idx >= 0) { ranges.push({ start: idx, end: idx + normW.length }); idx = normText.indexOf(normW, idx + 1); }
       const group = synonymMap.get(w.toLowerCase());
       if (group) {
         for (const syn of group) {
           const normSyn = normalize(syn);
           let sidx = normText.indexOf(normSyn);
-          while (sidx >= 0) {
-            ranges.push({ start: sidx, end: sidx + normSyn.length });
-            sidx = normText.indexOf(normSyn, sidx + 1);
-          }
+          while (sidx >= 0) { ranges.push({ start: sidx, end: sidx + normSyn.length }); sidx = normText.indexOf(normSyn, sidx + 1); }
         }
       }
     }
@@ -334,6 +390,11 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   const isSearching = searchQuery.trim().length > 0;
 
+  // Root traditions (parentId = null, not imported)
+  const roots = (catalog?.categories ?? [])
+    .filter(c => c.parentId === null && c.kind !== 'imported')
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+
   return (
     <div className="flex flex-col h-full">
       {/* Header + search */}
@@ -364,9 +425,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             <button
               onClick={() => { setSearchQuery(''); setSearchResults([]); }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
-            >
-              ✕
-            </button>
+            >✕</button>
           )}
         </div>
       </div>
@@ -398,29 +457,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     <div className="flex items-start">
                       <Checkbox
                         state={isChecked ? 'checked' : 'unchecked'}
-                        onChange={() => setCheckedResultIds(prev => {
-                          const next = new Set(prev);
-                          next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
-                          return next;
-                        })}
+                        onChange={() => setCheckedResultIds(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
                         className="pl-3 pr-1 pt-3.5 shrink-0"
                       />
                       <div
                         className="flex-1 text-left pr-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                        onClick={() => setExpandedResults(prev => {
-                          const next = new Set(prev);
-                          next.has(result.passageId) ? next.delete(result.passageId) : next.add(result.passageId);
-                          return next;
-                        })}
+                        onClick={() => setExpandedResults(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
                       >
                         <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
                           {result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="text-sm text-gray-700 leading-relaxed">
-                          {isExpanded
-                            ? highlightQuery(result.content, searchQuery)
-                            : highlightQuery(snippet, searchQuery)
-                          }
+                          {isExpanded ? highlightQuery(result.content, searchQuery) : highlightQuery(snippet, searchQuery)}
                         </p>
                         {isExpanded && (
                           <button
@@ -439,102 +487,39 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           )}
         </div>
       ) : (
-        /* ── Library tree (from catalog.json) ── */
+        /* ── Library tree ── */
         <div className="flex-1 overflow-y-auto">
           {roots.map(root => {
-            const isRootOpen  = openRoots.has(root.id);
-            const rootSlugs   = slugsUnderRoot(root.id);
-            const rootState   = checkState(rootSlugs);
-            const children    = childrenOf(root.id);
-            const directBooks = booksInCategory(root.id);
-            const totalBooks  = rootSlugs.length;
+            const rootSlugs = allSlugsUnder(root.id);
+            const isOpen    = openNodes.has(root.id);
+            const state     = checkState(rootSlugs);
 
             return (
               <div key={root.id}>
-                {/* Tradition row */}
                 <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <Checkbox state={rootState} onChange={() => toggleSlugs(rootSlugs)} className="pl-3 pr-1 py-3.5 shrink-0" />
+                  <Checkbox state={state} onChange={() => toggleSlugs(rootSlugs)} className="pl-3 pr-1 py-3.5 shrink-0" />
                   <button
-                    onClick={() => setOpenRoots(prev => { const n = new Set(prev); n.has(root.id) ? n.delete(root.id) : n.add(root.id); return n; })}
-                    className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left"
+                    onClick={() => toggleNode(root.id)}
+                    className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
                   >
-                    <span className="text-sm font-medium text-gray-800">{root.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400">{totalBooks}</span>
-                      <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isRootOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="text-sm font-medium text-gray-800 truncate">{root.name}</span>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <span className="text-xs text-gray-400">{rootSlugs.length}</span>
+                      <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>
                 </div>
-
-                {isRootOpen && (
-                  <>
-                    {/* Child categories (author / collection) */}
-                    {children.map(child => {
-                      const isChildOpen  = openChildren.has(child.id);
-                      const childSlugs   = slugsUnderChild(child.id);
-                      const childState   = checkState(childSlugs);
-                      const childBooks   = booksInCategory(child.id);
-
-                      return (
-                        <div key={child.id}>
-                          <div className="flex items-center border-b border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                            <Checkbox state={childState} onChange={() => toggleSlugs(childSlugs)} className="pl-6 pr-1 py-3 shrink-0" />
-                            <button
-                              onClick={() => setOpenChildren(prev => { const n = new Set(prev); n.has(child.id) ? n.delete(child.id) : n.add(child.id); return n; })}
-                              className="flex-1 flex items-center justify-between pr-4 py-3 text-left"
-                            >
-                              <span className="text-sm text-gray-700">{child.name}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400">{childSlugs.length}</span>
-                                <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isChildOpen ? 'rotate-90' : ''}`}>›</span>
-                              </div>
-                            </button>
-                          </div>
-
-                          {isChildOpen && childBooks.map(book => {
-                            const isChecked = selectedSlugs.has(book.id);
-                            return (
-                              <div key={book.id} className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                                <Checkbox state={isChecked ? 'checked' : 'unchecked'} onChange={() => toggleSlugs([book.id])} className="pl-9 pr-1 py-3 shrink-0" />
-                                <button onClick={() => onOpenBook(uuidForSlug(book.id))} className="flex-1 text-left pr-4 py-3">
-                                  <div className="text-sm text-gray-800">{book.title}</div>
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-
-                    {/* Books directly under the root (no child category) */}
-                    {directBooks.map(book => {
-                      const isChecked = selectedSlugs.has(book.id);
-                      return (
-                        <div key={book.id} className="flex items-center border-b border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                          <Checkbox state={isChecked ? 'checked' : 'unchecked'} onChange={() => toggleSlugs([book.id])} className="pl-6 pr-1 py-3 shrink-0" />
-                          <button onClick={() => onOpenBook(uuidForSlug(book.id))} className="flex-1 text-left pr-4 py-3">
-                            <div className="text-sm text-gray-800">{book.title}</div>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
+                {isOpen && renderChildren(root.id, 1)}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Action bar — search results only */}
+      {/* Tag action bar */}
       {checkedResultIds.size > 0 && (
         <div className="border-t border-gray-200 px-4 py-3 bg-white flex items-center justify-between gap-3 shrink-0">
-          <button
-            onClick={() => setCheckedResultIds(new Set())}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            Cancel
-          </button>
+          <button onClick={() => setCheckedResultIds(new Set())} className="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
           <button
             onClick={() => setTagPanelVisible(true)}
             className="flex-1 bg-[#1B6B7B] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-[#155a68] transition-colors"
@@ -552,8 +537,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         onSave={async (tagIds: string[]) => {
           if (!userId || tagIds.length === 0) return;
           const now = new Date().toISOString();
-          const checkedResults = searchResults.filter(r => checkedResultIds.has(r.passageId));
-          for (const result of checkedResults) {
+          for (const result of searchResults.filter(r => checkedResultIds.has(r.passageId))) {
             const { data: sel } = await supabase
               .from('selections')
               .insert({ user_id: userId, passage_id: result.passageId, start_offset: 0, end_offset: result.content.length, snapshot_text: result.content.slice(0, 300), created_at: now })
@@ -571,7 +555,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   );
 }
 
-// ── Checkbox component ─────────────────────────────────────────────────────────
+// ── Checkbox ──────────────────────────────────────────────────────────────────
 
 function Checkbox({ state, onChange, className }: {
   state: 'checked' | 'indeterminate' | 'unchecked';
@@ -579,14 +563,10 @@ function Checkbox({ state, onChange, className }: {
   className?: string;
 }) {
   return (
-    <button
-      onClick={e => { e.stopPropagation(); onChange(); }}
-      className={`flex items-center justify-center ${className}`}
-    >
+    <button onClick={e => { e.stopPropagation(); onChange(); }} className={`flex items-center justify-center ${className}`}>
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
         state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
-        state === 'indeterminate' ? 'border-[#1B6B7B]' :
-                                    'border-gray-300'
+        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300'
       }`}>
         {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
         {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}
