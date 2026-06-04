@@ -505,10 +505,20 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
 async function handleCopy() {
     if (!selectionBar) return;
     const passage = passages.find(p => p.id === selectionBar.startPassageId);
-    const location = passage?.chapter_label || passage?.section_title || null;
-    const para = passage?.paragraph_number ? `p.${passage.paragraph_number}` : null;
-    const citationParts = [book?.authorName, book?.title, location, para].filter(Boolean);
-    const citation = citationParts.length ? `— ${citationParts.join(', ')}` : '';
+
+    let citation = '';
+    if (target.bookId.startsWith('quran')) {
+      const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
+      const verse = passage?.paragraph_number ?? '';
+      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || (verse ? String(verse) : '');
+      citation = `— ${book?.title ?? "The Qur'an"}${loc ? ` ${loc}` : ''}`;
+    } else {
+      const author = book?.authorName && book.authorName !== book?.title ? book.authorName : null;
+      const location = passage?.chapter_label || passage?.section_title || null;
+      const para = passage?.paragraph_number ? `p.${passage.paragraph_number}` : null;
+      const citationParts = [author, book?.title, location, para].filter(Boolean);
+      citation = citationParts.length ? `— ${citationParts.join(', ')}` : '';
+    }
     const textToCopy = citation ? `"${selectionBar.text}"\n${citation}` : selectionBar.text;
     await navigator.clipboard.writeText(textToCopy);
     setSelectionBar(null);
