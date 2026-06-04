@@ -184,7 +184,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
     if (!userId || !target?.bookId) return;
     const passage = passages.find(p => p.id === passageId);
     const fraction = passage ? passage.sort_order / Math.max(maxSortOrder, 1) : 0;
-    await supabase.from('reading_progress').upsert(
+    const { error } = await supabase.from('reading_progress').upsert(
       {
         user_id:            userId,
         book_id:            target.bookId,
@@ -195,7 +195,8 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
       },
       { onConflict: 'user_id,book_id' },
     );
-    lastSavedPidRef.current = passageId;
+    if (error) console.error('[ReadingProgress] save failed:', error.message);
+    else lastSavedPidRef.current = passageId;
   }, [userId, target?.bookId, passages, maxSortOrder]);
 
   // Track topmost visible passage with IntersectionObserver; debounce saves by 3s
@@ -669,7 +670,17 @@ async function handleCopy() {
         updated_at: now,
       }).catch(() => {});
     }
-    if (bar) setNotedPassageIds(prev => new Set(prev).add(bar.startPassageId));
+    if (bar) {
+      setNotedPassageIds(prev => new Set(prev).add(bar.startPassageId));
+      if (noteData) {
+        setPassageToNote(prev => new Map(prev).set(bar.startPassageId, {
+          noteId: noteData.id,
+          content,
+          selectionId: selId,
+          snapshotText: bar.text,
+        }));
+      }
+    }
   }
 
   async function handleXrefSave(targetPassageId: string, targetSnapshotText: string) {
