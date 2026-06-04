@@ -2131,7 +2131,7 @@
       "title": "Job"
     },
     {
-      "id": "1-shir-hashirim-song-of-songs",
+      "id": "shir-hashirim-song-of-songs",
       "categoryId": "cat-jewish-tanakh-ketuvim-writings-megilot",
       "title": "Song of Songs"
     },
@@ -2179,11 +2179,6 @@
       "id": "9-divrei-yamim-b-2-chronicles",
       "categoryId": "cat-jewish-tanakh-ketuvim-writings",
       "title": "2 Chronicles"
-    },
-    {
-      "id": "shir-hashirim-song-of-songs",
-      "categoryId": "cat-jewish-tanakh-ketuvim-writings",
-      "title": "Song of Songs"
     },
     {
       "id": "gathas",
