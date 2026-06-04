@@ -199,47 +199,37 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
     else lastSavedPidRef.current = passageId;
   }, [userId, target?.bookId, passages, maxSortOrder]);
 
-  // Track topmost visible passage with IntersectionObserver; debounce saves by 3s
+  // Track topmost visible passage via scroll events; debounce saves by 3s
   useEffect(() => {
-    if (!userId || passages.length === 0) return;
+    if (!userId || passages.length === 0 || !scrollRef.current) return;
+    const container = scrollRef.current;
 
-    // Track which passages are currently intersecting
-    const visible = new Map<string, number>(); // passageId → boundingRect.top
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const pid = (entry.target as HTMLElement).dataset.pid;
-          if (!pid) continue;
-          if (entry.isIntersecting) {
-            visible.set(pid, entry.boundingClientRect.top);
-          } else {
-            visible.delete(pid);
+    function scheduleProgressSave() {
+      if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = setTimeout(() => {
+        // Scan passages in order; first whose bottom edge clears the container top is topmost visible
+        const containerTop = container.getBoundingClientRect().top;
+        let topmostId: string | null = null;
+        for (const p of passages) {
+          const el = document.getElementById(`p-${p.id}`);
+          if (!el) continue;
+          if (el.getBoundingClientRect().bottom > containerTop + 8) {
+            topmostId = p.id;
+            break;
           }
         }
-        // Find topmost visible passage
-        if (visible.size === 0) return;
-        const topmost = [...visible.entries()]
-          .sort((a, b) => a[1] - b[1])[0][0];
+        if (topmostId && topmostId !== lastSavedPidRef.current) {
+          saveProgress(topmostId).catch(() => {});
+        }
+      }, 3000);
+    }
 
-        if (topmost === lastSavedPidRef.current) return;
-
-        // Debounce: wait 3s of stability before writing
-        if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
-        progressTimerRef.current = setTimeout(() => {
-          saveProgress(topmost).catch(() => {});
-        }, 3000);
-      },
-      { threshold: 0.1 },
-    );
-
-    passages.forEach(p => {
-      const el = document.getElementById(`p-${p.id}`);
-      if (el) observer.observe(el);
-    });
+    container.addEventListener('scroll', scheduleProgressSave, { passive: true });
+    // Also fire once on setup so a stationary reader still saves after 3s
+    scheduleProgressSave();
 
     return () => {
-      observer.disconnect();
+      container.removeEventListener('scroll', scheduleProgressSave);
       if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
     };
   }, [passages, userId, saveProgress]);
