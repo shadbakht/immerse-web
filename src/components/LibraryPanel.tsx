@@ -76,8 +76,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   const booksInCategory = useCallback((catId: string): CatalogBook[] => {
     return (catalog?.books ?? [])
-      .filter(b => b.categoryId === catId)
-      .sort((a, b) => a.title.localeCompare(b.title));
+      .filter(b => b.categoryId === catId);
   }, [catalog]);
 
   // Recursively collect all book slugs under a category at any depth
