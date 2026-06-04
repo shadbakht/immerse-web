@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { pushNote, pushXref } from '@/lib/annotationSync';
+import { pushNote, pushXref, deleteRemote } from '@/lib/annotationSync';
 import type { ReaderTarget } from './AppShell';
 import PanelSheet from './PanelSheet';
 import TagPanel from './TagPanel';
@@ -98,6 +98,10 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
   const [taggedPassageIds, setTaggedPassageIds]   = useState<Set<string>>(new Set());
   const [notedPassageIds, setNotedPassageIds]     = useState<Set<string>>(new Set());
+  const [passageToNote, setPassageToNote] = useState<Map<string, { noteId: string; content: string; selectionId: string; snapshotText: string }>>(new Map());
+  const [passageToTags, setPassageToTags] = useState<Map<string, { selectionId: string; snapshotText: string; tags: Array<{ id: string; name: string }> }>>(new Map());
+  const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags'; passageId: string } | null>(null);
+  const [editNoteContent, setEditNoteContent] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
@@ -195,21 +199,38 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     if (!userId || passageIds.length === 0) return;
     const tagged = new Set<string>();
     const noted  = new Set<string>();
-    const BATCH  = 200;
+    const noteMap = new Map<string, { noteId: string; content: string; selectionId: string; snapshotText: string }>();
+    const tagsMap = new Map<string, { selectionId: string; snapshotText: string; tags: Array<{ id: string; name: string }> }>();
+    const BATCH = 200;
     for (let i = 0; i < passageIds.length; i += BATCH) {
       const ids = passageIds.slice(i, i + BATCH);
       const { data } = await supabase
         .from('selections')
-        .select('passage_id, selection_tags(id), notes(id)')
+        .select('id, passage_id, snapshot_text, selection_tags(tag_id, tags(id, name)), notes(id, content)')
         .eq('user_id', userId)
         .in('passage_id', ids);
-      for (const row of data ?? []) {
-        if ((row.selection_tags as any[])?.length > 0) tagged.add(row.passage_id);
-        if ((row.notes        as any[])?.length > 0) noted.add(row.passage_id);
+      for (const row of (data ?? []) as any[]) {
+        const selTags  = (row.selection_tags as any[]) ?? [];
+        const selNotes = (row.notes as any[]) ?? [];
+        if (selTags.length > 0) {
+          tagged.add(row.passage_id);
+          tagsMap.set(row.passage_id, {
+            selectionId: row.id,
+            snapshotText: row.snapshot_text ?? '',
+            tags: selTags.map((st: any) => ({ id: st.tags?.id ?? st.tag_id, name: st.tags?.name ?? '' })).filter((t: any) => t.name),
+          });
+        }
+        if (selNotes.length > 0) {
+          noted.add(row.passage_id);
+          const note = selNotes[0];
+          noteMap.set(row.passage_id, { noteId: note.id, content: note.content, selectionId: row.id, snapshotText: row.snapshot_text ?? '' });
+        }
       }
     }
     setTaggedPassageIds(tagged);
     setNotedPassageIds(noted);
+    setPassageToTags(tagsMap);
+    setPassageToNote(noteMap);
   }, [userId]);
 
   // Realtime: refresh annotation indicators when selections change for this user.
@@ -412,6 +433,48 @@ async function handleCopy() {
     await navigator.clipboard.writeText(textToCopy);
     setSelectionBar(null);
     window.getSelection()?.removeAllRanges();
+  }
+
+  function handleTagIconClick(passageId: string) {
+    setAnnotationPanel({ type: 'tags', passageId });
+  }
+
+  function handleNoteIconClick(passageId: string) {
+    const data = passageToNote.get(passageId);
+    if (!data) return;
+    setEditNoteContent(data.content);
+    setAnnotationPanel({ type: 'note', passageId });
+  }
+
+  function closeAnnotationPanel() {
+    setAnnotationPanel(null);
+    setEditNoteContent('');
+  }
+
+  async function handleSaveEditNote() {
+    if (!annotationPanel || annotationPanel.type !== 'note') return;
+    const data = passageToNote.get(annotationPanel.passageId);
+    if (!data || !editNoteContent.trim()) return;
+    const now = new Date().toISOString();
+    try {
+      await supabase.from('notes').update({ content: editNoteContent.trim(), updated_at: now }).eq('id', data.noteId);
+      await pushNote({ id: data.noteId, user_id: userId, selection_id: data.selectionId, content: editNoteContent.trim(), updated_at: now }).catch(() => {});
+      setPassageToNote(prev => { const next = new Map(prev); next.set(annotationPanel.passageId, { ...data, content: editNoteContent.trim() }); return next; });
+      closeAnnotationPanel();
+    } catch {}
+  }
+
+  async function handleDeleteNote() {
+    if (!annotationPanel || annotationPanel.type !== 'note') return;
+    const data = passageToNote.get(annotationPanel.passageId);
+    if (!data || !confirm('Delete this note?')) return;
+    try {
+      await supabase.from('notes').delete().eq('id', data.noteId);
+      deleteRemote('notes', data.noteId).catch(() => {});
+      setNotedPassageIds(prev => { const next = new Set(prev); next.delete(annotationPanel.passageId); return next; });
+      setPassageToNote(prev => { const next = new Map(prev); next.delete(annotationPanel.passageId); return next; });
+      closeAnnotationPanel();
+    } catch {}
   }
 
   function openPanel(panel: 'tag' | 'note' | 'xref' | 'ai') {
@@ -630,10 +693,19 @@ async function handleCopy() {
                   {(taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
                       {taggedPassageIds.has(passage.id) && (
-                        <span className="text-[32px] leading-none inline-block scale-x-[-1]" title="Tagged">🏷</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}
+                          className="text-[32px] leading-none inline-block scale-x-[-1] cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          title="View tags"
+                        >🏷</button>
                       )}
                       {notedPassageIds.has(passage.id) && (
-                        <span className="text-[32px] leading-none inline-block" title="Note" style={{ filter: 'sepia(1) saturate(3) hue-rotate(5deg)' }}>📝</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleNoteIconClick(passage.id); }}
+                          className="text-[32px] leading-none inline-block cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          title="View note"
+                          style={{ filter: 'sepia(1) saturate(3) hue-rotate(5deg)' }}
+                        >📝</button>
                       )}
                     </div>
                   )}
@@ -725,6 +797,81 @@ async function handleCopy() {
         authorName={book?.authorName ?? ''}
         isPro={isPro}
       />
+
+      {/* Tags view panel — opened by tapping the 🏷 margin icon */}
+      {(() => {
+        const data = annotationPanel?.type === 'tags' ? passageToTags.get(annotationPanel.passageId) : undefined;
+        return (
+          <PanelSheet
+            visible={annotationPanel?.type === 'tags'}
+            onClose={closeAnnotationPanel}
+            title="Tags"
+          >
+            {data && (
+              <div className="px-5 pt-4 pb-4">
+                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 line-clamp-2 italic">"{data.snapshotText}"</p>
+                </div>
+                {data.tags.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No tags on this selection.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.tags.map(tag => (
+                      <div key={tag.id} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className="text-xl leading-none inline-block scale-x-[-1] text-blue-500">🏷</span>
+                        <span className="text-sm font-medium text-gray-800">{tag.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </PanelSheet>
+        );
+      })()}
+
+      {/* Note edit panel — opened by tapping the 📝 margin icon */}
+      {(() => {
+        const data = annotationPanel?.type === 'note' ? passageToNote.get(annotationPanel.passageId) : undefined;
+        return (
+          <PanelSheet
+            visible={annotationPanel?.type === 'note'}
+            onClose={closeAnnotationPanel}
+            title="Note"
+            footer={
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDeleteNote}
+                  className="px-4 py-2.5 rounded-xl border border-red-200 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={handleSaveEditNote}
+                  className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] text-white text-sm font-semibold hover:bg-[#155a68] transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            }
+          >
+            {data && (
+              <div className="px-5 pt-4 pb-2">
+                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 line-clamp-2 italic">"{data.snapshotText}"</p>
+                </div>
+                <textarea
+                  autoFocus
+                  value={editNoteContent}
+                  onChange={e => setEditNoteContent(e.target.value)}
+                  rows={5}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
+                />
+              </div>
+            )}
+          </PanelSheet>
+        );
+      })()}
     </div>
   );
 }
