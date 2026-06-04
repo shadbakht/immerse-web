@@ -2616,46 +2616,6 @@
       "title": "The Bah\u00e1'\u00ed Proofs"
     },
     {
-      "id": "section-39-chaubolas-fifth-mehl",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 39 - Chaubolas, Fifth Mehl"
-    },
-    {
-      "id": "section-40-shaloks-of-devotee-kabeer-jee",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 40 - Shaloks Of Devotee Kabeer Jee"
-    },
-    {
-      "id": "section-41-shaloks-of-shaykh-fareed-jee",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 41 - Shaloks Of Shaykh Fareed Jee"
-    },
-    {
-      "id": "section-42-swaiyas-from-the-mouth-of-the-great-fifth-mehl",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 42 - Swaiyas From The Mouth Of The Great Fifth Mehl"
-    },
-    {
-      "id": "section-43-shaloks-in-addition-to-the-vaars",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 43 - Shaloks In Addition To The Vaars"
-    },
-    {
-      "id": "section-44-shalok-ninth-mehl",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 44 - Shalok, Ninth Mehl"
-    },
-    {
-      "id": "section-45-mundaavanee-fifth-mehl-raag-maalaa",
-      "categoryId": "cat-more-sikh",
-      "title": "Section 45 - Mundaavanee, Fifth Mehl, Raag Maalaa"
-    },
-    {
-      "id": "bahaullah-and-the-new-era",
-      "categoryId": "cat-bahai-other",
-      "title": "Bah\u00e1'u'll\u00e1h and the New Era"
-    },
-    {
       "id": "section-1-jup",
       "categoryId": "cat-more-sikh",
       "title": "Section  1 - Jup"
@@ -2689,6 +2649,11 @@
       "id": "section-7-raag-gauree",
       "categoryId": "cat-more-sikh",
       "title": "Section  7 - Raag Gauree"
+    },
+    {
+      "id": "bahaullah-and-the-new-era",
+      "categoryId": "cat-bahai-other",
+      "title": "Bah\u00e1'u'll\u00e1h and the New Era"
     },
     {
       "id": "section-8-raag-aasaa",
@@ -2844,6 +2809,41 @@
       "id": "section-38-phunhay-fifth-mehl",
       "categoryId": "cat-more-sikh",
       "title": "Section 38 - Phunhay, Fifth Mehl"
+    },
+    {
+      "id": "section-39-chaubolas-fifth-mehl",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 39 - Chaubolas, Fifth Mehl"
+    },
+    {
+      "id": "section-40-shaloks-of-devotee-kabeer-jee",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 40 - Shaloks Of Devotee Kabeer Jee"
+    },
+    {
+      "id": "section-41-shaloks-of-shaykh-fareed-jee",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 41 - Shaloks Of Shaykh Fareed Jee"
+    },
+    {
+      "id": "section-42-swaiyas-from-the-mouth-of-the-great-fifth-mehl",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 42 - Swaiyas From The Mouth Of The Great Fifth Mehl"
+    },
+    {
+      "id": "section-43-shaloks-in-addition-to-the-vaars",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 43 - Shaloks In Addition To The Vaars"
+    },
+    {
+      "id": "section-44-shalok-ninth-mehl",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 44 - Shalok, Ninth Mehl"
+    },
+    {
+      "id": "section-45-mundaavanee-fifth-mehl-raag-maalaa",
+      "categoryId": "cat-more-sikh",
+      "title": "Section 45 - Mundaavanee, Fifth Mehl, Raag Maalaa"
     },
     {
       "id": "the-brilliant-proof",
