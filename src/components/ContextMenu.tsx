@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface MenuOption {
   label: string;
@@ -11,34 +12,44 @@ export interface MenuOption {
 
 export function ContextMenu({ options }: { options: MenuOption[] }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClose(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
           buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    if (open) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (open) document.addEventListener('mousedown', handleClose);
+    return () => document.removeEventListener('mousedown', handleClose);
   }, [open]);
 
+  function handleOpen() {
+    if (buttonRef.current) {
+      const r = buttonRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    setOpen(v => !v);
+  }
+
   return (
-    <div className="relative">
+    <div>
       <button
         ref={buttonRef}
-        onClick={() => setOpen(!open)}
+        onClick={handleOpen}
         className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
         title="Options"
       >
         <span className="text-gray-400 text-lg">⋮</span>
       </button>
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
-          className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
+          style={{ position: 'fixed', top: pos.top, right: pos.right }}
+          className="w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999] overflow-hidden"
         >
           {options.map((option, i) => (
             <button
@@ -55,7 +66,8 @@ export function ContextMenu({ options }: { options: MenuOption[] }) {
               {option.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
