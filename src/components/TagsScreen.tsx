@@ -20,31 +20,46 @@ function Highlight({ text, q }: { text: string; q: string }) {
   return <>{text.split(pat).map((p, i) => pat.test(p) ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark> : <span key={i}>{p}</span>)}</>;
 }
 
-function PassageRow({ sel, searchQuery, onOpenBook }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void }) {
+function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
+
+  const menuOptions: MenuOption[] = [
+    {
+      label: 'Remove from tag',
+      icon: '✕',
+      color: 'danger',
+      onClick: () => { if (confirm('Remove this passage from the tag?')) onRemove(); },
+    },
+  ];
+
   return (
-    <div className="px-5 py-3 border-t border-gray-100">
-      <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
-        <Highlight text={sel.citation} q={searchQuery} />
-      </p>
-      <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-        <p className={`text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
-          "<Highlight text={sel.snapshot_text} q={searchQuery} />"
+    <div className="px-5 py-3 border-t border-gray-100 flex items-start gap-2">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
+          <Highlight text={sel.citation} q={searchQuery} />
         </p>
+        <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
+          <p className={`text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+            "<Highlight text={sel.snapshot_text} q={searchQuery} />"
+          </p>
+        </div>
+        {expanded && sel.book_id && (
+          <button
+            onClick={() => onOpenBook(sel.book_id, sel.passage_id)}
+            className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+          >
+            Open in reader →
+          </button>
+        )}
       </div>
-      {expanded && sel.book_id && (
-        <button
-          onClick={() => onOpenBook(sel.book_id, sel.passage_id)}
-          className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
-        >
-          Open in reader →
-        </button>
-      )}
+      <div className="shrink-0" onClick={e => e.stopPropagation()}>
+        <ContextMenu options={menuOptions} />
+      </div>
     </div>
   );
 }
 
-function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void; onToggleVisibility: (id: string, isPublic: boolean) => void }) {
+function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void; onToggleVisibility: (id: string, isPublic: boolean) => void; onRemovePassage: (tagId: string, selId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(tag.name);
@@ -121,7 +136,7 @@ function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVis
           {tag.selections.length === 0
             ? <p className="px-5 py-3 text-xs text-gray-400 border-t border-gray-100">No passages tagged.</p>
             : tag.selections.map(sel => (
-                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} />
+                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} />
               ))}
         </div>
       )}
@@ -186,6 +201,11 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     }
   }
 
+  async function handleRemovePassage(tagId: string, selId: string) {
+    try { await supabase.from('selection_tags').delete().eq('tag_id', tagId).eq('selection_id', selId); } catch {}
+    setTags(tags.map(t => t.id === tagId ? { ...t, selections: t.selections.filter(s => s.id !== selId) } : t));
+  }
+
   async function handleToggleVisibility(id: string, isPublic: boolean) {
     const tag = tags.find(t => t.id === id);
     if (tag) {
@@ -234,6 +254,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                 onDelete={handleDeleteTag}
                 onRename={handleRenameTag}
                 onToggleVisibility={handleToggleVisibility}
+                onRemovePassage={handleRemovePassage}
               />
             ))}
           </div>

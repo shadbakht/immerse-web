@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { pushTag } from '@/lib/annotationSync';
+import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import PanelSheet from './PanelSheet';
+import { ContextMenu, type MenuOption } from './ContextMenu';
 
 interface Tag {
   id: string;
@@ -44,6 +45,13 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
       .order('sort_order')
       .order('name');
     setTags(data ?? []);
+  }
+
+  async function handleDeleteTag(id: string) {
+    try { await supabase.from('tags').delete().eq('id', id); } catch {}
+    deleteRemote('tags', id).catch(() => {});
+    setTags(prev => prev.filter(t => t.id !== id));
+    setChecked(prev => { const next = new Set(prev); next.delete(id); return next; });
   }
 
   async function handleCreateTag() {
@@ -105,6 +113,13 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
     const isOpen = openNodes.has(tag.id);
     const isChecked = checked.has(tag.id);
 
+    const deleteOption: MenuOption[] = [{
+      label: 'Delete',
+      icon: '🗑️',
+      color: 'danger',
+      onClick: () => { if (confirm(`Delete tag "${tag.name}"?`)) handleDeleteTag(tag.id); },
+    }];
+
     return (
       <div key={tag.id}>
         <div
@@ -143,6 +158,11 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
               <span className={`inline-block transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
             </button>
           )}
+
+          {/* Kebab menu */}
+          <div onClick={e => e.stopPropagation()}>
+            <ContextMenu options={deleteOption} />
+          </div>
         </div>
 
         {isOpen && children.map(child => renderTag(child, allTags))}

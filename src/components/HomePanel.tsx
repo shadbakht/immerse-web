@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { loadCatalog, loadSlugMaps, collectionName } from '@/lib/catalog';
 import type { Catalog } from '@/lib/catalog';
+import { ContextMenu, type MenuOption } from './ContextMenu';
 
 interface Stats {
   tags: number;
@@ -89,6 +90,11 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
     }
   }
 
+  async function handleRemoveRecentBook(bookId: string) {
+    try { await supabase.from('reading_progress').delete().eq('user_id', userId).eq('book_id', bookId); } catch {}
+    setRecentBooks(prev => prev.filter(b => b.bookId !== bookId));
+  }
+
   function formatDate(iso: string) {
     const d = new Date(iso);
     const diff = (Date.now() - d.getTime()) / 1000;
@@ -153,31 +159,44 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
               <div className="space-y-2">
                 {recentBooks.map(book => {
                   const pct = Math.min(100, Math.max(0, Math.round(book.fraction * 100)));
+                  const menuOptions: MenuOption[] = [{
+                    label: 'Remove from recently read',
+                    icon: '✕',
+                    color: 'danger',
+                    onClick: () => handleRemoveRecentBook(book.bookId),
+                  }];
                   return (
-                    <button
+                    <div
                       key={book.bookId}
-                      onClick={() => onOpenBook(book.bookId, book.passageId ?? undefined)}
-                      className="w-full text-left bg-white rounded-xl px-5 py-4 shadow-sm border border-gray-100 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
+                      className="flex items-center bg-white rounded-xl shadow-sm border border-gray-100 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="min-w-0 mr-4">
-                          <div className="text-sm font-medium text-gray-900 truncate">{book.title}</div>
-                          {book.subtitle && (
-                            <div className="text-xs text-gray-400 mt-0.5 truncate">{book.subtitle}</div>
-                          )}
+                      <button
+                        onClick={() => onOpenBook(book.bookId, book.passageId ?? undefined)}
+                        className="flex-1 min-w-0 text-left px-5 py-4"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="min-w-0 mr-4">
+                            <div className="text-sm font-medium text-gray-900 truncate">{book.title}</div>
+                            {book.subtitle && (
+                              <div className="text-xs text-gray-400 mt-0.5 truncate">{book.subtitle}</div>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-xs font-medium text-[#1B6B7B]">{pct}%</div>
+                            <div className="text-xs text-gray-300 mt-0.5">{formatDate(book.updatedAt)}</div>
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs font-medium text-[#1B6B7B]">{pct}%</div>
-                          <div className="text-xs text-gray-300 mt-0.5">{formatDate(book.updatedAt)}</div>
+                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#1B6B7B] rounded-full transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
+                      </button>
+                      <div className="shrink-0 pr-2">
+                        <ContextMenu options={menuOptions} />
                       </div>
-                      <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#1B6B7B] rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
