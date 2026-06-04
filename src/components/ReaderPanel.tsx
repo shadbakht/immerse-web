@@ -446,6 +446,27 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
       } else {
         scrollRef.current?.scrollTo({ top: 0 });
       }
+
+      // Immediately record this book open so it appears in Recently Read right away
+      if (userId && ps.length > 0) {
+        const pidToSave = resolvedScrollId ?? ps[0].id;
+        const p = ps.find(p => p.id === pidToSave) ?? ps[0];
+        const maxSo = ps[ps.length - 1].sort_order;
+        lastSavedPidRef.current = pidToSave;
+        try {
+          await supabase.from('reading_progress').upsert(
+            {
+              user_id:            userId,
+              book_id:            bookId,
+              passage_id:         pidToSave,
+              passage_sort_order: p.sort_order,
+              fraction:           p.sort_order / Math.max(maxSo, 1),
+              updated_at:         new Date().toISOString(),
+            },
+            { onConflict: 'user_id,book_id' },
+          );
+        } catch {}
+      }
     } finally {
       setLoading(false);
     }
