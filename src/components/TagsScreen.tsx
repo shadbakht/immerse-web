@@ -6,7 +6,7 @@ import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 
-interface TagRow { id: string; name: string; created_at: string; is_public: boolean; selections: SelRow[]; }
+interface TagRow { id: string; name: string; created_at: string; visibility: string; selections: SelRow[]; }
 interface SelRow  { id: string; snapshot_text: string; passage_id: string; book_id: string; citation: string; }
 
 interface TagsScreenProps {
@@ -59,7 +59,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   );
 }
 
-function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void; onToggleVisibility: (id: string, isPublic: boolean) => void; onRemovePassage: (tagId: string, selId: string) => void }) {
+function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void; onToggleVisibility: (id: string, visibility: string) => void; onRemovePassage: (tagId: string, selId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(tag.name);
@@ -71,9 +71,9 @@ function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVis
       onClick: () => setRenaming(true),
     },
     {
-      label: tag.is_public ? 'Set Private' : 'Set Public',
-      icon: tag.is_public ? '🔓' : '🔒',
-      onClick: () => onToggleVisibility(tag.id, !tag.is_public),
+      label: tag.visibility === 'public' ? 'Set Private' : 'Set Public',
+      icon: tag.visibility === 'public' ? '🔓' : '🔒',
+      onClick: () => onToggleVisibility(tag.id, tag.visibility === 'public' ? 'private' : 'public'),
     },
     {
       label: 'Delete',
@@ -156,7 +156,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     setLoading(true);
     try {
       const [{ data: tagData }, selMap] = await Promise.all([
-        supabase.from('tags').select('id, name, created_at, is_public').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('tags').select('id, name, created_at, visibility').eq('user_id', userId).order('created_at', { ascending: false }),
         fetchSelectionsByUser(userId),
       ]);
       const tagList = tagData ?? [];
@@ -174,7 +174,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         if (!s) continue;
         (selsByTag[st.tag_id] ??= []).push({ id: st.selection_id, ...s });
       }
-      setTags((tagList as any[]).map(t => ({ ...t, selections: selsByTag[t.id] ?? [], is_public: t.is_public ?? false })));
+      setTags((tagList as any[]).map(t => ({ ...t, selections: selsByTag[t.id] ?? [], visibility: t.visibility ?? 'private' })));
     } finally {
       setLoading(false);
     }
@@ -193,7 +193,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           id: tag.id,
           user_id: userId,
           name: newName.trim(),
-          is_public: tag.is_public,
+          visibility: tag.visibility,
           updated_at: new Date().toISOString(),
         }).catch(() => {});
         setTags(tags.map(t => t.id === id ? { ...t, name: newName.trim() } : t));
@@ -206,17 +206,17 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     setTags(tags.map(t => t.id === tagId ? { ...t, selections: t.selections.filter(s => s.id !== selId) } : t));
   }
 
-  async function handleToggleVisibility(id: string, isPublic: boolean) {
+  async function handleToggleVisibility(id: string, visibility: string) {
     const tag = tags.find(t => t.id === id);
     if (tag) {
       await pushTag({
         id: tag.id,
         user_id: userId,
         name: tag.name,
-        is_public: isPublic,
+        visibility,
         updated_at: new Date().toISOString(),
       }).catch(() => {});
-      setTags(tags.map(t => t.id === id ? { ...t, is_public: isPublic } : t));
+      setTags(tags.map(t => t.id === id ? { ...t, visibility } : t));
     }
   }
 

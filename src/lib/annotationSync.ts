@@ -7,7 +7,7 @@ import { createClient } from './supabase/client';
 
 const supabase = createClient();
 
-export async function pushTag(tag: { id: string; user_id: string; name: string; is_public?: boolean; updated_at?: string }) {
+export async function pushTag(tag: { id: string; user_id: string; name: string; visibility?: string; updated_at?: string }) {
   try {
     const updated_at = tag.updated_at || new Date().toISOString();
     const { error } = await supabase
@@ -16,7 +16,7 @@ export async function pushTag(tag: { id: string; user_id: string; name: string; 
         id: tag.id,
         user_id: tag.user_id,
         name: tag.name,
-        is_public: tag.is_public ?? false,
+        visibility: tag.visibility ?? 'private',
         updated_at,
       }, { onConflict: 'id' });
 
