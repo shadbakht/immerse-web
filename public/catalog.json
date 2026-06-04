@@ -4,21 +4,21 @@
     {
       "id": "cat-bahai",
       "parentId": null,
-      "name": "Bahá'í",
+      "name": "Bah\u00e1'\u00ed",
       "sortOrder": 1,
       "kind": "tradition"
     },
     {
       "id": "cat-bahai-abdulbah",
       "parentId": "cat-bahai",
-      "name": "‘Abdu’l‑Bahá",
+      "name": "\u2018Abdu\u2019l\u2011Bah\u00e1",
       "sortOrder": 3,
       "kind": null
     },
     {
       "id": "cat-bahai-bahullh",
       "parentId": "cat-bahai",
-      "name": "Bahá'u'lláh",
+      "name": "Bah\u00e1'u'll\u00e1h",
       "sortOrder": 2,
       "kind": null
     },
@@ -32,7 +32,7 @@
     {
       "id": "cat-bahai-the-bb",
       "parentId": "cat-bahai",
-      "name": "The Báb",
+      "name": "The B\u00e1b",
       "sortOrder": 1,
       "kind": null
     },
@@ -46,7 +46,7 @@
     {
       "id": "cat-bahai-universal-house-of-justice-ridvan-messages",
       "parentId": "cat-bahai-universal-house-of-justice",
-      "name": "Riḍván Messages",
+      "name": "Rid\u0323va\u0301n Messages",
       "sortOrder": 0,
       "kind": null
     },
@@ -60,14 +60,14 @@
     {
       "id": "cat-bahai-universal-house-of-justice-agencies-bahai-international-community",
       "parentId": "cat-bahai-universal-house-of-justice-agencies",
-      "name": "Bahá’í International Community",
+      "name": "Baha\u0301\u2019i\u0301 International Community",
       "sortOrder": 0,
       "kind": null
     },
     {
       "id": "cat-bahai-universal-house-of-justice-agencies-bahai-world-center",
       "parentId": "cat-bahai-universal-house-of-justice-agencies",
-      "name": "Bahá’í World Center",
+      "name": "Baha\u0301\u2019i\u0301 World Center",
       "sortOrder": 0,
       "kind": null
     },
@@ -186,7 +186,7 @@
     {
       "id": "cat-christian-douay-rheims",
       "parentId": "cat-christian",
-      "name": "Douay–Rheims",
+      "name": "Douay\u2013Rheims",
       "sortOrder": 1,
       "kind": null
     },
@@ -328,22 +328,22 @@
     {
       "id": "travelers-narrative",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "A Traveler’s Narrative"
+      "title": "A Traveler\u2019s Narrative"
     },
     {
       "id": "additional-prayers-revealed-by-bahaullah",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Additional Prayers Revealed by Bahá’u’lláh"
+      "title": "Additional Prayers Revealed by Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "additional-prayers-revealed-by-abdulbaha",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "Additional Prayers Revealed by ‘Abdu’l‑Bahá"
+      "title": "Additional Prayers Revealed by \u2018Abdu\u2019l\u2011Bah\u00e1"
     },
     {
       "id": "additional-tablets-and-extracts-from-tablets-revealed-by-bahaullah",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Additional Tablets and Extracts from Tablets Revealed by Bahá’u’lláh"
+      "title": "Additional Tablets and Extracts from Tablets Revealed by Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "additional-tablets-extracts-and-talks",
@@ -353,7 +353,7 @@
     {
       "id": "bahai-administration",
       "categoryId": "cat-bahai-shoghi-effendi",
-      "title": "Bahá’í Administration"
+      "title": "Bah\u00e1\u2019\u00ed Administration"
     },
     {
       "id": "citadel-faith",
@@ -378,7 +378,7 @@
     {
       "id": "gleanings-writings-bahaullah",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Gleanings from the Writings of Bahá’u’lláh"
+      "title": "Gleanings from the Writings of Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "god-passes-by",
@@ -403,17 +403,17 @@
     {
       "id": "prayers-meditations-bahaullah",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Prayers and Meditations by Bahá’u’lláh"
+      "title": "Prayers and Meditations by Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "selections-writings-bab",
       "categoryId": "cat-bahai-the-bb",
-      "title": "Selections from the Writings of the Báb"
+      "title": "Selections from the Writings of the B\u00e1b"
     },
     {
       "id": "selections-writings-abdul-baha",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "Selections from the Writings of ‘Abdu’l‑Bahá"
+      "title": "Selections from the Writings of \u2018Abdu\u2019l\u2011Bah\u00e1"
     },
     {
       "id": "some-answered-questions",
@@ -428,7 +428,7 @@
     {
       "id": "tablets-bahaullah",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Tablets of Bahá’u’lláh"
+      "title": "Tablets of Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "tablets-divine-plan",
@@ -458,12 +458,12 @@
     {
       "id": "kitab-i-aqdas",
       "categoryId": "cat-bahai-bahullh",
-      "title": "The Kitáb-i-Aqdas"
+      "title": "The Kit\u00e1b-i-Aqdas"
     },
     {
       "id": "kitab-i-iqan",
       "categoryId": "cat-bahai-bahullh",
-      "title": "The Kitáb-i-Íqán"
+      "title": "The Kit\u00e1b-i-\u00cdq\u00e1n"
     },
     {
       "id": "promised-day-come",
@@ -493,7 +493,7 @@
     {
       "id": "world-order-bahaullah",
       "categoryId": "cat-bahai-shoghi-effendi",
-      "title": "The World Order of Bahá’u’lláh"
+      "title": "The World Order of Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "decisive-hour",
@@ -503,12 +503,12 @@
     {
       "id": "twelve-table-talks-abdul-baha",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "Twelve Table Talks Given by ‘Abdu’l‑Bahá in ‘Akká"
+      "title": "Twelve Table Talks Given by \u2018Abdu\u2019l\u2011Bah\u00e1 in \u2018Akk\u00e1"
     },
     {
       "id": "will-testament-abdul-baha",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "Will And Testament of ‘Abdu’l‑Bahá"
+      "title": "Will And Testament of \u2018Abdu\u2019l\u2011Bah\u00e1"
     },
     {
       "id": "four-valleys",
@@ -523,7 +523,7 @@
     {
       "id": "proclamation-of-bahaullah",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Proclamation of Bahá’u’lláh"
+      "title": "Proclamation of Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "seven-valleys",
@@ -533,12 +533,12 @@
     {
       "id": "tablets-of-bahaullah-revealed-after-the-kitab-i-aqdas",
       "categoryId": "cat-bahai-bahullh",
-      "title": "Tablets of Bahá’u’lláh Revealed After the Kitáb-i-Aqdas"
+      "title": "Tablets of Bah\u00e1\u2019u\u2019ll\u00e1h Revealed After the Kit\u00e1b-i-Aqdas"
     },
     {
       "id": "bahai-world-faith-abdul-bahas-section",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "Bahá’í World Faith—Selected Writings of Bahá’u’lláh and ‘Abdu’l-Bahá (‘Abdu’l-Bahá’s Section Only)"
+      "title": "Bah\u00e1\u2019\u00ed World Faith\u2014Selected Writings of Bah\u00e1\u2019u\u2019ll\u00e1h and \u2018Abdu\u2019l-Bah\u00e1 (\u2018Abdu\u2019l-Bah\u00e1\u2019s Section Only)"
     },
     {
       "id": "divine-philosophy",
@@ -558,7 +558,7 @@
     {
       "id": "abdul-baha-in-london",
       "categoryId": "cat-bahai-abdulbah",
-      "title": "‘Abdu’l-Bahá in London"
+      "title": "\u2018Abdu\u2019l-Bah\u00e1 in London"
     },
     {
       "id": "arohanui",
@@ -628,7 +628,7 @@
     {
       "id": "messages-to-the-bahai-world",
       "categoryId": "cat-bahai-shoghi-effendi",
-      "title": "Messages to the Bahá’í World"
+      "title": "Messages to the Bah\u00e1\u2019\u00ed World"
     },
     {
       "id": "unfolding-destiny",
@@ -688,317 +688,317 @@
     {
       "id": "ridvan-1964",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1964"
+      "title": "Ri\u1e0dv\u00e1n 1964"
     },
     {
       "id": "ridvan-1965",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1965"
+      "title": "Ri\u1e0dv\u00e1n 1965"
     },
     {
       "id": "ridvan-1966",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1966"
+      "title": "Ri\u1e0dv\u00e1n 1966"
     },
     {
       "id": "ridvan-1967",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1967"
+      "title": "Ri\u1e0dv\u00e1n 1967"
     },
     {
       "id": "ridvan-1968",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1968"
+      "title": "Ri\u1e0dv\u00e1n 1968"
     },
     {
       "id": "ridvan-1969",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1969"
+      "title": "Ri\u1e0dv\u00e1n 1969"
     },
     {
       "id": "ridvan-1970",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1970"
+      "title": "Ri\u1e0dv\u00e1n 1970"
     },
     {
       "id": "ridvan-1971",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1971"
+      "title": "Ri\u1e0dv\u00e1n 1971"
     },
     {
       "id": "ridvan-1972",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1972"
+      "title": "Ri\u1e0dv\u00e1n 1972"
     },
     {
       "id": "ridvan-1973",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1973"
+      "title": "Ri\u1e0dv\u00e1n 1973"
     },
     {
       "id": "ridvan-1974",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1974"
+      "title": "Ri\u1e0dv\u00e1n 1974"
     },
     {
       "id": "ridvan-1975",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1975"
+      "title": "Ri\u1e0dv\u00e1n 1975"
     },
     {
       "id": "ridvan-1976",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1976"
+      "title": "Ri\u1e0dv\u00e1n 1976"
     },
     {
       "id": "ridvan-1977",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1977"
+      "title": "Ri\u1e0dv\u00e1n 1977"
     },
     {
       "id": "ridvan-1978",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1978"
+      "title": "Ri\u1e0dv\u00e1n 1978"
     },
     {
       "id": "ridvan-1979",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1979"
+      "title": "Ri\u1e0dv\u00e1n 1979"
     },
     {
       "id": "ridvan-1980",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1980"
+      "title": "Ri\u1e0dv\u00e1n 1980"
     },
     {
       "id": "ridvan-1981",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1981"
+      "title": "Ri\u1e0dv\u00e1n 1981"
     },
     {
       "id": "ridvan-1982",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1982"
+      "title": "Ri\u1e0dv\u00e1n 1982"
     },
     {
       "id": "ridvan-1983",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1983"
+      "title": "Ri\u1e0dv\u00e1n 1983"
     },
     {
       "id": "ridvan-1984",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1984"
+      "title": "Ri\u1e0dv\u00e1n 1984"
     },
     {
       "id": "ridvan-1985",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1985"
+      "title": "Ri\u1e0dv\u00e1n 1985"
     },
     {
       "id": "ridvan-1986",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1986"
+      "title": "Ri\u1e0dv\u00e1n 1986"
     },
     {
       "id": "ridvan-1987",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1987"
+      "title": "Ri\u1e0dv\u00e1n 1987"
     },
     {
       "id": "ridvan-1988",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1988"
+      "title": "Ri\u1e0dv\u00e1n 1988"
     },
     {
       "id": "ridvan-1989",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1989"
+      "title": "Ri\u1e0dv\u00e1n 1989"
     },
     {
       "id": "ridvan-1990",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1990"
+      "title": "Ri\u1e0dv\u00e1n 1990"
     },
     {
       "id": "ridvan-1991",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1991"
+      "title": "Ri\u1e0dv\u00e1n 1991"
     },
     {
       "id": "ridvan-1992",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1992"
+      "title": "Rid\u0323va\u0301n 1992"
     },
     {
       "id": "ridvan-1993",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1993"
+      "title": "Ri\u1e0dv\u00e1n 1993"
     },
     {
       "id": "ridvan-1994",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1994"
+      "title": "Ri\u1e0dv\u00e1n 1994"
     },
     {
       "id": "ridvan-1995",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1995"
+      "title": "Ri\u1e0dv\u00e1n 1995"
     },
     {
       "id": "ridvan-1996",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1996"
+      "title": "Ri\u1e0dv\u00e1n 1996"
     },
     {
       "id": "ridvan-1997",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1997"
+      "title": "Ri\u1e0dv\u00e1n 1997"
     },
     {
       "id": "ridvan-1998",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1998"
+      "title": "Ri\u1e0dv\u00e1n 1998"
     },
     {
       "id": "ridvan-1999",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 1999"
+      "title": "Ri\u1e0dv\u00e1n 1999"
     },
     {
       "id": "ridvan-2000",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2000"
+      "title": "Ri\u1e0dv\u00e1n 2000"
     },
     {
       "id": "ridvan-2001",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2001"
+      "title": "Ri\u1e0dv\u00e1n 2001"
     },
     {
       "id": "ridvan-2002",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2002"
+      "title": "Ri\u1e0dv\u00e1n 2002"
     },
     {
       "id": "ridvan-2003",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2003"
+      "title": "Ri\u1e0dv\u00e1n 2003"
     },
     {
       "id": "ridvan-2004",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2004"
+      "title": "Ri\u1e0dv\u00e1n 2004"
     },
     {
       "id": "ridvan-2005",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2005"
+      "title": "Ri\u1e0dv\u00e1n 2005"
     },
     {
       "id": "ridvan-2006",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2006"
+      "title": "Ri\u1e0dv\u00e1n 2006"
     },
     {
       "id": "ridvan-2007",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2007"
+      "title": "Ri\u1e0dv\u00e1n 2007"
     },
     {
       "id": "ridvan-2008",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2008"
+      "title": "Ri\u1e0dv\u00e1n 2008"
     },
     {
       "id": "ridvan-2009",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2009"
+      "title": "Ri\u1e0dv\u00e1n 2009"
     },
     {
       "id": "ridvan-2010",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2010"
+      "title": "Ri\u1e0dv\u00e1n 2010"
     },
     {
       "id": "ridvan-2011",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2011"
+      "title": "Ri\u1e0dv\u00e1n 2011"
     },
     {
       "id": "ridvan-2012",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2012"
+      "title": "Ri\u1e0dv\u00e1n 2012"
     },
     {
       "id": "ridvan-2013",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2013"
+      "title": "Ri\u1e0dv\u00e1n 2013"
     },
     {
       "id": "ridvan-2014",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2014"
+      "title": "Ri\u1e0dv\u00e1n 2014"
     },
     {
       "id": "ridvan-2015",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2015"
+      "title": "Ri\u1e0dv\u00e1n 2015"
     },
     {
       "id": "rivn-2016",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2016"
+      "title": "Ri\u1e0dv\u00e1n 2016"
     },
     {
       "id": "rivn-2017",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2017"
+      "title": "Ri\u1e0dv\u00e1n 2017"
     },
     {
       "id": "rivn-2018",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2018"
+      "title": "Ri\u1e0dv\u00e1n 2018"
     },
     {
       "id": "rivn-2019",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2019"
+      "title": "Ri\u1e0dv\u00e1n 2019"
     },
     {
       "id": "rivn-2020",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2020"
+      "title": "Ri\u1e0dv\u00e1n 2020"
     },
     {
       "id": "rivn-2021",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2021"
+      "title": "Ri\u1e0dv\u00e1n 2021"
     },
     {
       "id": "rivn-2022",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2022"
+      "title": "Ri\u1e0dv\u00e1n 2022"
     },
     {
       "id": "rivn-2023",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2023"
+      "title": "Ri\u1e0dv\u00e1n 2023"
     },
     {
       "id": "rivn-2024",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2024"
+      "title": "Ri\u1e0dv\u00e1n 2024"
     },
     {
       "id": "rivn-2025",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2025"
+      "title": "Ri\u1e0dv\u00e1n 2025"
     },
     {
       "id": "rivn-2026",
       "categoryId": "cat-bahai-universal-house-of-justice-ridvan-messages",
-      "title": "Riḍván 2026"
+      "title": "Ri\u1e0dv\u00e1n 2026"
     },
     {
       "id": "turning-point-1996-2006",
@@ -1013,7 +1013,7 @@
     {
       "id": "bahaullah",
       "categoryId": "cat-bahai-universal-house-of-justice-agencies-bahai-international-community",
-      "title": "Bahá’u’lláh"
+      "title": "Bah\u00e1\u2019u\u2019ll\u00e1h"
     },
     {
       "id": "prosperity-of-humankind",
@@ -1038,17 +1038,17 @@
     {
       "id": "bahai-scholarship",
       "categoryId": "cat-bahai-universal-house-of-justice-agencies-international-teaching-centre",
-      "title": "Bahá'í Scholarship"
+      "title": "Bah\u00e1'\u00ed Scholarship"
     },
     {
       "id": "bahai-prayers",
       "categoryId": "cat-bahai-compilations",
-      "title": "Bahá’í Prayers"
+      "title": "Bah\u00e1\u2019\u00ed Prayers"
     },
     {
       "id": "bahiyyih-khanum",
       "categoryId": "cat-bahai-compilations",
-      "title": "Bahíyyih Khánum"
+      "title": "Bah\u00edyyih Kh\u00e1num"
     },
     {
       "id": "compilation-of-compilations-vol-1",
@@ -1068,7 +1068,7 @@
     {
       "id": "compilation-on-huququllah-right-of-god",
       "categoryId": "cat-bahai-compilations",
-      "title": "Compilation on Ḥuqúqu’lláh—The Right of God"
+      "title": "Compilation on \u1e24uq\u00faqu\u2019ll\u00e1h\u2014The Right of God"
     },
     {
       "id": "compilaton-on-scholarship",
@@ -1093,7 +1093,7 @@
     {
       "id": "george-townshend-christ-and-bahaullah",
       "categoryId": "cat-bahai-other",
-      "title": "George Townshend - Christ and Bahá'u'lláh"
+      "title": "George Townshend - Christ and Bah\u00e1'u'll\u00e1h"
     },
     {
       "id": "george-townshend-heart-of-the-gospel",
@@ -1113,27 +1113,27 @@
     {
       "id": "john-esslemont-bahaullah-and-the-new-era",
       "categoryId": "cat-bahai-other",
-      "title": "John E. Esslemont - Bahá’u’lláh and the New Era"
+      "title": "John E. Esslemont - Bah\u00e1\u2019u\u2019ll\u00e1h and the New Era"
     },
     {
       "id": "mirza-abul-fadl-bahai-proofs",
       "categoryId": "cat-bahai-other",
-      "title": "Mírzá Abu'l-Fadl - The Bahá'í Proofs"
+      "title": "M\u00edrz\u00e1 Abu'l-Fadl - The Bah\u00e1'\u00ed Proofs"
     },
     {
       "id": "mirza-abul-fadl-brilliant-proof",
       "categoryId": "cat-bahai-other",
-      "title": "Mírzá Abu'l-Fadl - The Brilliant Proof"
+      "title": "M\u00edrz\u00e1 Abu'l-Fadl - The Brilliant Proof"
     },
     {
       "id": "nabil-i-azam-dawn-breakers",
       "categoryId": "cat-bahai-other",
-      "title": "Nabíl-i-A‘zam - The Dawn-Breakers"
+      "title": "Nab\u00edl-i-A\u2018zam - The Dawn-Breakers"
     },
     {
       "id": "ruhiyyih-khanum-priceless-pearl",
       "categoryId": "cat-bahai-other",
-      "title": "Rúhíyyih Khánum - The Priceless Pearl"
+      "title": "R\u00fah\u00edyyih Kh\u00e1num - The Priceless Pearl"
     },
     {
       "id": "lotus-sutra",
@@ -1148,7 +1148,7 @@
     {
       "id": "1-brahmajala-sutta-all-embracing-net-of-views",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-digha-nikaya-long-discourses",
-      "title": "Brahmajāla Sutta: The All-embracing Net of Views"
+      "title": "Brahmaj\u0101la Sutta: The All-embracing Net of Views"
     },
     {
       "id": "11-kevaddha-sutta-to-kevaddha",
@@ -1173,7 +1173,7 @@
     {
       "id": "2-samannaphala-sutta-fruits-of-the-contemplative-life",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-digha-nikaya-long-discourses",
-      "title": "Samaññaphala Sutta: The Fruits of the Contemplative Life"
+      "title": "Sama\u00f1\u00f1aphala Sutta: The Fruits of the Contemplative Life"
     },
     {
       "id": "20-maha-samaya-sutta-great-meeting",
@@ -1183,7 +1183,7 @@
     {
       "id": "21-sakka-panha-sutta-sakkas-questions",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-digha-nikaya-long-discourses",
-      "title": "Sakka-pañha Sutta: Sakka's Questions (excerpt)"
+      "title": "Sakka-pa\u00f1ha Sutta: Sakka's Questions (excerpt)"
     },
     {
       "id": "22-maha-satipatthana-sutta-great-frames-of-reference",
@@ -1233,7 +1233,7 @@
     {
       "id": "106-anenja-sappaya-sutta-conducive-to-the-imperturbable",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-majjhima-nikaya-middle-discourses",
-      "title": "Aneñja-sappaya Sutta: Conducive to the Imperturbable"
+      "title": "Ane\u00f1ja-sappaya Sutta: Conducive to the Imperturbable"
     },
     {
       "id": "107-ganakamoggallana-sutta-discourse-to-ganaka-moggallana",
@@ -1298,12 +1298,12 @@
     {
       "id": "121-cula-sunnata-sutta-lesser-discourse-on-emptiness",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-majjhima-nikaya-middle-discourses",
-      "title": "Cula-suññata Sutta: The Lesser Discourse on Emptiness"
+      "title": "Cula-su\u00f1\u00f1ata Sutta: The Lesser Discourse on Emptiness"
     },
     {
       "id": "122-maha-sunnata-sutta-greater-discourse-on-emptiness",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-majjhima-nikaya-middle-discourses",
-      "title": "Maha-suññata Sutta: The Greater Discourse on Emptiness"
+      "title": "Maha-su\u00f1\u00f1ata Sutta: The Greater Discourse on Emptiness"
     },
     {
       "id": "125-dantabhumi-sutta-discourse-on-the-tamed-stage",
@@ -1638,7 +1638,7 @@
     {
       "id": "97-dhananjani-sutta-to-dhananjanin",
       "categoryId": "cat-buddhist-sutta-pitaka-pali-canon-majjhima-nikaya-middle-discourses",
-      "title": "Dhanañjani Sutta: To Dhanañjanin"
+      "title": "Dhana\u00f1jani Sutta: To Dhana\u00f1janin"
     },
     {
       "id": "1-devata-samyutta-devas",
@@ -2181,6 +2181,11 @@
       "title": "2 Chronicles"
     },
     {
+      "id": "shir-hashirim-song-of-songs",
+      "categoryId": "cat-jewish-tanakh-ketuvim-writings",
+      "title": "Song of Songs"
+    },
+    {
       "id": "gathas",
       "categoryId": "cat-zoroastrian",
       "title": "The Gathas"
@@ -2588,7 +2593,7 @@
     {
       "id": "christ-and-bahaullah",
       "categoryId": "cat-bahai-other",
-      "title": "Christ and Bahá'u'lláh"
+      "title": "Christ and Bah\u00e1'u'll\u00e1h"
     },
     {
       "id": "heart-of-the-gospel",
@@ -2608,7 +2613,7 @@
     {
       "id": "the-bahai-proofs",
       "categoryId": "cat-bahai-other",
-      "title": "The Bahá'í Proofs"
+      "title": "The Bah\u00e1'\u00ed Proofs"
     },
     {
       "id": "section-39-chaubolas-fifth-mehl",
@@ -2648,7 +2653,7 @@
     {
       "id": "bahaullah-and-the-new-era",
       "categoryId": "cat-bahai-other",
-      "title": "Bahá'u'lláh and the New Era"
+      "title": "Bah\u00e1'u'll\u00e1h and the New Era"
     },
     {
       "id": "section-1-jup",
@@ -2851,11 +2856,6 @@
       "title": "The Dawn-Breakers"
     },
     {
-      "id": "shir-hashirim-song-of-songs",
-      "categoryId": "cat-jewish-tanakh",
-      "title": "Shir HaShirim (Song of Songs)"
-    },
-    {
       "id": "myths-and-legends-of-the-sioux-1",
       "categoryId": "cat-more",
       "title": "Myths and Legends of the Sioux"
@@ -2953,7 +2953,7 @@
     {
       "id": "ridvan-1992-1",
       "categoryId": "cat-bahai-other",
-      "title": "Riḍván 1992"
+      "title": "Ri\u1e0dv\u00e1n 1992"
     }
   ]
 }

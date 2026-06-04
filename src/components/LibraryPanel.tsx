@@ -130,6 +130,30 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
     return (
       <>
+        {books.map(book => {
+          const isChecked = selectedSlugs.has(book.id);
+          const uuid = slugMap.get(book.id) ?? book.id;
+          return (
+            <div
+              key={book.id}
+              className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors"
+              style={{ paddingLeft: bookPadLeft }}
+            >
+              <Checkbox
+                state={isChecked ? 'checked' : 'unchecked'}
+                onChange={() => toggleSlugs([book.id])}
+                className="pr-1 py-2.5 shrink-0"
+              />
+              <button
+                onClick={() => onOpenBook(uuid)}
+                className="flex-1 text-left pr-4 py-2.5 min-w-0"
+              >
+                <div className="text-sm text-gray-800 truncate">{book.title}</div>
+              </button>
+            </div>
+          );
+        })}
+
         {children.map(child => {
           const childSlugs     = allSlugsUnder(child.id);
           const childImmediate = childrenOf(child.id).length + booksInCategory(child.id).length;
@@ -165,30 +189,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   {renderChildren(child.id, level + 1)}
                 </div>
               )}
-            </div>
-          );
-        })}
-
-        {books.map(book => {
-          const isChecked = selectedSlugs.has(book.id);
-          const uuid = slugMap.get(book.id) ?? book.id;
-          return (
-            <div
-              key={book.id}
-              className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors"
-              style={{ paddingLeft: bookPadLeft }}
-            >
-              <Checkbox
-                state={isChecked ? 'checked' : 'unchecked'}
-                onChange={() => toggleSlugs([book.id])}
-                className="pr-1 py-2.5 shrink-0"
-              />
-              <button
-                onClick={() => onOpenBook(uuid)}
-                className="flex-1 text-left pr-4 py-2.5 min-w-0"
-              >
-                <div className="text-sm text-gray-800 truncate">{book.title}</div>
-              </button>
             </div>
           );
         })}
