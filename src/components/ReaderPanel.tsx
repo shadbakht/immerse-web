@@ -507,12 +507,12 @@ async function handleCopy() {
     const passage = passages.find(p => p.id === selectionBar.startPassageId);
 
     let citation = '';
-    if (target.bookId.startsWith('quran')) {
+    if (target?.bookId.startsWith('quran')) {
       const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
       const verse = passage?.paragraph_number ?? '';
       const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || (verse ? String(verse) : '');
       citation = `— ${book?.title ?? "The Qur'an"}${loc ? ` ${loc}` : ''}`;
-    } else if (target.bookId.startsWith('bible-kjv-')) {
+    } else if (target?.bookId.startsWith('bible-kjv-')) {
       const collectionName = (book?.authorName ?? '').replace(/\s*\(.*?\)\s*/g, '').trim() || 'The Bible';
       const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
       const verse = passage?.paragraph_number ?? '';
