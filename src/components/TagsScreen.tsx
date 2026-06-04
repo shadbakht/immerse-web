@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
+import { TagIcon } from './Icons';
 
 interface TagRow { id: string; name: string; created_at: string; visibility: string; selections: SelRow[]; }
 interface SelRow  { id: string; snapshot_text: string; passage_id: string; book_id: string; citation: string; }
@@ -117,7 +118,7 @@ function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVis
         className="px-5 py-4 flex items-center gap-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(v => !v)}
       >
-        <span className="text-[#3B82F6] text-lg inline-block scale-x-[-1] shrink-0">🏷</span>
+        <TagIcon size={18} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">
             <Highlight text={tag.name} q={searchQuery} />

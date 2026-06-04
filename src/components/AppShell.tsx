@@ -100,7 +100,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
             </div>
           )}
           <div className="flex-1 overflow-hidden">
-            <ReaderPanel target={readerTarget} userId={userId} />
+            <ReaderPanel target={readerTarget} userId={userId} onOpenBook={openBook} />
           </div>
         </>
       )}

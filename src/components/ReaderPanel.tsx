@@ -9,6 +9,8 @@ import TagPanel from './TagPanel';
 import NotePanel from './NotePanel';
 import XRefPanel from './XRefPanel';
 import AiPanel from './AiPanel';
+import { ContextMenu, type MenuOption } from './ContextMenu';
+import { TagIcon, NoteIcon, XRefIcon } from './Icons';
 
 interface Passage {
   id: string;
@@ -41,6 +43,7 @@ interface SelectionBar {
 interface ReaderPanelProps {
   target: ReaderTarget;
   userId: string;
+  onOpenBook?: (bookId: string, passageId?: string) => void;
 }
 
 function PassageContent({ text, onFootnoteClick, highlight }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string }) {
@@ -82,7 +85,51 @@ function PassageContent({ text, onFootnoteClick, highlight }: { text: string; on
   );
 }
 
-export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
+interface XrefViewEntry {
+  xrefId: string;
+  thisSnapshotText: string;
+  otherPassageId: string;
+  otherSnapshotText: string;
+  otherBookId: string | null;
+  otherBookTitle: string;
+  otherCitation: string;
+}
+
+function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
+  entry: XrefViewEntry;
+  onOpenBook?: (bookId: string, passageId: string) => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const menuOptions: MenuOption[] = [{ label: 'Delete', icon: '🗑️', color: 'danger', onClick: onDelete }];
+  return (
+    <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+      <div className="px-4 py-3 flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-[#1B6B7B] font-medium mb-1.5 truncate">{entry.otherCitation}</p>
+          <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
+            <p className={`text-sm text-gray-700 leading-relaxed italic ${expanded ? '' : 'line-clamp-2'}`}>
+              "{entry.otherSnapshotText}"
+            </p>
+          </div>
+          {expanded && entry.otherBookId && onOpenBook && (
+            <button
+              onClick={() => onOpenBook(entry.otherBookId!, entry.otherPassageId)}
+              className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+            >
+              Open in reader →
+            </button>
+          )}
+        </div>
+        <div className="shrink-0" onClick={e => e.stopPropagation()}>
+          <ContextMenu options={menuOptions} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelProps) {
   const supabase = createClient();
   const [passages, setPassages] = useState<Passage[]>([]);
   const [book, setBook] = useState<BookMeta | null>(null);
@@ -98,9 +145,11 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
   const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
   const [taggedPassageIds, setTaggedPassageIds]   = useState<Set<string>>(new Set());
   const [notedPassageIds, setNotedPassageIds]     = useState<Set<string>>(new Set());
+  const [xrefPassageIds, setXrefPassageIds]       = useState<Set<string>>(new Set());
   const [passageToNote, setPassageToNote] = useState<Map<string, { noteId: string; content: string; selectionId: string; snapshotText: string }>>(new Map());
   const [passageToTags, setPassageToTags] = useState<Map<string, { selectionId: string; snapshotText: string; tags: Array<{ id: string; name: string }> }>>(new Map());
-  const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags'; passageId: string } | null>(null);
+  const [passageToXrefs, setPassageToXrefs] = useState<Map<string, XrefViewEntry[]>>(new Map());
+  const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags' | 'xrefs'; passageId: string } | null>(null);
   const [editNoteContent, setEditNoteContent] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
@@ -201,6 +250,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
     const noted  = new Set<string>();
     const noteMap = new Map<string, { noteId: string; content: string; selectionId: string; snapshotText: string }>();
     const tagsMap = new Map<string, { selectionId: string; snapshotText: string; tags: Array<{ id: string; name: string }> }>();
+    const selIdToPid = new Map<string, string>();
     const BATCH = 200;
     for (let i = 0; i < passageIds.length; i += BATCH) {
       const ids = passageIds.slice(i, i + BATCH);
@@ -210,6 +260,7 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
         .eq('user_id', userId)
         .in('passage_id', ids);
       for (const row of (data ?? []) as any[]) {
+        selIdToPid.set(row.id, row.passage_id);
         const selTags  = (row.selection_tags as any[]) ?? [];
         const selNotes = (row.notes as any[]) ?? [];
         if (selTags.length > 0) {
@@ -227,10 +278,27 @@ export default function ReaderPanel({ target, userId }: ReaderPanelProps) {
         }
       }
     }
+    // Detect which passages have xrefs (two-direction query)
+    const xrefPids = new Set<string>();
+    if (selIdToPid.size > 0) {
+      const allSelIds = [...selIdToPid.keys()];
+      for (let i = 0; i < allSelIds.length; i += BATCH) {
+        const batch = allSelIds.slice(i, i + BATCH);
+        const [{ data: xrefsA }, { data: xrefsB }] = await Promise.all([
+          supabase.from('xrefs').select('selection_a_id').eq('user_id', userId).in('selection_a_id', batch),
+          supabase.from('xrefs').select('selection_b_id').eq('user_id', userId).in('selection_b_id', batch),
+        ]);
+        for (const x of (xrefsA ?? []) as any[]) { const pid = selIdToPid.get(x.selection_a_id); if (pid) xrefPids.add(pid); }
+        for (const x of (xrefsB ?? []) as any[]) { const pid = selIdToPid.get(x.selection_b_id); if (pid) xrefPids.add(pid); }
+      }
+    }
     setTaggedPassageIds(tagged);
     setNotedPassageIds(noted);
     setPassageToTags(tagsMap);
     setPassageToNote(noteMap);
+    setXrefPassageIds(xrefPids);
+    // Invalidate cached xref details so re-open fetches fresh data
+    setPassageToXrefs(new Map());
   }, [userId]);
 
   // Realtime: refresh annotation indicators when selections change for this user.
@@ -477,6 +545,71 @@ async function handleCopy() {
     } catch {}
   }
 
+  async function handleXrefIconClick(passageId: string) {
+    if (passageToXrefs.has(passageId)) {
+      setAnnotationPanel({ type: 'xrefs', passageId });
+      return;
+    }
+    const { data: sels } = await supabase
+      .from('selections').select('id, snapshot_text').eq('user_id', userId).eq('passage_id', passageId);
+    const selIds = (sels ?? []).map((s: any) => s.id as string);
+    const selSnaps = new Map((sels ?? []).map((s: any) => [s.id as string, (s.snapshot_text as string) ?? '']));
+    if (selIds.length === 0) return;
+    const [{ data: xrefsA }, { data: xrefsB }] = await Promise.all([
+      supabase.from('xrefs').select('id, selection_a_id, selection_b_id').in('selection_a_id', selIds),
+      supabase.from('xrefs').select('id, selection_a_id, selection_b_id').in('selection_b_id', selIds),
+    ]);
+    const allXrefs = [...(xrefsA ?? []), ...(xrefsB ?? [])] as any[];
+    const xrefById = new Map(allXrefs.map((x: any) => [x.id as string, x]));
+    if (xrefById.size === 0) return;
+    const selIdSet = new Set(selIds);
+    const otherSelIds = [...xrefById.values()].map((x: any) =>
+      selIdSet.has(x.selection_a_id) ? x.selection_b_id : x.selection_a_id
+    );
+    const { data: otherSels } = await supabase
+      .from('selections')
+      .select('id, snapshot_text, passage_id, passages(chapter_label, section_title, books(id, title))')
+      .in('id', otherSelIds);
+    const otherSelMap = new Map((otherSels ?? []).map((s: any) => [s.id as string, s]));
+    const entries: XrefViewEntry[] = [];
+    for (const [xrefId, xref] of xrefById) {
+      const thisSelId = selIdSet.has(xref.selection_a_id) ? xref.selection_a_id : xref.selection_b_id;
+      const otherSelId = selIdSet.has(xref.selection_a_id) ? xref.selection_b_id : xref.selection_a_id;
+      const other = otherSelMap.get(otherSelId) as any;
+      if (!other) continue;
+      const passage = other.passages as any;
+      const bookObj = passage?.books as any;
+      const citParts = [bookObj?.title, passage?.chapter_label, passage?.section_title].filter(Boolean);
+      entries.push({
+        xrefId,
+        thisSnapshotText: selSnaps.get(thisSelId) ?? '',
+        otherPassageId: other.passage_id,
+        otherSnapshotText: other.snapshot_text ?? '',
+        otherBookId: bookObj?.id ?? null,
+        otherBookTitle: bookObj?.title ?? '',
+        otherCitation: citParts.join(' · '),
+      });
+    }
+    setPassageToXrefs(prev => new Map(prev).set(passageId, entries));
+    setAnnotationPanel({ type: 'xrefs', passageId });
+  }
+
+  async function handleDeleteXref(passageId: string, xrefId: string) {
+    if (!confirm('Delete this cross-reference?')) return;
+    try {
+      await supabase.from('xrefs').delete().eq('id', xrefId);
+      deleteRemote('xrefs', xrefId).catch(() => {});
+      const remaining = (passageToXrefs.get(passageId) ?? []).filter(e => e.xrefId !== xrefId);
+      if (remaining.length === 0) {
+        setPassageToXrefs(prev => { const next = new Map(prev); next.delete(passageId); return next; });
+        setXrefPassageIds(prev => { const s = new Set(prev); s.delete(passageId); return s; });
+        setAnnotationPanel(null);
+      } else {
+        setPassageToXrefs(prev => new Map(prev).set(passageId, remaining));
+      }
+    } catch {}
+  }
+
   function openPanel(panel: 'tag' | 'note' | 'xref' | 'ai') {
     pendingSelectionRef.current = selectionBar; // capture before mousedown clears it
     setActivePanel(userId ? panel : 'signin');
@@ -678,7 +811,7 @@ async function handleCopy() {
             if (showSection) lastSection = passage.section_title!;
 
             return (
-              <div key={passage.id} id={`p-${passage.id}`}>
+              <div key={passage.id} id={`p-${passage.id}`} data-pid={passage.id}>
                 {showChapter && (
                   <h2 className="text-lg font-semibold text-[#1B6B7B] mt-10 mb-4">
                     {passage.chapter_label}
@@ -690,22 +823,34 @@ async function handleCopy() {
                   </h3>
                 )}
                 <div className="relative">
-                  {(taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id)) && (
+                  {(taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
                       {taggedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}
-                          className="text-[32px] leading-none inline-block scale-x-[-1] cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
                           title="View tags"
-                        >🏷</button>
+                        >
+                          <TagIcon size={20} />
+                        </button>
                       )}
                       {notedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleNoteIconClick(passage.id); }}
-                          className="text-[32px] leading-none inline-block cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
                           title="View note"
-                          style={{ filter: 'sepia(1) saturate(3) hue-rotate(5deg)' }}
-                        >📝</button>
+                        >
+                          <NoteIcon size={20} />
+                        </button>
+                      )}
+                      {xrefPassageIds.has(passage.id) && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleXrefIconClick(passage.id); }}
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          title="View cross-references"
+                        >
+                          <XRefIcon size={20} />
+                        </button>
                       )}
                     </div>
                   )}
@@ -818,7 +963,7 @@ async function handleCopy() {
                   <div className="space-y-2">
                     {data.tags.map(tag => (
                       <div key={tag.id} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                        <span className="text-xl leading-none inline-block scale-x-[-1] text-blue-500">🏷</span>
+                        <TagIcon size={16} />
                         <span className="text-sm font-medium text-gray-800">{tag.name}</span>
                       </div>
                     ))}
@@ -869,6 +1014,41 @@ async function handleCopy() {
                 />
               </div>
             )}
+          </PanelSheet>
+        );
+      })()}
+
+      {/* Xref view panel — opened by tapping the chain-link margin icon */}
+      {(() => {
+        const entries = annotationPanel?.type === 'xrefs' ? (passageToXrefs.get(annotationPanel.passageId) ?? []) : [];
+        const thisSnap = entries[0]?.thisSnapshotText ?? '';
+        return (
+          <PanelSheet
+            visible={annotationPanel?.type === 'xrefs'}
+            onClose={closeAnnotationPanel}
+            title="Cross-Reference"
+          >
+            <div className="px-5 pt-4 pb-4">
+              {thisSnap && (
+                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 line-clamp-2 italic">"{thisSnap}"</p>
+                </div>
+              )}
+              {entries.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No cross-references found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {entries.map(entry => (
+                    <XrefEntryBlock
+                      key={entry.xrefId}
+                      entry={entry}
+                      onOpenBook={onOpenBook ? (bookId, passageId) => { onOpenBook(bookId, passageId); closeAnnotationPanel(); } : undefined}
+                      onDelete={() => handleDeleteXref(annotationPanel!.passageId, entry.xrefId)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </PanelSheet>
         );
       })()}
