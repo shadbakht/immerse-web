@@ -378,7 +378,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           {onCollapse && (
             <button
               onClick={onCollapse}
-              className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] hover:text-[#145860] hover:bg-[#1B6B7B]/10 rounded-lg transition-colors text-base"
+              className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] hover:text-[#145860] bg-[#1B6B7B]/10 hover:bg-[#1B6B7B]/20 rounded-lg transition-colors text-base"
               title="Collapse Library"
             >
               ‹
