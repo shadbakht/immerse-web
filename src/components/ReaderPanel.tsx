@@ -512,6 +512,13 @@ async function handleCopy() {
       const verse = passage?.paragraph_number ?? '';
       const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || (verse ? String(verse) : '');
       citation = `— ${book?.title ?? "The Qur'an"}${loc ? ` ${loc}` : ''}`;
+    } else if (target.bookId.startsWith('bible-kjv-')) {
+      const collectionName = (book?.authorName ?? '').replace(/\s*\(.*?\)\s*/g, '').trim() || 'The Bible';
+      const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
+      const verse = passage?.paragraph_number ?? '';
+      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || (verse ? String(verse) : '');
+      const bookPart = book?.title ? `${book.title}${loc ? ` ${loc}` : ''}` : loc;
+      citation = `— ${collectionName}${bookPart ? `, ${bookPart}` : ''}`;
     } else {
       const author = book?.authorName && book.authorName !== book?.title ? book.authorName : null;
       const location = passage?.chapter_label || passage?.section_title || null;
@@ -885,6 +892,11 @@ async function handleCopy() {
                         </button>
                       )}
                     </div>
+                  )}
+                  {passage.paragraph_number != null && (
+                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-300 select-none w-7 text-right leading-relaxed tabular-nums">
+                      {passage.paragraph_number}
+                    </span>
                   )}
                   <p
                     data-pid={passage.id}
