@@ -909,7 +909,7 @@ async function handleCopy() {
       {activeFootnote && (
         <>
           <div className="absolute inset-0 z-30" onClick={() => setActiveFootnote(null)} />
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl rounded-t-2xl px-6 py-5 max-h-52 overflow-y-auto">
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl rounded-t-2xl px-6 py-5 min-h-[33vh] max-h-[60vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-bold text-[#1B6B7B] uppercase tracking-widest mb-2 block">

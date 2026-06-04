@@ -1,18 +1,30 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
+import { exportAsImm, exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
-import { TagIcon } from './Icons';
-
-interface TagRow { id: string; name: string; created_at: string; visibility: string; selections: SelRow[]; }
-interface SelRow  { id: string; snapshot_text: string; passage_id: string; book_id: string; citation: string; }
 
 interface TagsScreenProps {
   userId: string;
   onOpenBook: (bookId: string, passageId?: string) => void;
+}
+
+function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onChange(); }}
+      className="flex items-center justify-center shrink-0 w-8 h-8 -ml-1"
+    >
+      <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
+        checked ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'
+      }`}>
+        {checked && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+      </div>
+    </button>
+  );
 }
 
 function Highlight({ text, q }: { text: string; q: string }) {
@@ -60,7 +72,17 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   );
 }
 
-function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage }: { tag: TagRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onDelete: (id: string) => void; onRename: (id: string, name: string) => void; onToggleVisibility: (id: string, visibility: string) => void; onRemovePassage: (tagId: string, selId: string) => void }) {
+function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage }: {
+  tag: TagRow;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  searchQuery: string;
+  onOpenBook: (b: string, p?: string) => void;
+  onDelete: (id: string) => void;
+  onRename: (id: string, name: string) => void;
+  onToggleVisibility: (id: string, visibility: string) => void;
+  onRemovePassage: (tagId: string, selId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(tag.name);
@@ -118,7 +140,7 @@ function TagCard({ tag, searchQuery, onOpenBook, onDelete, onRename, onToggleVis
         className="px-5 py-4 flex items-center gap-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(v => !v)}
       >
-        <TagIcon size={18} />
+        <Checkbox checked={isSelected} onChange={onToggleSelect} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">
             <Highlight text={tag.name} q={searchQuery} />
@@ -150,8 +172,23 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [tags, setTags] = useState<TagRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (userId) load(); }, [userId]);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [showExportMenu]);
 
   async function load() {
     setLoading(true);
@@ -184,6 +221,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   async function handleDeleteTag(id: string) {
     await deleteRemote('tags', id).catch(() => {});
     setTags(tags.filter(t => t.id !== id));
+    setSelectedTagIds(prev => { const n = new Set(prev); n.delete(id); return n; });
   }
 
   async function handleRenameTag(id: string, newName: string) {
@@ -221,6 +259,29 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     }
   }
 
+  function toggleSelectTag(id: string) {
+    setSelectedTagIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleExport(format: 'pdf' | 'docx' | 'imm') {
+    setShowExportMenu(false);
+    setExporting(true);
+    try {
+      const selected = tags.filter(t => selectedTagIds.has(t.id));
+      if (format === 'pdf')  await exportAsPdf(selected);
+      if (format === 'docx') await exportAsDocx(selected);
+      if (format === 'imm')  await exportAsImm(selected);
+    } catch (e) {
+      console.error('[TagExport] failed:', e);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return tags;
@@ -233,7 +294,43 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       <div className="px-6 pt-8 pb-4 shrink-0">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-4">Tags</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-semibold text-gray-900">Tags</h1>
+          {selectedTagIds.size > 0 && (
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(v => !v)}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 disabled:opacity-60 transition-colors"
+                title="Export selected tags"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {exporting ? 'Exporting…' : `Export (${selectedTagIds.size})`}
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 min-w-[160px]">
+                  {([
+                    { label: 'PDF',           format: 'pdf'  },
+                    { label: 'Word (.docx)',   format: 'docx' },
+                    { label: 'Immerse (.imm)', format: 'imm'  },
+                  ] as const).map(({ label, format }) => (
+                    <button
+                      key={format}
+                      onClick={() => handleExport(format)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tags and passages…" className="w-full pl-9 pr-4 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50" />
@@ -250,6 +347,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
               <TagCard
                 key={tag.id}
                 tag={tag}
+                isSelected={selectedTagIds.has(tag.id)}
+                onToggleSelect={() => toggleSelectTag(tag.id)}
                 searchQuery={searchQuery}
                 onOpenBook={onOpenBook}
                 onDelete={handleDeleteTag}
