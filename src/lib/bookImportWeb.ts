@@ -1,49 +1,51 @@
 /**
- * bookImportWeb.ts — Client-side file parsing + Supabase persistence for
- * user-imported books on the web.
+ * bookImportWeb.ts — Client-side file parsing + local IndexedDB persistence.
  *
- * Supported formats: TXT, DOCX, EPUB, RTF → parsed to paragraphs, stored as
- * passages in Supabase (books + passages tables, is_user_imported=true).
- * PDF → uploaded to the 'user-imports' storage bucket, no passages.
+ * Imported books are local-only, exactly like the mobile app's SQLite "My Books".
+ * They are never uploaded to Supabase; annotations on them stay local too.
+ *
+ * Supported formats: TXT, EPUB, DOCX, RTF (parsed to paragraphs) and PDF
+ * (stored as a Blob, displayed in an embedded PDF viewer).
  */
 
 import JSZip from 'jszip';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { saveLocalBook, deleteLocalBook } from './importedBooksDb';
+import type { LocalBook } from './importedBooksDb';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ParsedBook {
-  title: string;
-  paragraphs: string[];
-  sourceFormat: string;
-  isPdf: boolean;
-}
-
 export interface ImportBookResult {
   success: boolean;
-  title?: string;
-  bookId?: string;
-  error?: string;
+  title?:  string;
+  bookId?: string;   // 'imported:{uuid}'
+  error?:  string;
+}
+
+interface ParsedBook {
+  title:      string;
+  paragraphs: string[];
+  format:     string;
+  pdfBlob:    Blob | null;
 }
 
 // ─── Parsers ──────────────────────────────────────────────────────────────────
 
 async function parseTxt(file: File): Promise<ParsedBook> {
-  const text = await file.text();
+  const text       = await file.text();
   const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
   if (paragraphs.length === 0) throw new Error('No readable text found.');
-  return { title: file.name.replace(/\.txt$/i, ''), paragraphs, sourceFormat: 'txt', isPdf: false };
+  return { title: file.name.replace(/\.txt$/i, ''), paragraphs, format: 'txt', pdfBlob: null };
 }
 
 async function parseDocx(file: File): Promise<ParsedBook> {
-  const ab = await file.arrayBuffer();
+  const ab  = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(ab);
 
   const docXml  = (await zip.file('word/document.xml')?.async('string')) ?? '';
   const coreXml = (await zip.file('docProps/core.xml')?.async('string')) ?? '';
 
   const titleMatch = coreXml.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/);
-  const title = titleMatch?.[1]?.trim() ?? file.name.replace(/\.docx$/i, '');
+  const title      = titleMatch?.[1]?.trim() ?? file.name.replace(/\.docx$/i, '');
 
   const paragraphs: string[] = [];
   for (const seg of docXml.split('</w:p>')) {
@@ -54,11 +56,11 @@ async function parseDocx(file: File): Promise<ParsedBook> {
   }
 
   if (paragraphs.length === 0) throw new Error('No readable text found in this DOCX.');
-  return { title, paragraphs, sourceFormat: 'docx', isPdf: false };
+  return { title, paragraphs, format: 'docx', pdfBlob: null };
 }
 
 async function parseEpub(file: File): Promise<ParsedBook> {
-  const ab = await file.arrayBuffer();
+  const ab  = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(ab);
 
   const containerXml = (await zip.file('META-INF/container.xml')?.async('string')) ?? '';
@@ -116,7 +118,7 @@ async function parseEpub(file: File): Promise<ParsedBook> {
   }
 
   if (paragraphs.length === 0) throw new Error('No readable text found in this EPUB.');
-  return { title, paragraphs, sourceFormat: 'epub', isPdf: false };
+  return { title, paragraphs, format: 'epub', pdfBlob: null };
 }
 
 function stripRtf(rtf: string): string {
@@ -158,26 +160,20 @@ function stripRtf(rtf: string): string {
 }
 
 async function parseRtf(file: File): Promise<ParsedBook> {
-  const text = await file.text();
-  const plain = stripRtf(text);
+  const text       = await file.text();
+  const plain      = stripRtf(text);
   const paragraphs = plain.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
   if (paragraphs.length === 0) throw new Error('No readable text found in this RTF.');
-  return { title: file.name.replace(/\.rtf$/i, ''), paragraphs, sourceFormat: 'rtf', isPdf: false };
+  return { title: file.name.replace(/\.rtf$/i, ''), paragraphs, format: 'rtf', pdfBlob: null };
 }
 
 // ─── Main import ──────────────────────────────────────────────────────────────
 
-const PASSAGE_BATCH = 200;
-
 /**
- * Parse the file client-side and persist it to Supabase as a user-owned book.
- * Text formats → stored as passages. PDF → uploaded to storage bucket.
+ * Parse the file client-side and store it in IndexedDB.
+ * Returns a bookId in the form 'imported:{uuid}' that the reader understands.
  */
-export async function importBook(
-  file: File,
-  userId: string,
-  supabase: SupabaseClient,
-): Promise<ImportBookResult> {
+export async function importBook(file: File): Promise<ImportBookResult> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
   let parsed: ParsedBook;
@@ -188,7 +184,7 @@ export async function importBook(
       case 'epub': parsed = await parseEpub(file); break;
       case 'rtf':  parsed = await parseRtf(file);  break;
       case 'pdf':
-        parsed = { title: file.name.replace(/\.pdf$/i, ''), paragraphs: [], sourceFormat: 'pdf', isPdf: true };
+        parsed = { title: file.name.replace(/\.pdf$/i, ''), paragraphs: [], format: 'pdf', pdfBlob: file };
         break;
       default:
         return { success: false, error: `Unsupported format .${ext}. Use TXT, EPUB, DOCX, RTF, or PDF.` };
@@ -197,131 +193,29 @@ export async function importBook(
     return { success: false, error: err.message ?? 'Could not parse the file.' };
   }
 
-  const bookId = crypto.randomUUID();
+  const id: string = crypto.randomUUID();
+  const book: LocalBook = {
+    id,
+    title:      parsed.title,
+    format:     parsed.format,
+    paragraphs: parsed.paragraphs,
+    pdfBlob:    parsed.pdfBlob,
+    createdAt:  Date.now(),
+  };
 
-  // Insert book record (author_id left null — allowed after migration)
-  const { error: bookErr } = await supabase.from('books').insert({
-    id:               bookId,
-    title:            parsed.title,
-    is_user_imported: true,
-    user_id:          userId,
-    is_active:        true,
-    citation_format:  'book_only',
-    language:         'English',
-    sort_order:       9999,
-  });
-  if (bookErr) {
-    console.error('[importBook] book insert:', bookErr);
-    return { success: false, error: 'Failed to save book.' };
+  try {
+    await saveLocalBook(book);
+  } catch (err: any) {
+    console.error('[importBook] IndexedDB save error:', err);
+    return { success: false, error: 'Failed to save the book locally.' };
   }
 
-  // Insert passages in batches (text formats only)
-  for (let i = 0; i < parsed.paragraphs.length; i += PASSAGE_BATCH) {
-    const batch = parsed.paragraphs.slice(i, i + PASSAGE_BATCH).map((content, j) => ({
-      book_id:   bookId,
-      reference: '',
-      content,
-      sort_order: i + j,
-    }));
-    const { error: passErr } = await supabase.from('passages').insert(batch);
-    if (passErr) {
-      console.error('[importBook] passages insert:', passErr);
-      await supabase.from('books').delete().eq('id', bookId).eq('user_id', userId);
-      return { success: false, error: 'Failed to save passages.' };
-    }
-  }
-
-  // Upload PDF to storage bucket
-  let storagePath: string | null = null;
-  if (parsed.isPdf) {
-    const path = `${userId}/${bookId}.pdf`;
-    const { error: uploadErr } = await supabase.storage
-      .from('user-imports')
-      .upload(path, file, { contentType: 'application/pdf' });
-    if (uploadErr) {
-      console.error('[importBook] PDF upload:', uploadErr);
-      await supabase.from('books').delete().eq('id', bookId).eq('user_id', userId);
-      return { success: false, error: 'Failed to upload PDF.' };
-    }
-    storagePath = path;
-  }
-
-  // Track in user_imported_books (non-fatal if this fails)
-  await supabase.from('user_imported_books').insert({
-    user_id:           userId,
-    book_id:           bookId,
-    original_filename: file.name,
-    storage_path:      storagePath,
-    status:            'complete',
-  });
-
-  return { success: true, title: parsed.title, bookId };
+  return { success: true, title: parsed.title, bookId: `imported:${id}` };
 }
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
-/**
- * Delete a user-imported book and all its dependent data in the correct order
- * to satisfy FK constraints without requiring CASCADE in the schema.
- */
-export async function deleteImportedBook(
-  bookId: string,
-  userId: string,
-  supabase: SupabaseClient,
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    // 1. Get PDF storage path if present
-    const { data: trackRow } = await supabase
-      .from('user_imported_books')
-      .select('storage_path')
-      .eq('book_id', bookId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    // 2. Remove PDF from storage
-    if (trackRow?.storage_path) {
-      await supabase.storage.from('user-imports').remove([trackRow.storage_path]);
-    }
-
-    // 3. Collect passage IDs to unblock downstream FKs
-    const { data: passageRows } = await supabase
-      .from('passages')
-      .select('id')
-      .eq('book_id', bookId);
-    const passageIds = (passageRows ?? []).map(p => p.id as string);
-
-    // 4. Clean up selections and their dependents
-    if (passageIds.length > 0) {
-      const { data: selRows } = await supabase
-        .from('selections')
-        .select('id')
-        .in('passage_id', passageIds);
-      const selIds = (selRows ?? []).map(s => s.id as string);
-
-      if (selIds.length > 0) {
-        await supabase.from('xrefs').delete().in('selection_a_id', selIds);
-        await supabase.from('xrefs').delete().in('selection_b_id', selIds);
-        await supabase.from('notes').delete().in('selection_id', selIds);
-        await supabase.from('selection_tags').delete().in('selection_id', selIds);
-        await supabase.from('selections').delete().in('id', selIds);
-      }
-
-      await supabase.from('passages').delete().eq('book_id', bookId);
-    }
-
-    // 5. Delete reading progress
-    await supabase.from('reading_progress').delete().eq('book_id', bookId);
-
-    // 6. Delete tracking row
-    await supabase.from('user_imported_books').delete().eq('book_id', bookId).eq('user_id', userId);
-
-    // 7. Delete book
-    const { error } = await supabase.from('books').delete().eq('id', bookId).eq('user_id', userId);
-    if (error) return { success: false, error: 'Failed to delete book.' };
-
-    return { success: true };
-  } catch (err: any) {
-    console.error('[deleteImportedBook]', err);
-    return { success: false, error: err.message ?? 'Delete failed.' };
-  }
+export async function removeImportedBook(bookId: string): Promise<void> {
+  const id = bookId.startsWith('imported:') ? bookId.slice('imported:'.length) : bookId;
+  await deleteLocalBook(id);
 }

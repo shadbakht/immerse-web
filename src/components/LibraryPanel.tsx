@@ -6,7 +6,8 @@ import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
 import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
-import { importBook, deleteImportedBook } from '@/lib/bookImportWeb';
+import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
+import { listLocalBooks } from '@/lib/importedBooksDb';
 
 interface SearchResult {
   passageId:    string;
@@ -80,7 +81,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       ]);
       setCatalog(cat);
       setSlugMap(slugToUuid);
-      if (userId) await loadImportedBooks();
+      await loadImportedBooks();
     } catch (err) {
       console.error('[LibraryPanel] Failed to load catalog:', err);
     } finally {
@@ -89,14 +90,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   }
 
   async function loadImportedBooks() {
-    if (!userId) return;
-    const { data } = await supabase
-      .from('books')
-      .select('id, title')
-      .eq('user_id', userId)
-      .eq('is_user_imported', true)
-      .order('created_at', { ascending: false });
-    setImportedBooks(data ?? []);
+    const rows = await listLocalBooks();
+    setImportedBooks(rows.map(r => ({ id: `imported:${r.id}`, title: r.title })));
   }
 
   // ── Import handlers ───────────────────────────────────────────────────────────
@@ -120,7 +115,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     setImporting(true);
     setImportMsg(null);
 
-    const result = await importBook(file, userId, supabase);
+    const result = await importBook(file);
 
     setImporting(false);
 
@@ -134,10 +129,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   }
 
   async function handleDeleteBook(bookId: string) {
-    const result = await deleteImportedBook(bookId, userId, supabase);
-    if (result.success) {
-      setImportedBooks(prev => prev.filter(b => b.id !== bookId));
-    }
+    await removeImportedBook(bookId);
+    setImportedBooks(prev => prev.filter(b => b.id !== bookId));
   }
 
   // ── Tree helpers ─────────────────────────────────────────────────────────────
@@ -598,7 +591,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           })}
 
           {/* ── My Books ── */}
-          {userId && (importedBooks.length > 0 || isPro) && (
+          {(importedBooks.length > 0 || (userId && isPro)) && (
             <div className="border-t border-gray-200 mt-1">
               <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <div className="w-9 shrink-0" />

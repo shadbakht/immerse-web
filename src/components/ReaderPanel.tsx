@@ -11,6 +11,7 @@ import XRefPanel from './XRefPanel';
 import AiPanel from './AiPanel';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { TagIcon, NoteIcon, XRefIcon } from './Icons';
+import { getLocalBook } from '@/lib/importedBooksDb';
 
 interface Passage {
   id: string;
@@ -151,7 +152,9 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
   const [passageToXrefs, setPassageToXrefs] = useState<Map<string, XrefViewEntry[]>>(new Map());
   const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags' | 'xrefs'; passageId: string } | null>(null);
   const [editNoteContent, setEditNoteContent] = useState('');
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl]         = useState<string | null>(null);
+  const [isImported, setIsImported] = useState(false);
+  const pdfUrlRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
@@ -355,13 +358,65 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
   }, [selectionBar]);
 
   async function loadBook(bookId: string, scrollToId?: string) {
+    // Revoke any previous blob URL to avoid memory leaks
+    if (pdfUrlRef.current) {
+      URL.revokeObjectURL(pdfUrlRef.current);
+      pdfUrlRef.current = null;
+    }
+
     setLoading(true);
     setPassages([]);
     setBook(null);
     setPdfUrl(null);
+    setIsImported(false);
     setTaggedPassageIds(new Set());
     setNotedPassageIds(new Set());
     lastSavedPidRef.current = null;
+
+    // ── Local (IndexedDB) imported book ──────────────────────────────────────
+    if (bookId.startsWith('imported:')) {
+      const localId = bookId.slice('imported:'.length);
+      try {
+        const record = await getLocalBook(localId);
+        if (!record) {
+          setBook({ title: 'Book not found', authorName: '' });
+          setLoading(false);
+          return;
+        }
+        setBook({ title: record.title, authorName: '' });
+        setIsImported(true);
+
+        if (record.pdfBlob) {
+          const url = URL.createObjectURL(record.pdfBlob);
+          pdfUrlRef.current = url;
+          setPdfUrl(url);
+        } else {
+          // Convert paragraphs to fake Passage objects
+          const ps: Passage[] = record.paragraphs.map((content, i) => ({
+            id:               `local-${localId}-${i}`,
+            content,
+            chapter_label:    null,
+            section_title:    null,
+            paragraph_number: null,
+            sort_order:       i,
+          }));
+          setPassages(ps);
+          if (scrollToId) {
+            setTimeout(() => {
+              document.getElementById(`p-${scrollToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          } else {
+            scrollRef.current?.scrollTo({ top: 0 });
+          }
+        }
+      } catch (err) {
+        console.error('[ReaderPanel] local book load error:', err);
+        setBook({ title: 'Could not load book', authorName: '' });
+      }
+      setLoading(false);
+      return;
+    }
+    // ── End local book ────────────────────────────────────────────────────────
     try {
       // Fetch book metadata and all passages in parallel.
       // Passages are fetched in batches of 1000 to bypass the PostgREST server-side
@@ -397,24 +452,6 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
 
       const ps: Passage[] = passageData ?? [];
       setPassages(ps);
-
-      // PDF imported book: no passages — fetch a signed storage URL to embed
-      if (ps.length === 0 && userId && bookData) {
-        const { data: importRow } = await supabase
-          .from('user_imported_books')
-          .select('storage_path')
-          .eq('book_id', bookId)
-          .eq('user_id', userId)
-          .maybeSingle();
-        if (importRow?.storage_path) {
-          const { data: signed } = await supabase.storage
-            .from('user-imports')
-            .createSignedUrl(importRow.storage_path, 3600);
-          if (signed?.signedUrl) setPdfUrl(signed.signedUrl);
-        }
-        setLoading(false);
-        return;
-      }
 
       // Load existing annotations asynchronously so the book renders immediately.
       if (ps.length > 0) {
@@ -867,7 +904,7 @@ async function handleCopy() {
       )}
 
       {/* Passage content */}
-      {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={handleMouseUp}>
+      {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={isImported ? undefined : handleMouseUp}>
         <div className="max-w-2xl mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
@@ -895,7 +932,7 @@ async function handleCopy() {
                   </h3>
                 )}
                 <div className="relative">
-                  {(taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
+                  {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
                       {taggedPassageIds.has(passage.id) && (
                         <button
