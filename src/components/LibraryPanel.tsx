@@ -7,7 +7,7 @@ import TagPanel from './TagPanel';
 import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
-import { listLocalBooks } from '@/lib/importedBooksDb';
+import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 
 interface SearchResult {
   passageId:    string;
@@ -294,8 +294,12 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).join(' & ');
   }
 
+  /** Map catalog slugs → Supabase UUIDs, filtering out 'imported:*' local IDs. */
   function selectedUUIDs(): string[] {
-    return [...selectedSlugs].map(s => slugMap.get(s)).filter(Boolean) as string[];
+    return [...selectedSlugs]
+      .filter(s => !s.startsWith('imported:'))
+      .map(s => slugMap.get(s))
+      .filter(Boolean) as string[];
   }
 
   useEffect(() => {
@@ -308,15 +312,63 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   async function doSearch(q: string) {
     setSearchLoading(true);
     try {
-      const scope = selectedSlugs.size > 0 ? selectedUUIDs() : null;
-      const results = await runFtsSearch(q, scope);
-      setSearchResults(results.length > 0 ? results : await runFuzzySearch(q, scope));
+      const importedSelected = [...selectedSlugs].filter(s => s.startsWith('imported:'));
+      const regularUUIDs     = selectedSlugs.size > 0 ? selectedUUIDs() : null;
+
+      // Remote (Supabase) search: run when no filter, or when regular books are selected.
+      // If only imported books are selected, skip remote to avoid empty-IN query.
+      let remoteResults: SearchResult[] = [];
+      const onlyImportedSelected = selectedSlugs.size > 0 && importedSelected.length === selectedSlugs.size;
+      if (!onlyImportedSelected) {
+        remoteResults = await runFtsSearch(q, regularUUIDs);
+        if (remoteResults.length === 0) remoteResults = await runFuzzySearch(q, regularUUIDs);
+      }
+
+      // Local (IndexedDB) search: run when no filter (search all local books),
+      // or when My Books / specific imported books are selected.
+      const localBookIds = selectedSlugs.size === 0
+        ? importedBooks.map(b => b.id)
+        : importedSelected;
+      const localResults = await searchLocalBooks(q, localBookIds);
+
+      setSearchResults([...localResults, ...remoteResults]);
     } finally {
       setSearchLoading(false);
     }
   }
 
+  async function searchLocalBooks(q: string, bookIds: string[]): Promise<SearchResult[]> {
+    if (bookIds.length === 0) return [];
+    const words = q.trim().split(/\s+/).filter(w => w.length >= 2);
+    if (words.length === 0) return [];
+
+    const results: SearchResult[] = [];
+    await Promise.all(bookIds.map(async bookId => {
+      const localId = bookId.startsWith('imported:') ? bookId.slice('imported:'.length) : bookId;
+      const record  = await getLocalBook(localId);
+      if (!record || record.paragraphs.length === 0) return;
+      for (let i = 0; i < record.paragraphs.length; i++) {
+        const para = record.paragraphs[i];
+        if (words.every(w => normalize(para).includes(normalize(w)))) {
+          results.push({
+            passageId:    `local-${localId}-${i}`,
+            bookId:       `imported:${localId}`,
+            bookTitle:    record.title,
+            authorName:   '',
+            chapterLabel: null,
+            sectionTitle: null,
+            content:      para,
+          });
+          if (results.length >= 40) break;
+        }
+      }
+    }));
+    return results.slice(0, 40);
+  }
+
   async function runFtsSearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
+    // scope=[] means only imported books selected — no remote results needed
+    if (scope !== null && scope.length === 0) return [];
     const expanded = expandSynonyms(q);
     const hasOps = /[|&!()"]/.test(expanded);
     const tsQuery = hasOps ? expanded : q.trim().split(/\s+/).filter(Boolean).map(t => `${t}:*`).join(' & ');
@@ -325,12 +377,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
       .textSearch('content', tsQuery, { type: 'websearch', config: 'english' })
       .limit(40);
-    if (scope) query = query.in('book_id', scope);
+    if (scope && scope.length > 0) query = query.in('book_id', scope);
     const { data } = await query;
     return mapResults(data ?? []);
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
+    if (scope !== null && scope.length === 0) return [];
     const words = q.trim().split(/\s+/).filter(w => w.length >= 2);
     if (words.length === 0) return [];
     let query = supabase
@@ -338,7 +391,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
       .ilike('content', `%${words[0]}%`)
       .limit(60);
-    if (scope) query = query.in('book_id', scope);
+    if (scope && scope.length > 0) query = query.in('book_id', scope);
     const { data } = await query;
     const filtered = (data ?? []).filter((p: any) =>
       words.every(w => normalize(p.content).includes(normalize(w)))
@@ -463,7 +516,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   <div className="w-3.5 h-3.5 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 14V3M5 8l5-5 5 5" />
+                    <path d="M10 3V14M5 9l5 5 5-5" />
                     <path d="M3 17h14" />
                   </svg>
                 )}
@@ -594,7 +647,11 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           {(importedBooks.length > 0 || (userId && isPro)) && (
             <div className="border-t border-gray-200 mt-1">
               <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                <div className="w-9 shrink-0" />
+                <Checkbox
+                  state={checkState(importedBooks.map(b => b.id))}
+                  onChange={() => toggleSlugs(importedBooks.map(b => b.id))}
+                  className="pl-3 pr-1 py-3.5 shrink-0"
+                />
                 <button
                   onClick={() => setMyBooksOpen(v => !v)}
                   className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
