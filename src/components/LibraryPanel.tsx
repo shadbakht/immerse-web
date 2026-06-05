@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
 import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
+import { importBook, deleteImportedBook } from '@/lib/bookImportWeb';
 
 interface SearchResult {
   passageId:    string;
@@ -26,6 +27,11 @@ interface LibraryPanelProps {
 
 // (Caching is handled by src/lib/catalog.ts)
 
+interface ImportedBook {
+  id: string;
+  title: string;
+}
+
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
 
@@ -34,6 +40,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   const [loading, setLoading]   = useState(true);
   const [openNodes, setOpenNodes] = useState<Set<string>>(new Set());
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+
+  // My Books
+  const [isPro, setIsPro]                 = useState(false);
+  const [importedBooks, setImportedBooks] = useState<ImportedBook[]>([]);
+  const [myBooksOpen, setMyBooksOpen]     = useState(true);
+  const [importing, setImporting]         = useState(false);
+  const [importMsg, setImportMsg]         = useState<{ text: string; isError: boolean } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Search
   const [searchQuery,       setSearchQuery]       = useState('');
@@ -44,6 +58,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   const [tagPanelVisible,   setTagPanelVisible]   = useState(false);
 
   // ── Load ──────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (userId) {
+      supabase.from('profiles').select('is_pro').eq('id', userId).single()
+        .then(({ data }) => setIsPro(data?.is_pro ?? false));
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (activeTab !== 'library') return;
@@ -59,10 +80,63 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       ]);
       setCatalog(cat);
       setSlugMap(slugToUuid);
+      if (userId) await loadImportedBooks();
     } catch (err) {
       console.error('[LibraryPanel] Failed to load catalog:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadImportedBooks() {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('books')
+      .select('id, title')
+      .eq('user_id', userId)
+      .eq('is_user_imported', true)
+      .order('created_at', { ascending: false });
+    setImportedBooks(data ?? []);
+  }
+
+  // ── Import handlers ───────────────────────────────────────────────────────────
+
+  function handleImportClick() {
+    if (!userId) return;
+    if (!isPro) {
+      setImportMsg({ text: 'Book import is a Pro feature. Upgrade in Settings to import your own books.', isError: false });
+      setTimeout(() => setImportMsg(null), 4000);
+      return;
+    }
+    setImportMsg(null);
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+    e.target.value = '';
+
+    setImporting(true);
+    setImportMsg(null);
+
+    const result = await importBook(file, userId, supabase);
+
+    setImporting(false);
+
+    if (!result.success) {
+      setImportMsg({ text: result.error ?? 'Import failed.', isError: true });
+    } else {
+      setImportMsg({ text: `"${result.title}" imported successfully.`, isError: false });
+      setTimeout(() => setImportMsg(null), 3000);
+      await loadImportedBooks();
+    }
+  }
+
+  async function handleDeleteBook(bookId: string) {
+    const result = await deleteImportedBook(bookId, userId, supabase);
+    if (result.success) {
+      setImportedBooks(prev => prev.filter(b => b.id !== bookId));
     }
   }
 
@@ -371,20 +445,54 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   return (
     <div className="flex flex-col h-full">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.epub,.docx,.rtf,.pdf"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900">Library</h2>
-          {onCollapse && (
-            <button
-              onClick={onCollapse}
-              className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] hover:text-[#145860] bg-[#1B6B7B]/10 hover:bg-[#1B6B7B]/20 rounded-lg transition-colors text-base"
-              title="Collapse Library"
-            >
-              ‹
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {userId && (
+              <button
+                onClick={handleImportClick}
+                title="Import a book (TXT, EPUB, DOCX, RTF, PDF)"
+                disabled={importing}
+                className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] hover:text-[#145860] bg-[#1B6B7B]/10 hover:bg-[#1B6B7B]/20 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {importing ? (
+                  <div className="w-3.5 h-3.5 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 14V3M5 8l5-5 5 5" />
+                    <path d="M3 17h14" />
+                  </svg>
+                )}
+              </button>
+            )}
+            {onCollapse && (
+              <button
+                onClick={onCollapse}
+                className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] hover:text-[#145860] bg-[#1B6B7B]/10 hover:bg-[#1B6B7B]/20 rounded-lg transition-colors text-base"
+                title="Collapse Library"
+              >
+                ‹
+              </button>
+            )}
+          </div>
         </div>
+        {importMsg && (
+          <p className={`text-xs mb-2 px-1 ${importMsg.isError ? 'text-red-600' : 'text-[#1B6B7B]'}`}>
+            {importMsg.text}
+          </p>
+        )}
+
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -488,6 +596,45 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               </div>
             );
           })}
+
+          {/* ── My Books ── */}
+          {userId && (importedBooks.length > 0 || isPro) && (
+            <div className="border-t border-gray-200 mt-1">
+              <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <div className="w-9 shrink-0" />
+                <button
+                  onClick={() => setMyBooksOpen(v => !v)}
+                  className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
+                >
+                  <span className="text-sm font-medium text-gray-800 truncate">My Books</span>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {importedBooks.length > 0 && (
+                      <span className="text-xs text-gray-400">{importedBooks.length}</span>
+                    )}
+                    <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''}`}>›</span>
+                  </div>
+                </button>
+              </div>
+              {myBooksOpen && (
+                <div className="bg-gray-50/30">
+                  {importedBooks.length === 0 ? (
+                    <p className="text-xs text-gray-400 pl-9 pr-4 py-3">
+                      No imported books yet. Use the upload button above to import a file.
+                    </p>
+                  ) : (
+                    importedBooks.map(book => (
+                      <ImportedBookRow
+                        key={book.id}
+                        book={book}
+                        onOpen={() => onOpenBook(book.id)}
+                        onDelete={() => handleDeleteBook(book.id)}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -526,6 +673,56 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           setTagPanelVisible(false);
         }}
       />
+    </div>
+  );
+}
+
+// ── ImportedBookRow ───────────────────────────────────────────────────────────
+
+function ImportedBookRow({ book, onOpen, onDelete }: {
+  book: { id: string; title: string };
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  if (confirmDelete) {
+    return (
+      <div className="flex items-center border-b border-gray-100 px-4 py-2.5 bg-red-50/60">
+        <span className="text-xs text-gray-600 flex-1 truncate pr-2">Delete &quot;{book.title}&quot;?</span>
+        <button
+          onClick={() => { setConfirmDelete(false); onDelete(); }}
+          className="text-xs text-red-600 font-medium hover:text-red-700 mr-3 shrink-0"
+        >
+          Delete
+        </button>
+        <button
+          onClick={() => setConfirmDelete(false)}
+          className="text-xs text-gray-500 hover:text-gray-700 shrink-0"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors group"
+      style={{ paddingLeft: 36 }}
+    >
+      <button onClick={onOpen} className="flex-1 text-left py-2.5 min-w-0 pr-2">
+        <div className="text-sm text-gray-800 truncate">{book.title}</div>
+      </button>
+      <button
+        onClick={() => setConfirmDelete(true)}
+        title="Delete"
+        className="opacity-0 group-hover:opacity-100 shrink-0 p-1.5 text-gray-400 hover:text-red-500 transition-all mr-1"
+      >
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M9 3h2a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1zm4 2V4a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3v1H4a1 1 0 0 0 0 2h.1l.9 10.1A2 2 0 0 0 7 19h6a2 2 0 0 0 2-1.9L15.9 7H16a1 1 0 0 0 0-2h-3z" clipRule="evenodd" />
+        </svg>
+      </button>
     </div>
   );
 }

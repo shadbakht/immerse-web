@@ -151,6 +151,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
   const [passageToXrefs, setPassageToXrefs] = useState<Map<string, XrefViewEntry[]>>(new Map());
   const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags' | 'xrefs'; passageId: string } | null>(null);
   const [editNoteContent, setEditNoteContent] = useState('');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
@@ -357,6 +358,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
     setLoading(true);
     setPassages([]);
     setBook(null);
+    setPdfUrl(null);
     setTaggedPassageIds(new Set());
     setNotedPassageIds(new Set());
     lastSavedPidRef.current = null;
@@ -395,6 +397,24 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
 
       const ps: Passage[] = passageData ?? [];
       setPassages(ps);
+
+      // PDF imported book: no passages — fetch a signed storage URL to embed
+      if (ps.length === 0 && userId && bookData) {
+        const { data: importRow } = await supabase
+          .from('user_imported_books')
+          .select('storage_path')
+          .eq('book_id', bookId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (importRow?.storage_path) {
+          const { data: signed } = await supabase.storage
+            .from('user-imports')
+            .createSignedUrl(importRow.storage_path, 3600);
+          if (signed?.signedUrl) setPdfUrl(signed.signedUrl);
+        }
+        setLoading(false);
+        return;
+      }
 
       // Load existing annotations asynchronously so the book renders immediately.
       if (ps.length > 0) {
@@ -834,8 +854,20 @@ async function handleCopy() {
         </div>
       )}
 
+      {/* PDF viewer */}
+      {pdfUrl && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {book && (
+            <div className="px-6 py-3 border-b border-gray-100 shrink-0">
+              <h1 className="text-base font-semibold text-gray-900 truncate">{book.title}</h1>
+            </div>
+          )}
+          <embed src={pdfUrl} type="application/pdf" className="flex-1 w-full" />
+        </div>
+      )}
+
       {/* Passage content */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={handleMouseUp}>
+      {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={handleMouseUp}>
         <div className="max-w-2xl mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
@@ -916,7 +948,7 @@ async function handleCopy() {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Footnote panel */}
       {activeFootnote && (
