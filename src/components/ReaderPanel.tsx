@@ -467,7 +467,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
         const p = ps.find(p => p.id === pidToSave) ?? ps[0];
         const maxSo = ps[ps.length - 1].sort_order;
         lastSavedPidRef.current = pidToSave;
-        supabase.from('reading_progress').upsert(
+        await supabase.from('reading_progress').upsert(
           {
             user_id:            userId,
             book_id:            bookId,
@@ -477,7 +477,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
             updated_at:         new Date().toISOString(),
           },
           { onConflict: 'user_id,book_id' },
-        ).catch(() => {});
+        );
       }
     } finally {
       setLoading(false);
