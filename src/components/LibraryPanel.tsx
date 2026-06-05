@@ -375,7 +375,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     let query = supabase
       .from('passages')
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
-      .textSearch('content', tsQuery, { type: 'websearch', config: 'english' })
+      .textSearch('fts', tsQuery, { type: 'websearch', config: 'english' })
       .limit(40);
     if (scope && scope.length > 0) query = query.in('book_id', scope);
     const { data } = await query;
