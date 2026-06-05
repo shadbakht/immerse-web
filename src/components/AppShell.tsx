@@ -26,6 +26,15 @@ function ComingSoon({ label }: { label: string }) {
 
 export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string } | null;
 
+export interface XRefPickFrom {
+  text: string;
+  startPassageId: string;
+  bookId: string;
+  passageId: string;
+  startOffset: number;
+  endOffset: number;
+}
+
 interface AppShellProps {
   user:          User | null;
   initialBookId?: string;
@@ -37,6 +46,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     initialBookId ? { bookId: initialBookId } : null,
   );
   const [libraryCollapsed, setLibraryCollapsed] = useState(false);
+  const [xrefPickFrom, setXrefPickFrom] = useState<XRefPickFrom | null>(null);
 
   // Library is the only split-panel tab; everything else is full-width
   const isFullWidth = activeTab !== 'library';
@@ -58,6 +68,22 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
 
   function openBookFromHome(bookId: string, passageId?: string, highlightQuery?: string) {
     openBook(bookId, passageId, highlightQuery, true);
+  }
+
+  function handleStartXrefPick(from: XRefPickFrom) {
+    setXrefPickFrom(from);
+    setLibraryCollapsed(false);
+    setActiveTab('library');
+  }
+
+  function handleXrefPickDone() {
+    const from = xrefPickFrom;
+    setXrefPickFrom(null);
+    if (from) {
+      setReaderTarget({ bookId: from.bookId, passageId: from.passageId });
+      setActiveTab('library');
+      history.replaceState(null, '', `/read/${from.bookId}`);
+    }
   }
 
   function handleTabChange(tab: NavTab) {
@@ -100,7 +126,14 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
             </div>
           )}
           <div className="flex-1 overflow-hidden">
-            <ReaderPanel target={readerTarget} userId={userId} onOpenBook={openBook} />
+            <ReaderPanel
+              target={readerTarget}
+              userId={userId}
+              onOpenBook={openBook}
+              xrefPickFrom={xrefPickFrom}
+              onStartXrefPick={handleStartXrefPick}
+              onXrefPickDone={handleXrefPickDone}
+            />
           </div>
         </>
       )}

@@ -37,7 +37,7 @@ export default function PanelSheet({ visible, onClose, title, children, footer, 
       <div
         ref={sheetRef}
         className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ maxHeight, minHeight: '33vh' }}
+        style={{ maxHeight, minHeight: '40vh' }}
       >
         {/* Handle + Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 shrink-0">

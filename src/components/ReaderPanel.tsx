@@ -3,11 +3,10 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { pushNote, pushXref, deleteRemote } from '@/lib/annotationSync';
-import type { ReaderTarget } from './AppShell';
+import type { ReaderTarget, XRefPickFrom } from './AppShell';
 import PanelSheet from './PanelSheet';
 import TagPanel from './TagPanel';
 import NotePanel from './NotePanel';
-import XRefPanel from './XRefPanel';
 import AiPanel from './AiPanel';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { TagIcon, NoteIcon, XRefIcon } from './Icons';
@@ -45,6 +44,9 @@ interface ReaderPanelProps {
   target: ReaderTarget;
   userId: string;
   onOpenBook?: (bookId: string, passageId?: string) => void;
+  xrefPickFrom?: XRefPickFrom | null;
+  onStartXrefPick?: (from: XRefPickFrom) => void;
+  onXrefPickDone?: () => void;
 }
 
 function PassageContent({ text, onFootnoteClick, highlight }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string }) {
@@ -130,7 +132,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
   );
 }
 
-export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelProps) {
+export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone }: ReaderPanelProps) {
   const supabase = createClient();
   const [passages, setPassages] = useState<Passage[]>([]);
   const [book, setBook] = useState<BookMeta | null>(null);
@@ -141,7 +143,8 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
   const [activeFootnote, setActiveFootnote] = useState<{ num: string; text: string } | null>(null);
   const [selectionBar, setSelectionBar] = useState<SelectionBar | null>(null);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
-  const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'xref' | 'ai' | 'signin' | null>(null);
+  const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'ai' | 'signin' | null>(null);
+  const [pickSaving, setPickSaving] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
   const [taggedPassageIds, setTaggedPassageIds]   = useState<Set<string>>(new Set());
@@ -523,6 +526,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
 
   // Handle text selection — show action bar on mouseup
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (xrefPickFrom) return; // in pick mode, suppress selection bar
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
       setSelectionBar(null);
@@ -558,7 +562,7 @@ export default function ReaderPanel({ target, userId, onOpenBook }: ReaderPanelP
       startOffset: range.startOffset,
       endOffset: range.endOffset,
     });
-  }, []);
+  }, [xrefPickFrom]);
 
 async function handleCopy() {
     if (!selectionBar) return;
@@ -697,7 +701,7 @@ async function handleCopy() {
     } catch {}
   }
 
-  function openPanel(panel: 'tag' | 'note' | 'xref' | 'ai') {
+  function openPanel(panel: 'tag' | 'note' | 'ai') {
     pendingSelectionRef.current = selectionBar; // capture before mousedown clears it
     setActivePanel(userId ? panel : 'signin');
     window.getSelection()?.removeAllRanges();
@@ -748,50 +752,110 @@ async function handleCopy() {
     }
   }
 
-  async function handleXrefSave(targetPassageId: string, targetSnapshotText: string) {
-    const selIdA = await createSelection();
+  // Called when user clicks "Xref" in the action bar — initiates pick-mode flow
+  function handleXrefStart() {
+    const bar = selectionBar;
+    if (!bar || !target) return;
+    const from: XRefPickFrom = {
+      text: bar.text,
+      startPassageId: bar.startPassageId,
+      bookId: target.bookId,
+      passageId: bar.startPassageId,
+      startOffset: bar.startOffset,
+      endOffset: bar.endOffset,
+    };
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+    onStartXrefPick?.(from);
+  }
+
+  // Creates selection A (the "from") using stored pick-from data
+  async function createSelectionFrom(from: XRefPickFrom): Promise<string> {
     const now = new Date().toISOString();
-
-    // Resolve mobile-compatible anchor for the target passage (parallel fetches)
-    const [{ data: targetPidRow }, { data: targetPassageData }] = await Promise.all([
-      supabase.from('passage_pid_map').select('pid').eq('passage_id', targetPassageId).maybeSingle(),
-      supabase.from('passages').select('book_id').eq('id', targetPassageId).maybeSingle(),
+    const [{ data: pidRow }, { data: bookRow }] = await Promise.all([
+      supabase.from('passage_pid_map').select('pid').eq('passage_id', from.startPassageId).maybeSingle(),
+      supabase.from('book_slug_map').select('local_id').eq('book_id', from.bookId).maybeSingle(),
     ]);
-    const targetMobilePid = targetPidRow?.pid ?? null;
-    const { data: targetBookRow } = targetPassageData?.book_id
-      ? await supabase.from('book_slug_map').select('local_id').eq('book_id', targetPassageData.book_id).maybeSingle()
-      : { data: null };
-    const targetBookLocalId = targetBookRow?.local_id ?? null;
-
-    // Create selection B for the target passage (with full mobile-compatible anchor)
-    const { data: selB } = await supabase
+    const { data, error } = await supabase
       .from('selections')
       .insert({
         user_id:               userId,
-        passage_id:            targetPassageId,
-        start_pid:             targetMobilePid,
-        end_pid:               targetMobilePid,
-        book_local_id:         targetBookLocalId,
+        passage_id:            from.startPassageId,
+        start_pid:             pidRow?.pid ?? null,
+        end_pid:               pidRow?.pid ?? null,
+        book_local_id:         bookRow?.local_id ?? null,
         anchor_schema_version: 1,
-        start_offset:          0,
-        end_offset:            targetSnapshotText.length,
-        snapshot_text:         targetSnapshotText,
+        start_offset:          from.startOffset,
+        end_offset:            from.endOffset,
+        snapshot_text:         from.text,
         created_at:            now,
         updated_at:            now,
       })
-      .select('id').single();
-    if (!selB) throw new Error('Could not create target selection');
-    // Create xref
-    const { data: xrefData } = await supabase.from('xrefs').insert({ user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, created_at: now, updated_at: now }).select('id').single();
-    // Push xref to sync service
-    if (xrefData) {
-      await pushXref({
-        id: xrefData.id,
-        user_id: userId,
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  }
+
+  // Called when user clicks a passage while in pick mode
+  async function handlePickPassage(targetPassageId: string, targetContent: string) {
+    if (!xrefPickFrom || !userId || pickSaving) return;
+    const from = xrefPickFrom;
+    const sameBook = from.bookId === target?.bookId;
+    setPickSaving(true);
+    try {
+      const now = new Date().toISOString();
+
+      // Selection A: the user's original text selection
+      const selIdA = await createSelectionFrom(from);
+
+      // Selection B: the picked passage (whole passage as snapshot)
+      const snapshotText = targetContent.slice(0, 500);
+      const [{ data: pidRowB }, { data: passageDataB }] = await Promise.all([
+        supabase.from('passage_pid_map').select('pid').eq('passage_id', targetPassageId).maybeSingle(),
+        supabase.from('passages').select('book_id').eq('id', targetPassageId).maybeSingle(),
+      ]);
+      const { data: targetBookRow } = passageDataB?.book_id
+        ? await supabase.from('book_slug_map').select('local_id').eq('book_id', passageDataB.book_id).maybeSingle()
+        : { data: null };
+      const { data: selB } = await supabase.from('selections').insert({
+        user_id:               userId,
+        passage_id:            targetPassageId,
+        start_pid:             pidRowB?.pid ?? null,
+        end_pid:               pidRowB?.pid ?? null,
+        book_local_id:         targetBookRow?.local_id ?? null,
+        anchor_schema_version: 1,
+        start_offset:          0,
+        end_offset:            snapshotText.length,
+        snapshot_text:         snapshotText,
+        created_at:            now,
+        updated_at:            now,
+      }).select('id').single();
+      if (!selB) throw new Error('Could not create target selection');
+
+      // Xref linking both selections
+      const { data: xrefData } = await supabase.from('xrefs').insert({
+        user_id:        userId,
         selection_a_id: selIdA,
         selection_b_id: selB.id,
-        updated_at: now,
-      }).catch(() => {});
+        created_at:     now,
+        updated_at:     now,
+      }).select('id').single();
+      if (xrefData) {
+        await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, updated_at: now }).catch(() => {});
+      }
+
+      // Navigate back to the original passage
+      onXrefPickDone?.();
+
+      // For same-book picks, loadBook won't re-fire so reload annotations explicitly
+      if (sameBook) {
+        loadAnnotations(passages.map(p => p.id)).catch(() => {});
+      }
+    } catch (err) {
+      console.error('[ReaderPanel] handlePickPassage failed:', err);
+    } finally {
+      setPickSaving(false);
     }
   }
 
@@ -873,7 +937,7 @@ async function handleCopy() {
           {[
             { label: 'Tag',  onClick: () => openPanel('tag') },
             { label: 'Note', onClick: () => openPanel('note') },
-            { label: 'Xref', onClick: () => openPanel('xref') },
+            { label: 'Xref', onClick: handleXrefStart },
             { label: 'AI',   onClick: () => openPanel('ai') },
             { label: 'Copy', onClick: handleCopy },
           ].map(({ label, onClick }, i, arr) => (
@@ -891,6 +955,35 @@ async function handleCopy() {
         </div>
       )}
 
+      {/* Xref pick-mode banner */}
+      {xrefPickFrom && (
+        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 px-5 py-3 flex items-center justify-between gap-3 z-10">
+          <div className="flex-1 min-w-0">
+            {pickSaving ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin shrink-0" />
+                <span className="text-sm text-[#1B6B7B] font-medium">Saving cross-reference…</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-[#1B6B7B]">Click any passage to cross-reference</p>
+                <p className="text-xs text-gray-500 truncate mt-0.5 italic">
+                  "{xrefPickFrom.text.length > 80 ? xrefPickFrom.text.slice(0, 80) + '…' : xrefPickFrom.text}"
+                </p>
+              </>
+            )}
+          </div>
+          {!pickSaving && (
+            <button
+              onClick={onXrefPickDone}
+              className="shrink-0 text-xs text-gray-500 hover:text-gray-700 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+
       {/* PDF viewer */}
       {pdfUrl && (
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -904,7 +997,7 @@ async function handleCopy() {
       )}
 
       {/* Passage content */}
-      {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={isImported ? undefined : handleMouseUp}>
+      {!pdfUrl && <div ref={scrollRef} className={`flex-1 overflow-y-auto${xrefPickFrom ? ' select-none' : ''}`} onMouseUp={isImported ? undefined : handleMouseUp}>
         <div className="max-w-2xl mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
@@ -931,7 +1024,10 @@ async function handleCopy() {
                     {passage.section_title}
                   </h3>
                 )}
-                <div className="relative">
+                <div
+                  className={`relative${xrefPickFrom && !pickSaving ? ' cursor-pointer rounded-xl -mx-2 px-2 hover:bg-[#1B6B7B]/5 transition-colors' : ''}`}
+                  onClick={xrefPickFrom && !pickSaving ? () => handlePickPassage(passage.id, passage.content) : undefined}
+                >
                   {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
                       {taggedPassageIds.has(passage.id) && (
@@ -991,7 +1087,7 @@ async function handleCopy() {
       {activeFootnote && (
         <>
           <div className="absolute inset-0 z-30" onClick={() => setActiveFootnote(null)} />
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl rounded-t-2xl px-6 py-5 min-h-[33vh] max-h-[60vh] overflow-y-auto">
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-bold text-[#1B6B7B] uppercase tracking-widest mb-2 block">
@@ -1041,12 +1137,6 @@ async function handleCopy() {
         onClose={closePanel}
         selectionText={selectionBar?.text ?? ''}
         onSave={handleNoteSave}
-      />
-      <XRefPanel
-        visible={activePanel === 'xref'}
-        onClose={closePanel}
-        selectionText={selectionBar?.text ?? ''}
-        onSave={handleXrefSave}
       />
       <AiPanel
         visible={activePanel === 'ai'}
