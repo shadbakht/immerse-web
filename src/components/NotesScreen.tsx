@@ -293,7 +293,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                   >
                     <span className="text-gray-400 text-xs w-3 shrink-0">{tradOpen ? '▾' : '▸'}</span>
                     <span className="flex-1 font-semibold text-gray-900 text-base">{trad.name}</span>
-                    <span className="text-xs font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{totalNotes}</span>
+                    <span className="text-xs font-medium text-gray-400">{totalNotes}</span>
                   </button>
 
                   {tradOpen && (
@@ -309,7 +309,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                             >
                               <span className="text-gray-400 text-xs w-3 shrink-0">{bookOpen ? '▾' : '▸'}</span>
                               <span className="flex-1 text-sm font-medium text-gray-700 truncate">{book.title}</span>
-                              <span className="text-xs font-medium text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5">{book.notes.length}</span>
+                              <span className="text-xs font-medium text-gray-400">{book.notes.length}</span>
                             </button>
 
                             {/* Note items */}
