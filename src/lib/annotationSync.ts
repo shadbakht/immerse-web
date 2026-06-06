@@ -95,7 +95,7 @@ export async function pushSelectionTag(st: { id: string; tag_id: string; selecti
   }
 }
 
-export async function pushXref(xref: { id: string; user_id: string; selection_a_id: string; selection_b_id: string; updated_at?: string }) {
+export async function pushXref(xref: { id: string; user_id: string; selection_a_id: string; selection_b_id: string; label?: string | null; updated_at?: string }) {
   try {
     const updated_at = xref.updated_at || new Date().toISOString();
     const { error } = await supabase
@@ -105,6 +105,7 @@ export async function pushXref(xref: { id: string; user_id: string; selection_a_
         user_id: xref.user_id,
         selection_a_id: xref.selection_a_id,
         selection_b_id: xref.selection_b_id,
+        label: xref.label ?? null,
         updated_at,
       }, { onConflict: 'id' });
 
