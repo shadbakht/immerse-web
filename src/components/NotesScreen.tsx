@@ -63,7 +63,7 @@ function NoteItem({
       onClick={() => setExpanded(v => !v)}>
       <div className="flex-1 min-w-0">
         {note.snapshotText && (
-          <p className={`text-sm italic text-gray-500 leading-relaxed mb-1.5 ${expanded ? '' : 'line-clamp-2'}`}>
+          <p className="text-sm italic text-gray-500 leading-relaxed mb-1.5 line-clamp-2">
             "<Highlight text={note.snapshotText} q={searchQuery} />"
           </p>
         )}
