@@ -53,7 +53,6 @@ function NoteItem({
   const [expanded, setExpanded] = useState(false);
 
   const menuOptions: MenuOption[] = [
-    { label: 'Open in reader', icon: '📖', onClick: () => onOpenBook(note.bookId, note.passageId) },
     { label: 'Edit', icon: '✏️', onClick: () => onEdit(note.noteId) },
     { label: 'Delete', icon: '🗑️', color: 'danger', onClick: () => { if (confirm('Delete this note?')) onDelete(note.noteId); } },
   ];
@@ -63,20 +62,28 @@ function NoteItem({
       onClick={() => setExpanded(v => !v)}>
       <div className="flex-1 min-w-0">
         {note.snapshotText && (
-          <p className="text-sm italic text-gray-500 leading-relaxed mb-1.5 line-clamp-2">
+          <p className="text-sm italic text-gray-500 leading-relaxed mb-1 line-clamp-2">
             "<Highlight text={note.snapshotText} q={searchQuery} />"
+          </p>
+        )}
+        {note.citation && (
+          <p className="text-xs text-[#1B6B7B] font-medium truncate mb-1.5">
+            <Highlight text={note.citation} q={searchQuery} />
           </p>
         )}
         <p className={`text-sm text-gray-800 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
           <Highlight text={note.content} q={searchQuery} />
         </p>
-        <div className="flex items-center gap-3 mt-1.5">
-          {note.citation && (
-            <p className="text-xs text-[#1B6B7B] font-medium truncate flex-1">
-              <Highlight text={note.citation} q={searchQuery} />
-            </p>
+        <div className="flex items-center justify-between mt-1.5">
+          <p className="text-xs text-gray-300">{formatDate(note.updatedAt)}</p>
+          {note.bookId && (
+            <button
+              onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
+              className="text-xs text-[#1B6B7B] font-medium hover:underline"
+            >
+              Open in reader →
+            </button>
           )}
-          <p className="text-xs text-gray-300 shrink-0">{formatDate(note.updatedAt)}</p>
         </div>
       </div>
       <div className="shrink-0" onClick={e => e.stopPropagation()}>

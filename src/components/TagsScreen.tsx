@@ -178,6 +178,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [includeNotes, setIncludeNotes] = useState(true);
+  const [includeXrefs, setIncludeXrefs] = useState(true);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -289,9 +291,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     setExporting(true);
     try {
       const selected = tags.filter(t => selectedTagIds.has(t.id));
-      if (format === 'pdf')  await exportAsPdf(selected);
-      if (format === 'docx') await exportAsDocx(selected);
-      if (format === 'imm')  await exportAsImm(selected);
+      const opts = { includeNotes, includeXrefs };
+      if (format === 'pdf')  await exportAsPdf(selected, opts);
+      if (format === 'docx') await exportAsDocx(selected, opts);
+      if (format === 'imm')  await exportAsImm(selected, opts);
     } catch (e) {
       console.error('[TagExport] failed:', e);
     } finally {
@@ -329,20 +332,36 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                 {exporting ? 'Exporting…' : `Export (${selectedTagIds.size})`}
               </button>
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 min-w-[160px]">
-                  {([
-                    { label: 'PDF',           format: 'pdf'  },
-                    { label: 'Word (.docx)',   format: 'docx' },
-                    { label: 'Immerse (.imm)', format: 'imm'  },
-                  ] as const).map(({ label, format }) => (
-                    <button
-                      key={format}
-                      onClick={() => handleExport(format)}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      {label}
-                    </button>
-                  ))}
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-20 min-w-[200px]">
+                  <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mb-2">Include</p>
+                    {([
+                      { label: 'Notes',            checked: includeNotes, set: () => setIncludeNotes(v => !v) },
+                      { label: 'Cross-references', checked: includeXrefs, set: () => setIncludeXrefs(v => !v) },
+                    ]).map(({ label, checked, set }) => (
+                      <div key={label} className="flex items-center gap-2 py-1 cursor-pointer select-none" onClick={e => { e.stopPropagation(); set(); }}>
+                        <div className={`w-[15px] h-[15px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${checked ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'}`}>
+                          {checked && <span className="text-white text-[9px] leading-none font-bold">✓</span>}
+                        </div>
+                        <span className="text-sm text-gray-700">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="py-1">
+                    {([
+                      { label: 'PDF',           format: 'pdf'  },
+                      { label: 'Word (.docx)',   format: 'docx' },
+                      { label: 'Immerse (.imm)', format: 'imm'  },
+                    ] as const).map(({ label, format }) => (
+                      <button
+                        key={format}
+                        onClick={() => handleExport(format)}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

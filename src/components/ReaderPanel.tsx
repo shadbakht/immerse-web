@@ -843,6 +843,14 @@ async function handleCopy() {
       }).select('id').single();
       if (xrefData) {
         await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, updated_at: now }).catch(() => {});
+        // Auto-generate label in background
+        supabase.functions.invoke('generate-xref-label', {
+          body: { text_a: from.text, text_b: snapshotText },
+        }).then(async ({ data }) => {
+          if (data?.label) {
+            await supabase.from('xrefs').update({ label: data.label }).eq('id', xrefData.id);
+          }
+        }).catch(() => {});
       }
 
       // Navigate back to the original passage

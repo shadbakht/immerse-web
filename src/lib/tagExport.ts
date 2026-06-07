@@ -64,6 +64,11 @@ interface ImmSelectionExport {
   createdAt: string;
 }
 
+export interface ExportOptions {
+  includeNotes: boolean;
+  includeXrefs: boolean;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
@@ -98,16 +103,42 @@ function triggerDownload(blob: Blob, filename: string) {
 
 interface EnrichedData {
   notesBySelId: Record<string, string[]>;
-  selFullMap: Record<string, { start_pid: string; end_pid: string; start_offset: number; end_offset: number; created_at: string }>;
+  xrefsBySel:   Record<string, string[]>; // selId → display strings for linked passages
+  selFullMap:   Record<string, { start_pid: string; end_pid: string; start_offset: number; end_offset: number; created_at: string }>;
 }
 
-async function fetchEnrichedData(allSelIds: string[]): Promise<EnrichedData> {
-  if (!allSelIds.length) return { notesBySelId: {}, selFullMap: {} };
+async function fetchEnrichedData(allSelIds: string[], opts: ExportOptions): Promise<EnrichedData> {
+  if (!allSelIds.length) return { notesBySelId: {}, xrefsBySel: {}, selFullMap: {} };
 
   const supabase = createClient();
-  const [{ data: notesData }, { data: selFullData }] = await Promise.all([
-    supabase.from('notes').select('selection_id, content').in('selection_id', allSelIds),
+  const [{ data: selFullData }, { data: notesData }, xrefsResult] = await Promise.all([
     supabase.from('selections').select('id, start_pid, end_pid, start_offset, end_offset, created_at').in('id', allSelIds),
+    opts.includeNotes
+      ? supabase.from('notes').select('selection_id, content').in('selection_id', allSelIds)
+      : Promise.resolve({ data: [] }),
+    opts.includeXrefs
+      ? (async () => {
+          const [{ data: ra }, { data: rb }] = await Promise.all([
+            supabase.from('xrefs').select('id, selection_a_id, selection_b_id, label').in('selection_a_id', allSelIds),
+            supabase.from('xrefs').select('id, selection_a_id, selection_b_id, label').in('selection_b_id', allSelIds),
+          ]);
+          const seen = new Set<string>();
+          const all = [...(ra ?? []), ...(rb ?? [])].filter(x => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
+          // Fetch snapshot texts for the "other" side
+          const otherIds = [...new Set(all.map(x => allSelIds.includes(x.selection_a_id) ? x.selection_b_id : x.selection_a_id).filter(id => !allSelIds.includes(id)))];
+          const otherSnaps: Record<string, string> = {};
+          if (otherIds.length) {
+            const { data: others } = await supabase.from('selections').select('id, snapshot_text').in('id', otherIds);
+            for (const s of (others ?? []) as any[]) otherSnaps[s.id] = s.snapshot_text ?? '';
+          }
+          return all.map(x => {
+            const myId    = allSelIds.includes(x.selection_a_id) ? x.selection_a_id : x.selection_b_id;
+            const otherId = myId === x.selection_a_id ? x.selection_b_id : x.selection_a_id;
+            const display = x.label || `"${(otherSnaps[otherId] ?? '').slice(0, 80)}${(otherSnaps[otherId] ?? '').length > 80 ? '…' : ''}"`;
+            return { myId, display };
+          });
+        })()
+      : Promise.resolve([]),
   ]);
 
   const notesBySelId: Record<string, string[]> = {};
@@ -115,17 +146,22 @@ async function fetchEnrichedData(allSelIds: string[]): Promise<EnrichedData> {
     (notesBySelId[n.selection_id] ??= []).push(n.content ?? '');
   }
 
+  const xrefsBySel: Record<string, string[]> = {};
+  for (const { myId, display } of (xrefsResult as any[])) {
+    (xrefsBySel[myId] ??= []).push(display);
+  }
+
   const selFullMap: Record<string, any> = {};
   for (const s of (selFullData ?? []) as any[]) selFullMap[s.id] = s;
 
-  return { notesBySelId, selFullMap };
+  return { notesBySelId, xrefsBySel, selFullMap };
 }
 
 // ─── Export: IMM ──────────────────────────────────────────────────────────────
 
-export async function exportAsImm(selectedTags: TagRow[]): Promise<void> {
+export async function exportAsImm(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
   const allSelIds = selectedTags.flatMap(t => t.selections.map(s => s.id));
-  const { notesBySelId, selFullMap } = await fetchEnrichedData(allSelIds);
+  const { notesBySelId, xrefsBySel, selFullMap } = await fetchEnrichedData(allSelIds, opts);
 
   const tagExports: ImmTagExport[] = selectedTags.map((tag, i) => ({
     exportId: `t${i}`,
@@ -141,8 +177,8 @@ export async function exportAsImm(selectedTags: TagRow[]): Promise<void> {
         bookId: sel.book_id,
         bookTitle: sel.citation.replace(/^—\s*/, '').split(',')[0]?.trim() ?? sel.book_id,
         citation: sel.citation,
-        notes: notesBySelId[sel.id] ?? [],
-        xrefCitations: [],
+        notes: opts.includeNotes ? (notesBySelId[sel.id] ?? []) : [],
+        xrefCitations: opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [],
         startPid: full?.start_pid ?? sel.passage_id,
         startOffset: full?.start_offset ?? 0,
         endPid: full?.end_pid ?? sel.passage_id,
@@ -170,9 +206,9 @@ const DOC_BODY    = '1C2B35';
 const DOC_MUTED   = '6B7280';
 const DOC_FAINT   = '9CA3AF';
 
-export async function exportAsDocx(selectedTags: TagRow[]): Promise<void> {
+export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
   const allSelIds = selectedTags.flatMap(t => t.selections.map(s => s.id));
-  const { notesBySelId } = await fetchEnrichedData(allSelIds);
+  const { notesBySelId, xrefsBySel } = await fetchEnrichedData(allSelIds, opts);
 
   const children: Paragraph[] = [];
 
@@ -195,8 +231,9 @@ export async function exportAsDocx(selectedTags: TagRow[]): Promise<void> {
     }
 
     for (const sel of tag.selections) {
-      const notes = notesBySelId[sel.id] ?? [];
-      const hasExtra = notes.length > 0;
+      const notes = opts.includeNotes ? (notesBySelId[sel.id] ?? []) : [];
+      const xrefs = opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [];
+      const hasExtra = notes.length > 0 || xrefs.length > 0;
       const cit = citationInParens(sel.citation);
 
       children.push(
@@ -227,7 +264,19 @@ export async function exportAsDocx(selectedTags: TagRow[]): Promise<void> {
               new TextRun({ text: note, size: 20, color: DOC_BODY }),
             ],
             indent: { left: 432, hanging: 216 },
-            spacing: { after: ni === notes.length - 1 ? 300 : 80 },
+            spacing: { after: ni === notes.length - 1 && xrefs.length === 0 ? 300 : 80 },
+          }),
+        );
+      });
+      xrefs.forEach((xref, xi) => {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: '↔  ', size: 20, color: DOC_PRIMARY }),
+              new TextRun({ text: xref, size: 20, italics: true, color: DOC_MUTED }),
+            ],
+            indent: { left: 432, hanging: 216 },
+            spacing: { after: xi === xrefs.length - 1 ? 300 : 80 },
           }),
         );
       });
@@ -253,9 +302,9 @@ export async function exportAsDocx(selectedTags: TagRow[]): Promise<void> {
 
 // ─── Export: PDF (print-to-PDF via browser) ───────────────────────────────────
 
-export async function exportAsPdf(selectedTags: TagRow[]): Promise<void> {
+export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
   const allSelIds = selectedTags.flatMap(t => t.selections.map(s => s.id));
-  const { notesBySelId } = await fetchEnrichedData(allSelIds);
+  const { notesBySelId, xrefsBySel } = await fetchEnrichedData(allSelIds, opts);
 
   let body = '';
 
@@ -268,14 +317,18 @@ export async function exportAsPdf(selectedTags: TagRow[]): Promise<void> {
     }
 
     for (const sel of tag.selections) {
-      const notes = notesBySelId[sel.id] ?? [];
+      const notes = opts.includeNotes ? (notesBySelId[sel.id] ?? []) : [];
+      const xrefs = opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [];
       const cit   = citationInParens(sel.citation);
 
-      body += `\n  <div class="passage-block">`;
-      body += `\n    <p class="quote">“${escapeHtml(sel.snapshot_text)}”</p>`;
-      body += `\n    <p class="citation">${escapeHtml(cit)}</p>`;
+      body += `\n  <div class=”passage-block”>`;
+      body += `\n    <p class=”quote”>”${escapeHtml(sel.snapshot_text)}”</p>`;
+      body += `\n    <p class=”citation”>${escapeHtml(cit)}</p>`;
       for (const note of notes) {
-        body += `\n    <p class="note">•  ${escapeHtml(note)}</p>`;
+        body += `\n    <p class=”note”>•  ${escapeHtml(note)}</p>`;
+      }
+      for (const xref of xrefs) {
+        body += `\n    <p class=”xref”>↔  ${escapeHtml(xref)}</p>`;
       }
       body += `\n  </div>`;
     }
@@ -294,6 +347,7 @@ export async function exportAsPdf(selectedTags: TagRow[]): Promise<void> {
     .quote { margin: 0; text-align: justify; }
     .citation { margin: 0; text-align: right; font-size: 11px; color: #6B7280; font-style: italic; }
     .note { margin: 6px 0 3px; font-size: 13px; padding-left: 20px; text-indent: -12px; }
+    .xref { margin: 4px 0 3px; font-size: 12px; color: #1B6B7B; font-style: italic; padding-left: 20px; text-indent: -14px; }
     .empty { font-style: italic; color: #9CA3AF; font-size: 13px; }
     .footer { text-align: center; font-size: 10px; color: #9CA3AF; font-style: italic; margin-top: 48px; }
     @media print { body { padding: 0; } }
