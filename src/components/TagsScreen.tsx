@@ -72,12 +72,13 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   );
 }
 
-function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage }: {
+function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth }: {
   tag: TagRow;
   isSelected: boolean;
   onToggleSelect: () => void;
   searchQuery: string;
   onOpenBook: (b: string, p?: string) => void;
+  depth?: number;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onToggleVisibility: (id: string, visibility: string) => void;
@@ -108,8 +109,10 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
     },
   ];
 
+  const indent = (depth ?? 0) * 20;
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div style={indent ? { marginLeft: indent } : undefined} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       {renaming && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center" onClick={() => setRenaming(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
@@ -194,7 +197,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     setLoading(true);
     try {
       const [{ data: tagData }, selMap] = await Promise.all([
-        supabase.from('tags').select('id, name, created_at, visibility').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('tags').select('id, name, parent_id, depth, sort_order, created_at, visibility').eq('user_id', userId).order('sort_order', { ascending: true }),
         fetchSelectionsByUser(userId),
       ]);
       const tagList = tagData ?? [];
@@ -212,7 +215,21 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         if (!s) continue;
         (selsByTag[st.tag_id] ??= []).push({ id: st.selection_id, ...s });
       }
-      setTags((tagList as any[]).map(t => ({ ...t, selections: selsByTag[t.id] ?? [], visibility: t.visibility ?? 'private' })));
+      // Build tree-ordered flat list: top-level first (sort_order), then children under parent
+      const tagById = new Map((tagList as any[]).map(t => [t.id, t]));
+      const ordered: any[] = [];
+      const addTag = (t: any) => {
+        ordered.push(t);
+        (tagList as any[])
+          .filter(c => c.parent_id === t.id)
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
+          .forEach(addTag);
+      };
+      (tagList as any[])
+        .filter(t => !t.parent_id)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
+        .forEach(addTag);
+      setTags(ordered.map(t => ({ ...t, selections: selsByTag[t.id] ?? [], visibility: t.visibility ?? 'private' })));
     } finally {
       setLoading(false);
     }
@@ -347,6 +364,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
               <TagCard
                 key={tag.id}
                 tag={tag}
+                depth={tag.depth ?? 0}
                 isSelected={selectedTagIds.has(tag.id)}
                 onToggleSelect={() => toggleSelectTag(tag.id)}
                 searchQuery={searchQuery}

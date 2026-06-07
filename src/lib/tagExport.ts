@@ -23,6 +23,9 @@ export interface SelRow {
 export interface TagRow {
   id: string;
   name: string;
+  parent_id: string | null;
+  depth: number;
+  sort_order: number;
   created_at: string;
   visibility: string;
   selections: SelRow[];
