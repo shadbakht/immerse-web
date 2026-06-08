@@ -213,10 +213,15 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
   const children: Paragraph[] = [];
 
   for (const tag of selectedTags) {
+    const D   = tag.depth ?? 0;
+    const dI  = D * 360;                              // indent in twips (0.25 in per level)
+    const hSz = D === 0 ? 48 : D === 1 ? 36 : 28;   // 24 / 18 / 14 pt
+
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: tag.name, size: 48, color: DOC_PRIMARY })],
-        spacing: { before: 600, after: 160 },
+        children: [new TextRun({ text: tag.name, size: hSz, color: DOC_PRIMARY })],
+        indent:  D > 0 ? { left: dI } : undefined,
+        spacing: { before: D === 0 ? 600 : 400, after: 160 },
       }),
     );
 
@@ -224,6 +229,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
       children.push(
         new Paragraph({
           children: [new TextRun({ text: '(no passages tagged)', italics: true, size: 20, color: DOC_FAINT })],
+          indent:  D > 0 ? { left: dI } : undefined,
           spacing: { after: 200 },
         }),
       );
@@ -239,12 +245,13 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
       children.push(
         new Paragraph({
           children: [
-            new TextRun({ text: '“', size: 22, color: DOC_BODY }),
+            new TextRun({ text: '”', size: 22, color: DOC_BODY }),
             new TextRun({ text: sel.snapshot_text, size: 22, color: DOC_BODY }),
             new TextRun({ text: '”', size: 22, color: DOC_BODY }),
           ],
           alignment: AlignmentType.BOTH,
-          spacing: { before: 160, after: 0 },
+          indent:    D > 0 ? { left: dI } : undefined,
+          spacing:   { before: 160, after: 0 },
         }),
       );
 
@@ -252,7 +259,8 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
         new Paragraph({
           children: [new TextRun({ text: cit, size: 18, italics: true, color: DOC_MUTED })],
           alignment: AlignmentType.RIGHT,
-          spacing: { after: hasExtra ? 80 : 300 },
+          indent:    D > 0 ? { left: dI } : undefined,
+          spacing:   { after: hasExtra ? 80 : 300 },
         }),
       );
 
@@ -263,7 +271,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
               new TextRun({ text: '•  ', size: 20, color: DOC_BODY }),
               new TextRun({ text: note, size: 20, color: DOC_BODY }),
             ],
-            indent: { left: 432, hanging: 216 },
+            indent:  { left: dI + 432, hanging: 216 },
             spacing: { after: ni === notes.length - 1 && xrefs.length === 0 ? 300 : 80 },
           }),
         );
@@ -275,7 +283,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
               new TextRun({ text: '↔  ', size: 20, color: DOC_PRIMARY }),
               new TextRun({ text: xref, size: 20, italics: true, color: DOC_MUTED }),
             ],
-            indent: { left: 432, hanging: 216 },
+            indent:  { left: dI + 432, hanging: 216 },
             spacing: { after: xi === xrefs.length - 1 ? 300 : 80 },
           }),
         );
