@@ -6,21 +6,13 @@
  * relying on PostgREST FK join inference.
  */
 import { createClient } from '@/lib/supabase/client';
+import { buildCitation } from '@/lib/citationUtils';
 
 export interface SelInfo {
   snapshot_text: string;
   passage_id:    string;
   book_id:       string;
   citation:      string;
-}
-
-function buildCitation(passage: any, book: any, author: any): string {
-  return [
-    author?.name,
-    book?.title,
-    passage?.chapter_label || passage?.section_title,
-    passage?.paragraph_number ? `p.${passage.paragraph_number}` : null,
-  ].filter(Boolean).join(', ');
 }
 
 export async function fetchSelectionsByUser(userId: string): Promise<Record<string, SelInfo>> {
@@ -46,7 +38,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
   const bookIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
   const { data: bookData } = await supabase
     .from('books')
-    .select('id, title, authors(name)')
+    .select('id, title, citation_format, authors(name)')
     .in('id', bookIds);
   const bookMap: Record<string, any> = {};
   for (const b of (bookData ?? []) as any[]) bookMap[b.id] = b;
@@ -61,7 +53,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
       snapshot_text: sel.snapshot_text ?? '',
       passage_id:    sel.passage_id    ?? '',
       book_id:       passage?.book_id  ?? '',
-      citation:      buildCitation(passage, book, author),
+      citation:      buildCitation(passage, book, (author as any)?.name),
     };
   }
   return result;

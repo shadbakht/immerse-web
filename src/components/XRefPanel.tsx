@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import PanelSheet from './PanelSheet';
+import { buildCitation } from '@/lib/citationUtils';
 
 interface Passage {
   id: string;
@@ -12,6 +13,7 @@ interface Passage {
   chapter_label: string | null;
   section_title: string | null;
   paragraph_number: number | null;
+  citation_format: string | null;
 }
 
 interface XRefPanelProps {
@@ -45,7 +47,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
     try {
       const { data } = await supabase
         .from('passages')
-        .select('id, content, chapter_label, section_title, paragraph_number, books(title, authors(name))')
+        .select('id, content, chapter_label, section_title, paragraph_number, books(title, citation_format, authors(name))')
         .ilike('content', `%${q}%`)
         .limit(10);
 
@@ -57,6 +59,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
         chapter_label:    p.chapter_label,
         section_title:    p.section_title,
         paragraph_number: p.paragraph_number,
+        citation_format:  p.books?.citation_format ?? null,
       })));
     } finally {
       setSearching(false);
@@ -75,8 +78,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
   }
 
   function citationFor(p: Passage) {
-    const parts = [p.author_name, p.book_title, p.chapter_label || p.section_title, p.paragraph_number ? `p.${p.paragraph_number}` : null].filter(Boolean);
-    return parts.join(', ');
+    return buildCitation(p, { title: p.book_title, citation_format: p.citation_format }, p.author_name);
   }
 
   return (

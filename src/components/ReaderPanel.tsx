@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { pushNote, pushXref, deleteRemote } from '@/lib/annotationSync';
+import { buildCitation } from '@/lib/citationUtils';
 import type { ReaderTarget, XRefPickFrom } from './AppShell';
 import PanelSheet from './PanelSheet';
 import TagPanel from './TagPanel';
@@ -24,6 +25,7 @@ interface Passage {
 interface BookMeta {
   title: string;
   authorName: string;
+  citationFormat: string;
 }
 
 interface TocEntry {
@@ -382,11 +384,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       try {
         const record = await getLocalBook(localId);
         if (!record) {
-          setBook({ title: 'Book not found', authorName: '' });
+          setBook({ title: 'Book not found', authorName: '', citationFormat: 'author_book_paragraph' });
           setLoading(false);
           return;
         }
-        setBook({ title: record.title, authorName: '' });
+        setBook({ title: record.title, authorName: '', citationFormat: 'author_book_paragraph' });
         setIsImported(true);
 
         if (record.pdfBlob) {
@@ -414,7 +416,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         }
       } catch (err) {
         console.error('[ReaderPanel] local book load error:', err);
-        setBook({ title: 'Could not load book', authorName: '' });
+        setBook({ title: 'Could not load book', authorName: '', citationFormat: 'author_book_paragraph' });
       }
       setLoading(false);
       return;
@@ -444,12 +446,12 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       };
 
       const [{ data: bookData }, passageData] = await Promise.all([
-        supabase.from('books').select('title, authors(name), footnotes').eq('id', bookId).single(),
+        supabase.from('books').select('title, citation_format, authors(name), footnotes').eq('id', bookId).single(),
         fetchAllPassages(),
       ]);
 
       if (bookData) {
-        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '' });
+        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph' });
         setFootnoteMap((bookData as any).footnotes ?? {});
       }
 
@@ -569,18 +571,18 @@ async function handleCopy() {
     const passage = passages.find(p => p.id === selectionBar.startPassageId);
 
     let citation = '';
-    if (target?.bookId.startsWith('quran')) {
+    const fmt = book?.citationFormat ?? 'author_book_paragraph';
+    if (fmt === 'scripture_sura_verse') {
       const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
-      const verse = passage?.paragraph_number ?? '';
-      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || (verse ? String(verse) : '');
+      const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';
+      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || verse;
       citation = `— ${book?.title ?? "The Qur'an"}${loc ? ` ${loc}` : ''}`;
-    } else if (target?.bookId.startsWith('bible-kjv-')) {
-      const collectionName = (book?.authorName ?? '').replace(/\s*\(.*?\)\s*/g, '').trim() || 'The Bible';
+    } else if (fmt === 'bible') {
       const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
-      const verse = passage?.paragraph_number ?? '';
-      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || (verse ? String(verse) : '');
+      const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';
+      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || verse;
       const bookPart = book?.title ? `${book.title}${loc ? ` ${loc}` : ''}` : loc;
-      citation = `— ${collectionName}${bookPart ? `, ${bookPart}` : ''}`;
+      citation = bookPart ? `— The Bible, ${bookPart}` : '— The Bible';
     } else {
       const author = book?.authorName && book.authorName !== book?.title ? book.authorName : null;
       const location = passage?.chapter_label || passage?.section_title || null;
@@ -659,7 +661,7 @@ async function handleCopy() {
     );
     const { data: otherSels } = await supabase
       .from('selections')
-      .select('id, snapshot_text, passage_id, passages(chapter_label, section_title, books(id, title))')
+      .select('id, snapshot_text, passage_id, passages(chapter_label, section_title, paragraph_number, books(id, title, citation_format))')
       .in('id', otherSelIds);
     const otherSelMap = new Map((otherSels ?? []).map((s: any) => [s.id as string, s]));
     const entries: XrefViewEntry[] = [];
@@ -670,7 +672,6 @@ async function handleCopy() {
       if (!other) continue;
       const passage = other.passages as any;
       const bookObj = passage?.books as any;
-      const citParts = [bookObj?.title, passage?.chapter_label, passage?.section_title].filter(Boolean);
       entries.push({
         xrefId,
         thisSnapshotText: selSnaps.get(thisSelId) ?? '',
@@ -678,7 +679,7 @@ async function handleCopy() {
         otherSnapshotText: other.snapshot_text ?? '',
         otherBookId: bookObj?.id ?? null,
         otherBookTitle: bookObj?.title ?? '',
-        otherCitation: citParts.join(' · '),
+        otherCitation: buildCitation(passage, bookObj),
       });
     }
     setPassageToXrefs(prev => new Map(prev).set(passageId, entries));
