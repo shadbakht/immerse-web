@@ -72,19 +72,22 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   );
 }
 
-function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth }: {
+function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth, hasChildren, isOpen, onToggleOpen }: {
   tag: TagRow;
   isSelected: boolean;
   onToggleSelect: () => void;
   searchQuery: string;
   onOpenBook: (b: string, p?: string) => void;
   depth?: number;
+  hasChildren?: boolean;
+  isOpen?: boolean;
+  onToggleOpen?: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onToggleVisibility: (id: string, visibility: string) => void;
   onRemovePassage: (tagId: string, selId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const open = isOpen ?? false;
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(tag.name);
 
@@ -141,7 +144,7 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
       )}
       <div
         className="px-5 py-4 flex items-center gap-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
-        onClick={() => setExpanded(v => !v)}
+        onClick={() => onToggleOpen?.()}
       >
         <Checkbox checked={isSelected} onChange={onToggleSelect} />
         <div className="flex-1 min-w-0">
@@ -150,14 +153,15 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
             {tag.selections.length} passage{tag.selections.length !== 1 ? 's' : ''}
+            {hasChildren && <span className="ml-1 text-gray-300">· subtags</span>}
           </p>
         </div>
-        <span className={`text-gray-400 text-xl shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} style={{ display: 'inline-block' }}>›</span>
+        <span className={`text-gray-400 text-xl shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} style={{ display: 'inline-block' }}>›</span>
         <div onClick={e => e.stopPropagation()}>
           <ContextMenu options={menuOptions} />
         </div>
       </div>
-      {expanded && (
+      {open && (
         <div>
           {tag.selections.length === 0
             ? <p className="px-5 py-3 text-xs text-gray-400 border-t border-gray-100">No passages tagged.</p>
@@ -176,6 +180,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  const [openTagIds, setOpenTagIds] = useState<Set<string>>(new Set());
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [includeNotes, setIncludeNotes] = useState(true);
@@ -302,14 +307,43 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     }
   }
 
+  // Which tag IDs have at least one child
+  const hasChildrenSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const t of tags) { if (t.parent_id) s.add(t.parent_id); }
+    return s;
+  }, [tags]);
+
+  function toggleOpenTag(id: string) {
+    setOpenTagIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // When searching: show all matching tags flat. Otherwise: tree-walk, only show subtags whose parent is open.
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return tags;
-    return tags.filter(t =>
-      t.name.toLowerCase().includes(q) ||
-      t.selections.some(s => s.snapshot_text.toLowerCase().includes(q) || s.citation.toLowerCase().includes(q))
-    );
-  }, [tags, searchQuery]);
+    if (q) {
+      return tags.filter(t =>
+        t.name.toLowerCase().includes(q) ||
+        t.selections.some(s => s.snapshot_text.toLowerCase().includes(q) || s.citation.toLowerCase().includes(q))
+      );
+    }
+    // tags is already in tree order from load(), so one pass is enough:
+    // include a tag only if it has no parent, or its parent is both in the result AND open
+    const inResult = new Set<string>();
+    const result: TagRow[] = [];
+    for (const tag of tags) {
+      const pid = tag.parent_id ?? null;
+      if (pid === null || (inResult.has(pid) && openTagIds.has(pid))) {
+        result.push(tag);
+        inResult.add(tag.id);
+      }
+    }
+    return result;
+  }, [tags, openTagIds, searchQuery]);
 
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
@@ -384,6 +418,9 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                 key={tag.id}
                 tag={tag}
                 depth={tag.depth ?? 0}
+                hasChildren={hasChildrenSet.has(tag.id)}
+                isOpen={openTagIds.has(tag.id)}
+                onToggleOpen={() => toggleOpenTag(tag.id)}
                 isSelected={selectedTagIds.has(tag.id)}
                 onToggleSelect={() => toggleSelectTag(tag.id)}
                 searchQuery={searchQuery}
