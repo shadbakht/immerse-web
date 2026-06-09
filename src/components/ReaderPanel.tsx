@@ -659,19 +659,35 @@ async function handleCopy() {
     const otherSelIds = [...xrefById.values()].map((x: any) =>
       selIdSet.has(x.selection_a_id) ? x.selection_b_id : x.selection_a_id
     );
-    const { data: otherSels } = await supabase
+
+    // Fetch other selections without FK join — selections.passage_id has no FK to passages,
+    // so PostgREST embedded-resource syntax would fail silently. Use three separate queries instead.
+    const { data: otherSelData } = await supabase
       .from('selections')
-      .select('id, snapshot_text, passage_id, passages(chapter_label, section_title, paragraph_number, books(id, title, citation_format))')
+      .select('id, snapshot_text, passage_id')
       .in('id', otherSelIds);
-    const otherSelMap = new Map((otherSels ?? []).map((s: any) => [s.id as string, s]));
+    const otherPassageIds = [...new Set((otherSelData ?? []).map((s: any) => s.passage_id).filter(Boolean))];
+    const { data: passData } = otherPassageIds.length > 0
+      ? await supabase.from('passages').select('id, chapter_label, section_title, paragraph_number, book_id').in('id', otherPassageIds)
+      : { data: [] as any[] };
+    const passMap: Record<string, any> = {};
+    for (const p of (passData ?? []) as any[]) passMap[p.id] = p;
+    const bookIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
+    const { data: bookDataArr } = bookIds.length > 0
+      ? await supabase.from('books').select('id, title, citation_format').in('id', bookIds)
+      : { data: [] as any[] };
+    const bookMap: Record<string, any> = {};
+    for (const b of (bookDataArr ?? []) as any[]) bookMap[b.id] = b;
+
+    const otherSelMap = new Map((otherSelData ?? []).map((s: any) => [s.id as string, s]));
     const entries: XrefViewEntry[] = [];
     for (const [xrefId, xref] of xrefById) {
       const thisSelId = selIdSet.has(xref.selection_a_id) ? xref.selection_a_id : xref.selection_b_id;
       const otherSelId = selIdSet.has(xref.selection_a_id) ? xref.selection_b_id : xref.selection_a_id;
       const other = otherSelMap.get(otherSelId) as any;
       if (!other) continue;
-      const passage = other.passages as any;
-      const bookObj = passage?.books as any;
+      const passage = passMap[other.passage_id] as any;
+      const bookObj = passage ? bookMap[passage.book_id] : null;
       entries.push({
         xrefId,
         thisSnapshotText: selSnaps.get(thisSelId) ?? '',

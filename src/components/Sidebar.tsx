@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { ReactNode } from 'react';
 import type { NavTab } from './AppShell';
@@ -30,6 +31,18 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) {
+  const [fullName, setFullName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setFullName(null); return; }
+    const supabase = createClient();
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => { if (data?.full_name) setFullName(data.full_name); });
+  }, [user?.id]);
   const router = useRouter();
   const supabase = createClient();
 
@@ -40,7 +53,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
   }
 
   const displayName = user
-    ? (user.user_metadata?.full_name || user.email || 'Reader')
+    ? (fullName || user.user_metadata?.full_name || user.email || 'Reader')
     : 'Guest';
 
   return (
