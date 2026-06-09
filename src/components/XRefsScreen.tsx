@@ -75,7 +75,7 @@ function XRefCard({
   ];
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="border-t border-gray-100">
       {/* Label row */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100">
         {editing ? (
@@ -263,10 +263,10 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     setOpenPairKeys(prev => { const next = new Set(prev); next.has(pairKey) ? next.delete(pairKey) : next.add(pairKey); return next; });
 
   return (
-    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
+    <div className="h-full flex flex-col w-full">
       {/* Header + search */}
-      <div className="px-6 pt-8 pb-4 shrink-0">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-4">Cross-References</h1>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
+        <h1 className="text-lg font-semibold text-gray-900 mb-3">Cross-References</h1>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -281,7 +281,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
       </div>
 
       {/* Hierarchy list */}
-      <div className="flex-1 overflow-y-auto pb-8">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
@@ -291,23 +291,23 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
             {searchQuery ? 'No cross-references match your search.' : 'No cross-references yet. Select passages in the reader to link them.'}
           </p>
         ) : (
-          <div className="px-6 space-y-2 pt-2">
+          <div>
             {hierarchy.map(pair => {
               const isOpen = openPairKeys.has(pair.pairKey);
               return (
-                <div key={pair.pairKey} className="rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div key={pair.pairKey}>
                   {/* Pair header */}
                   <button
-                    className="w-full flex items-center gap-2 px-5 py-3.5 bg-white hover:bg-gray-50 transition-colors text-left select-none"
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
                     onClick={() => togglePair(pair.pairKey)}
                   >
-                    <span className="text-gray-400 text-xs w-3 shrink-0">{isOpen ? '▾' : '▸'}</span>
-                    <span className="flex-1 font-semibold text-gray-900 text-base">{pair.name}</span>
-                    <span className="text-xs font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{pair.xrefs.length}</span>
+                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="flex-1 text-sm font-medium text-gray-800">{pair.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{pair.xrefs.length}</span>
                   </button>
 
                   {isOpen && (
-                    <div className="border-t border-gray-100 px-5 py-3 space-y-3">
+                    <div>
                       {pair.xrefs.map(row => (
                         <XRefCard
                           key={row.id}

@@ -76,13 +76,13 @@ function TagCard({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 flex items-center gap-3">
+    <div className="border-b border-gray-100">
+      <div className="flex items-center px-4 py-3.5 gap-2">
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => setExpanded(e => !e)}
         >
-          <div className="text-sm font-semibold text-gray-900 truncate">{ct.name}</div>
+          <div className="text-sm font-medium text-gray-800 truncate">{ct.name}</div>
           <div className="text-xs text-gray-400 mt-0.5">
             {showAuthor && (
               <>
@@ -118,7 +118,7 @@ function TagCard({
           )}
 
           <span
-            className={`text-gray-400 text-lg transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
+            className={`text-gray-400 text-xs transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
             onClick={() => setExpanded(e => !e)}
           >
             ›
@@ -251,7 +251,7 @@ function ProfileView({
       </div>
 
       {/* Tag list */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
@@ -263,7 +263,7 @@ function ProfileView({
             <p className="text-xs text-gray-400">This user hasn't shared any tags yet.</p>
           </div>
         ) : (
-          <div className="space-y-3 max-w-2xl mx-auto">
+          <div>
             {tags.map(ct => (
               <TagCard
                 key={ct.id}
@@ -370,8 +370,8 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
   return (
     <div className="h-full flex flex-col relative">
       {/* Search */}
-      <div className="px-6 pt-6 pb-3 shrink-0 border-b border-gray-100">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-4">Community</h1>
+      <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
+        <h1 className="text-lg font-semibold text-gray-900 mb-3">Community</h1>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -403,7 +403,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
@@ -415,7 +415,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
             <p className="text-xs text-gray-400">{searchQuery ? 'Try a different search term.' : 'Be the first to share a tag.'}</p>
           </div>
         ) : (
-          <div className="space-y-3 max-w-2xl mx-auto">
+          <div>
             {filtered.map(ct => (
               <TagCard
                 key={ct.id}

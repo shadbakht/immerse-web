@@ -46,7 +46,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   ];
 
   return (
-    <div className="px-5 py-3 border-t border-gray-100 flex items-start gap-2">
+    <div className="pl-9 pr-4 py-3 border-t border-gray-100 flex items-start gap-2">
       <div className="flex-1 min-w-0">
         <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
           <Highlight text={sel.citation} q={searchQuery} />
@@ -114,8 +114,10 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
 
   const indent = (depth ?? 0) * 20;
 
+  const rowPaddingLeft = 12 + (depth ?? 0) * 14;
+
   return (
-    <div style={indent ? { marginLeft: indent } : undefined} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="border-b border-gray-100">
       {renaming && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center" onClick={() => setRenaming(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
@@ -143,28 +145,24 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
         </div>
       )}
       <div
-        className="px-5 py-4 flex items-center gap-3 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        className="flex items-center py-3.5 pr-4 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        style={{ paddingLeft: rowPaddingLeft }}
         onClick={() => onToggleOpen?.()}
       >
         <Checkbox checked={isSelected} onChange={onToggleSelect} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">
-            <Highlight text={tag.name} q={searchQuery} />
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {tag.selections.length} passage{tag.selections.length !== 1 ? 's' : ''}
-            {hasChildren && <span className="ml-1 text-gray-300">· subtags</span>}
-          </p>
-        </div>
-        <span className={`text-gray-400 text-xl shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} style={{ display: 'inline-block' }}>›</span>
-        <div onClick={e => e.stopPropagation()}>
+        <span className="flex-1 text-sm font-medium text-gray-800 truncate ml-1 min-w-0">
+          <Highlight text={tag.name} q={searchQuery} />
+        </span>
+        <span className="text-xs text-gray-400 shrink-0 mx-2">{tag.selections.length}</span>
+        <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <div onClick={e => e.stopPropagation()} className="ml-2">
           <ContextMenu options={menuOptions} />
         </div>
       </div>
       {open && (
         <div>
           {tag.selections.length === 0
-            ? <p className="px-5 py-3 text-xs text-gray-400 border-t border-gray-100">No passages tagged.</p>
+            ? <p className="pl-9 pr-4 py-3 text-xs text-gray-400 border-t border-gray-100">No passages tagged.</p>
             : tag.selections.map(sel => (
                 <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} />
               ))}
@@ -376,9 +374,9 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
 
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
-      <div className="px-6 pt-8 pb-4 shrink-0">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-semibold text-gray-900">Tags</h1>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-semibold text-gray-900">Tags</h1>
           {selectedTagIds.size > 0 && (
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -440,13 +438,13 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tags and passages…" className="w-full pl-9 pr-4 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50" />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-6 pb-8">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" /></div>
         ) : filtered.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-16">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
+          <p className="text-sm text-gray-400 text-center py-16 px-4">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
         ) : (
-          <div className="space-y-3">
+          <div>
             {filtered.map(tag => (
               <TagCard
                 key={tag.id}

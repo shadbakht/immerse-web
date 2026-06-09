@@ -236,7 +236,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     setOpenBooks(prev => { const next = new Set(prev); next.has(bookKey) ? next.delete(bookKey) : next.add(bookKey); return next; });
 
   return (
-    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
+    <div className="h-full flex flex-col w-full">
       {/* Edit modal */}
       {editingId && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center"
@@ -261,8 +261,8 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       )}
 
       {/* Header + search */}
-      <div className="px-6 pt-8 pb-4 shrink-0">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-4">Notes</h1>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
+        <h1 className="text-lg font-semibold text-gray-900 mb-3">Notes</h1>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -277,68 +277,60 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       </div>
 
       {/* Hierarchy list */}
-      <div className="flex-1 overflow-y-auto pb-8">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : hierarchy.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-16 px-6">
+          <p className="text-sm text-gray-400 text-center py-16 px-4">
             {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
           </p>
         ) : (
-          <div className="px-6 space-y-2 pt-2">
+          <div>
             {hierarchy.map(trad => {
               const tradOpen   = openTraditions.has(trad.catId);
               const totalNotes = trad.books.reduce((s, b) => s + b.notes.length, 0);
               return (
-                <div key={trad.catId} className="rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div key={trad.catId}>
                   {/* Tradition header */}
                   <button
-                    className="w-full flex items-center gap-2 px-5 py-3.5 bg-white hover:bg-gray-50 transition-colors text-left select-none"
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
                     onClick={() => toggleTradition(trad.catId)}
                   >
-                    <span className="text-gray-400 text-xs w-3 shrink-0">{tradOpen ? '▾' : '▸'}</span>
-                    <span className="flex-1 font-semibold text-gray-900 text-base">{trad.name}</span>
-                    <span className="text-xs font-medium text-gray-400">{totalNotes}</span>
+                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="flex-1 text-sm font-medium text-gray-800 truncate">{trad.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{totalNotes}</span>
                   </button>
 
-                  {tradOpen && (
-                    <div className="border-t border-gray-100">
-                      {trad.books.map(book => {
-                        const bookOpen = openBooks.has(book.bookKey);
-                        return (
-                          <div key={book.bookKey} className="border-t border-gray-100 first:border-t-0">
-                            {/* Book sub-header */}
-                            <button
-                              className="w-full flex items-center gap-2 pl-9 pr-5 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left select-none"
-                              onClick={() => toggleBook(book.bookKey)}
-                            >
-                              <span className="text-gray-400 text-xs w-3 shrink-0">{bookOpen ? '▾' : '▸'}</span>
-                              <span className="flex-1 text-sm font-medium text-gray-700 truncate">{book.title}</span>
-                              <span className="text-xs font-medium text-gray-400">{book.notes.length}</span>
-                            </button>
+                  {tradOpen && trad.books.map(book => {
+                    const bookOpen = openBooks.has(book.bookKey);
+                    return (
+                      <div key={book.bookKey}>
+                        {/* Book sub-header */}
+                        <button
+                          className="w-full flex items-center gap-2 pl-9 pr-4 py-3 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
+                          onClick={() => toggleBook(book.bookKey)}
+                        >
+                          <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
+                          <span className="flex-1 text-sm text-gray-700 truncate">{book.title}</span>
+                          <span className="text-xs text-gray-400 shrink-0">{book.notes.length}</span>
+                        </button>
 
-                            {/* Note items */}
-                            {bookOpen && (
-                              <div className="pl-6">
-                                {book.notes.map(note => (
-                                  <NoteItem
-                                    key={note.noteId}
-                                    note={note}
-                                    searchQuery={searchQuery}
-                                    onOpenBook={onOpenBook}
-                                    onDelete={handleDeleteNote}
-                                    onEdit={handleEditNote}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                        {/* Note items */}
+                        {bookOpen && book.notes.map(note => (
+                          <NoteItem
+                            key={note.noteId}
+                            note={note}
+                            searchQuery={searchQuery}
+                            onOpenBook={onOpenBook}
+                            onDelete={handleDeleteNote}
+                            onEdit={handleEditNote}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
