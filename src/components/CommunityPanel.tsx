@@ -368,7 +368,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
 
   // ── Feed view ───────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full relative">
       {/* Search */}
       <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
         <h1 className="text-lg font-semibold text-gray-900 mb-3">Community</h1>

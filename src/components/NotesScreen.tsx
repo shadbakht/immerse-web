@@ -236,7 +236,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     setOpenBooks(prev => { const next = new Set(prev); next.has(bookKey) ? next.delete(bookKey) : next.add(bookKey); return next; });
 
   return (
-    <div className="h-full flex flex-col w-full">
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       {/* Edit modal */}
       {editingId && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center"

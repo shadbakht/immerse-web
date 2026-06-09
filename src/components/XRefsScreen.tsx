@@ -263,7 +263,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     setOpenPairKeys(prev => { const next = new Set(prev); next.has(pairKey) ? next.delete(pairKey) : next.add(pairKey); return next; });
 
   return (
-    <div className="h-full flex flex-col w-full">
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
         <h1 className="text-lg font-semibold text-gray-900 mb-3">Cross-References</h1>
