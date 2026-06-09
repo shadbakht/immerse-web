@@ -38,6 +38,7 @@ interface SelectionBar {
   y: number;
   text: string;
   startPassageId: string;
+  endPassageId: string;
   startOffset: number;
   endOffset: number;
 }
@@ -528,7 +529,6 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
   // Handle text selection — show action bar on mouseup
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (xrefPickFrom) return; // in pick mode, suppress selection bar
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
       setSelectionBar(null);
@@ -561,10 +561,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       y: rect.top - containerRect.top - 48,
       text: selectedText,
       startPassageId,
+      endPassageId,
       startOffset: range.startOffset,
       endOffset: range.endOffset,
     });
-  }, [xrefPickFrom]);
+  }, []);
 
 async function handleCopy() {
     if (!selectionBar) return;
@@ -884,6 +885,80 @@ async function handleCopy() {
     }
   }
 
+  // Called when user clicks "Pick as X-Ref" in the selection bar while in pick mode.
+  // Uses the selected text (potentially spanning multiple passages) as selection B.
+  async function handlePickFromSelection() {
+    const bar = selectionBar;
+    if (!bar || !xrefPickFrom || !userId || pickSaving) return;
+    const from = xrefPickFrom;
+    const sameBook = from.bookId === target?.bookId;
+    setPickSaving(true);
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+    try {
+      const now = new Date().toISOString();
+
+      // Selection A: the user's original text selection
+      const selIdA = await createSelectionFrom(from);
+
+      // Selection B: the selected text in the target passage(s)
+      const snapshotText = bar.text.slice(0, 500);
+      const [{ data: pidRowB }, { data: passageDataB }] = await Promise.all([
+        supabase.from('passage_pid_map').select('pid').eq('passage_id', bar.startPassageId).maybeSingle(),
+        supabase.from('passages').select('book_id').eq('id', bar.startPassageId).maybeSingle(),
+      ]);
+      // Resolve end_pid separately when the selection spans multiple passages
+      const { data: endPidRow } = bar.endPassageId !== bar.startPassageId
+        ? await supabase.from('passage_pid_map').select('pid').eq('passage_id', bar.endPassageId).maybeSingle()
+        : { data: pidRowB };
+      const { data: targetBookRow } = passageDataB?.book_id
+        ? await supabase.from('book_slug_map').select('local_id').eq('book_id', passageDataB.book_id).maybeSingle()
+        : { data: null };
+      const { data: selB } = await supabase.from('selections').insert({
+        user_id:               userId,
+        passage_id:            bar.startPassageId,
+        start_pid:             pidRowB?.pid ?? null,
+        end_pid:               endPidRow?.pid ?? null,
+        book_local_id:         targetBookRow?.local_id ?? null,
+        anchor_schema_version: 1,
+        start_offset:          bar.startOffset,
+        end_offset:            bar.endOffset,
+        snapshot_text:         snapshotText,
+        created_at:            now,
+        updated_at:            now,
+      }).select('id').single();
+      if (!selB) throw new Error('Could not create target selection');
+
+      // Xref linking both selections
+      const { data: xrefData } = await supabase.from('xrefs').insert({
+        user_id:        userId,
+        selection_a_id: selIdA,
+        selection_b_id: selB.id,
+        created_at:     now,
+        updated_at:     now,
+      }).select('id').single();
+      if (xrefData) {
+        await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, updated_at: now }).catch(() => {});
+        supabase.functions.invoke('generate-xref-label', {
+          body: { text_a: from.text, text_b: snapshotText },
+        }).then(async ({ data }) => {
+          if (data?.label) {
+            await supabase.from('xrefs').update({ label: data.label }).eq('id', xrefData.id);
+          }
+        }).catch(() => {});
+      }
+
+      onXrefPickDone?.();
+      if (sameBook) {
+        loadAnnotations(passages.map(p => p.id)).catch(() => {});
+      }
+    } catch (err) {
+      console.error('[ReaderPanel] handlePickFromSelection failed:', err);
+    } finally {
+      setPickSaving(false);
+    }
+  }
+
   function scrollToPassage(passageId: string) {
     document.getElementById(`p-${passageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTocOpen(false);
@@ -959,17 +1034,20 @@ async function handleCopy() {
           className="absolute z-30 flex items-center bg-gray-900 rounded-2xl px-1.5 py-1.5 shadow-xl"
           style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
-          {[
-            { label: 'Tag',  onClick: () => openPanel('tag') },
-            { label: 'Note', onClick: () => openPanel('note') },
-            { label: 'Xref', onClick: handleXrefStart },
-            { label: 'AI',   onClick: () => openPanel('ai') },
-            { label: 'Copy', onClick: handleCopy },
-          ].map(({ label, onClick }, i, arr) => (
+          {(xrefPickFrom
+            ? [{ label: 'Pick as X-Ref', onClick: handlePickFromSelection }]
+            : [
+                { label: 'Tag',  onClick: () => openPanel('tag') },
+                { label: 'Note', onClick: () => openPanel('note') },
+                { label: 'Xref', onClick: handleXrefStart },
+                { label: 'AI',   onClick: () => openPanel('ai') },
+                { label: 'Copy', onClick: handleCopy },
+              ]
+          ).map(({ label, onClick }, i, arr) => (
             <div key={label} className="flex items-center">
               <button
                 onClick={onClick}
-                disabled={savingAnnotation}
+                disabled={savingAnnotation || pickSaving}
                 className="px-[15px] py-[7px] text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
               >
                 {label}
@@ -991,7 +1069,7 @@ async function handleCopy() {
               </div>
             ) : (
               <>
-                <p className="text-sm font-semibold text-[#1B6B7B]">Click any passage to cross-reference</p>
+                <p className="text-sm font-semibold text-[#1B6B7B]">Select text or click a passage to link</p>
                 <p className="text-xs text-gray-500 truncate mt-0.5 italic">
                   "{xrefPickFrom.text.length > 80 ? xrefPickFrom.text.slice(0, 80) + '…' : xrefPickFrom.text}"
                 </p>
@@ -1022,7 +1100,7 @@ async function handleCopy() {
       )}
 
       {/* Passage content */}
-      {!pdfUrl && <div ref={scrollRef} className={`flex-1 overflow-y-auto${xrefPickFrom ? ' select-none' : ''}`} onMouseUp={isImported ? undefined : handleMouseUp}>
+      {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={isImported ? undefined : handleMouseUp}>
         <div className="max-w-2xl mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
@@ -1051,7 +1129,11 @@ async function handleCopy() {
                 )}
                 <div
                   className={`relative${xrefPickFrom && !pickSaving ? ' cursor-pointer rounded-xl -mx-2 px-2 hover:bg-[#1B6B7B]/5 transition-colors' : ''}`}
-                  onClick={xrefPickFrom && !pickSaving ? () => handlePickPassage(passage.id, passage.content) : undefined}
+                  onClick={xrefPickFrom && !pickSaving ? () => {
+                    // If the user has selected text, they should use the "Pick as X-Ref" button
+                    if (window.getSelection()?.toString().trim()) return;
+                    handlePickPassage(passage.id, passage.content);
+                  } : undefined}
                 >
                   {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
