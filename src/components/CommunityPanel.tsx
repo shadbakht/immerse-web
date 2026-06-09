@@ -142,6 +142,69 @@ function TagCard({
   );
 }
 
+// ── Feed column ───────────────────────────────────────────────────────────────
+
+function FeedColumn({
+  title,
+  tags,
+  loading,
+  searchQuery,
+  subscribedIds,
+  onImport,
+  onProfilePress,
+}: {
+  title:          string;
+  tags:           CommunityTag[];
+  loading:        boolean;
+  searchQuery:    string;
+  subscribedIds:  Set<string>;
+  onImport:       (ct: CommunityTag) => void;
+  onProfilePress: (ct: CommunityTag) => void;
+}) {
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return tags;
+    return tags.filter(ct =>
+      ct.name?.toLowerCase().includes(q) ||
+      ct.profiles?.username?.toLowerCase().includes(q) ||
+      ct.profiles?.full_name?.toLowerCase().includes(q),
+    );
+  }, [tags, searchQuery]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className="px-4 py-2.5 border-b border-gray-100 shrink-0">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</span>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+            <p className="text-3xl mb-3">{searchQuery ? '🔍' : '🏷️'}</p>
+            <p className="text-sm font-semibold text-gray-700 mb-1">{searchQuery ? 'No results' : 'No shared tags yet'}</p>
+            <p className="text-xs text-gray-400">{searchQuery ? 'Try a different search term.' : 'Be the first to share a tag.'}</p>
+          </div>
+        ) : (
+          <div>
+            {filtered.map(ct => (
+              <TagCard
+                key={ct.id}
+                ct={ct}
+                isImported={subscribedIds.has(ct.id)}
+                onImport={onImport}
+                onProfilePress={onProfilePress}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Publisher profile view ────────────────────────────────────────────────────
 
 function ProfileView({
@@ -164,7 +227,6 @@ function ProfileView({
   const [followLoading, setFollowLoading] = useState(true);
 
   useEffect(() => {
-    // Load tags
     supabase
       .from('community_tags')
       .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
@@ -175,7 +237,6 @@ function ProfileView({
         setLoading(false);
       });
 
-    // Load follow state
     if (profile.userId === currentUserId) {
       setFollowLoading(false);
       return;
@@ -284,15 +345,15 @@ function ProfileView({
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function CommunityPanel({ user }: CommunityPanelProps) {
-  const supabase    = createClient();
-  const [tab, setTab]           = useState<'recent' | 'trending'>('recent');
-  const [tags, setTags]         = useState<CommunityTag[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const supabase = createClient();
+  const [recentTags, setRecentTags]       = useState<CommunityTag[]>([]);
+  const [trendingTags, setTrendingTags]   = useState<CommunityTag[]>([]);
+  const [recentLoading, setRecentLoading]   = useState(true);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [searchQuery, setSearchQuery]     = useState('');
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [profileView, setProfileView]     = useState<ProfileUser | null>(null);
 
-  // Load the set of community_tag IDs the user has already imported
   const loadSubscribedIds = useCallback(async () => {
     if (!user?.id) return;
     const { data } = await supabase
@@ -302,31 +363,44 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
     setSubscribedIds(new Set((data ?? []).map((r: { community_tag_id: string }) => r.community_tag_id)));
   }, [user?.id]);
 
-  async function load(currentTab: 'recent' | 'trending') {
-    setLoading(true);
+  async function loadRecent() {
+    setRecentLoading(true);
     try {
-      let query = supabase
+      const { data } = await supabase
         .from('community_tags')
         .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
-        .order(currentTab === 'trending' ? 'import_count' : 'published_at', { ascending: false })
+        .order('published_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
-      if (currentTab === 'trending') query = (query as any).order('published_at', { ascending: false });
-      const { data } = await query;
-      setTags((data ?? []) as unknown as CommunityTag[]);
+      setRecentTags((data ?? []) as unknown as CommunityTag[]);
     } finally {
-      setLoading(false);
+      setRecentLoading(false);
+    }
+  }
+
+  async function loadTrending() {
+    setTrendingLoading(true);
+    try {
+      const { data } = await (supabase
+        .from('community_tags')
+        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
+        .order('import_count', { ascending: false }) as any)
+        .order('published_at', { ascending: false })
+        .range(0, PAGE_SIZE - 1);
+      setTrendingTags((data ?? []) as unknown as CommunityTag[]);
+    } finally {
+      setTrendingLoading(false);
     }
   }
 
   useEffect(() => {
-    load(tab);
+    loadRecent();
+    loadTrending();
     loadSubscribedIds();
-    // Silently sync on panel mount
     if (user?.id) {
       syncSubscribedTags(user.id).catch(e => console.warn('[Community] syncSubscribed error:', e));
       syncFollowedUsers(user.id).catch(e => console.warn('[Community] syncFollowed error:', e));
     }
-  }, [tab]);
+  }, []);
 
   const handleImport = useCallback(async (ct: CommunityTagRow) => {
     if (!user?.id) return;
@@ -343,16 +417,6 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
     setProfileView({ userId: ct.user_id, displayName, username: ct.profiles?.username ?? null });
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return tags;
-    return tags.filter(ct =>
-      ct.name?.toLowerCase().includes(q) ||
-      ct.profiles?.username?.toLowerCase().includes(q) ||
-      ct.profiles?.full_name?.toLowerCase().includes(q),
-    );
-  }, [tags, searchQuery]);
-
   // ── Profile view ────────────────────────────────────────────────────────────
   if (profileView && user?.id) {
     return (
@@ -368,8 +432,8 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
 
   // ── Feed view ───────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col max-w-2xl mx-auto w-full relative">
-      {/* Search */}
+    <div className="h-full flex flex-col w-full relative">
+      {/* Header + search */}
       <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
         <h1 className="text-lg font-semibold text-gray-900 mb-3">Community</h1>
         <div className="relative">
@@ -385,51 +449,30 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100 shrink-0">
-        {(['recent', 'trending'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === t
-                ? 'border-[#1B6B7B] text-[#1B6B7B]'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
+      {/* Two-column split */}
+      <div className="flex-1 flex overflow-hidden">
+        <FeedColumn
+          title="Recent"
+          tags={recentTags}
+          loading={recentLoading}
+          searchQuery={searchQuery}
+          subscribedIds={subscribedIds}
+          onImport={handleImport}
+          onProfilePress={handleProfilePress}
+        />
+        <div className="w-px bg-gray-200 shrink-0" />
+        <FeedColumn
+          title="Trending"
+          tags={trendingTags}
+          loading={trendingLoading}
+          searchQuery={searchQuery}
+          subscribedIds={subscribedIds}
+          onImport={handleImport}
+          onProfilePress={handleProfilePress}
+        />
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-3xl mb-3">{searchQuery ? '🔍' : '🏷️'}</p>
-            <p className="text-sm font-semibold text-gray-700 mb-1">{searchQuery ? 'No results' : 'No shared tags yet'}</p>
-            <p className="text-xs text-gray-400">{searchQuery ? 'Try a different search term.' : 'Be the first to share a tag.'}</p>
-          </div>
-        ) : (
-          <div>
-            {filtered.map(ct => (
-              <TagCard
-                key={ct.id}
-                ct={ct}
-                isImported={subscribedIds.has(ct.id)}
-                onImport={handleImport}
-                onProfilePress={handleProfilePress}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Guest / non-pro overlay */}
+      {/* Guest overlay */}
       {!user && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-8">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
