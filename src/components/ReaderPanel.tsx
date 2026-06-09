@@ -1128,12 +1128,8 @@ async function handleCopy() {
                   </h3>
                 )}
                 <div
-                  className={`relative${xrefPickFrom && !pickSaving ? ' cursor-pointer rounded-xl -mx-2 px-2 hover:bg-[#1B6B7B]/5 transition-colors' : ''}`}
-                  onClick={xrefPickFrom && !pickSaving ? () => {
-                    // If the user has selected text, they should use the "Pick as X-Ref" button
-                    if (window.getSelection()?.toString().trim()) return;
-                    handlePickPassage(passage.id, passage.content);
-                  } : undefined}
+                  className="relative"
+                  onClick={undefined}
                 >
                   {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
                     <div className="absolute -left-8 top-1 flex flex-col gap-1">
