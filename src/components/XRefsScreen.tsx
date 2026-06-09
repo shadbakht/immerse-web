@@ -113,7 +113,7 @@ function XRefCard({
             <p className="text-xs text-[#1B6B7B] font-medium leading-snug truncate">
               <Highlight text={side.citation} q={searchQuery} />
             </p>
-            <p className={`text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+            <p className={`font-serif text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
             {expanded && side.bookId && (

@@ -52,7 +52,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
           <Highlight text={sel.citation} q={searchQuery} />
         </p>
         <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-          <p className={`text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+          <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
             "<Highlight text={sel.snapshot_text} q={searchQuery} />"
           </p>
         </div>

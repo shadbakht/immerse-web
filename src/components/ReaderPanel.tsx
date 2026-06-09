@@ -114,7 +114,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
         <div className="flex-1 min-w-0">
           <p className="text-xs text-[#1B6B7B] font-medium mb-1.5 truncate">{entry.otherCitation}</p>
           <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-            <p className={`text-sm text-gray-700 leading-relaxed italic ${expanded ? '' : 'line-clamp-2'}`}>
+            <p className={`font-serif text-sm text-gray-700 leading-relaxed italic ${expanded ? '' : 'line-clamp-2'}`}>
               "{entry.otherSnapshotText}"
             </p>
           </div>
@@ -1101,7 +1101,7 @@ async function handleCopy() {
 
       {/* Passage content */}
       {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={isImported ? undefined : handleMouseUp}>
-        <div className="max-w-2xl mx-auto px-8 py-12">
+        <div className="max-w-[70ch] mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
               <h1 className="text-2xl font-semibold text-gray-900 leading-snug">{book.title}</h1>
@@ -1169,7 +1169,7 @@ async function handleCopy() {
                   )}
                   <p
                     data-pid={passage.id}
-                    className="text-gray-800 leading-relaxed mb-4 text-[17px]"
+                    className="font-serif text-gray-800 leading-relaxed mb-4 text-[17px]"
                   >
                     <PassageContent
                       text={passage.content}
@@ -1262,7 +1262,7 @@ async function handleCopy() {
             {data && (
               <div className="px-5 pt-4 pb-4">
                 <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-xs text-gray-500 line-clamp-2 italic">"{data.snapshotText}"</p>
+                  <p className="font-serif text-xs text-gray-500 line-clamp-2 italic">"{data.snapshotText}"</p>
                 </div>
                 {data.tags.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">No tags on this selection.</p>
@@ -1310,7 +1310,7 @@ async function handleCopy() {
             {data && (
               <div className="px-5 pt-4 pb-2">
                 <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-xs text-gray-500 line-clamp-2 italic">"{data.snapshotText}"</p>
+                  <p className="font-serif text-xs text-gray-500 line-clamp-2 italic">"{data.snapshotText}"</p>
                 </div>
                 <textarea
                   autoFocus

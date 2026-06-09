@@ -130,7 +130,7 @@ function TagCard({
         <div className="border-t border-gray-50 divide-y divide-gray-50">
           {allSelections.map((sel: any, i: number) => (
             <div key={i} className="px-5 py-3">
-              <p className="text-xs italic text-gray-700 leading-relaxed line-clamp-3">"{sel.snapshotText}"</p>
+              <p className="font-serif text-xs italic text-gray-700 leading-relaxed line-clamp-3">"{sel.snapshotText}"</p>
               {(sel.citation || sel.bookTitle) && (
                 <p className="text-xs text-gray-400 mt-1">{sel.citation ?? sel.bookTitle}</p>
               )}
