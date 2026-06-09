@@ -301,9 +301,9 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                     className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
                     onClick={() => togglePair(pair.pairKey)}
                   >
-                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     <span className="flex-1 text-sm font-medium text-gray-800">{pair.name}</span>
                     <span className="text-xs text-gray-400 shrink-0">{pair.xrefs.length}</span>
+                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {isOpen && (

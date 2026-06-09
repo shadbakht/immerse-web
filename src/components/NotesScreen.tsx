@@ -298,9 +298,9 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                     className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
                     onClick={() => toggleTradition(trad.catId)}
                   >
-                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
                     <span className="flex-1 text-sm font-medium text-gray-800 truncate">{trad.name}</span>
                     <span className="text-xs text-gray-400 shrink-0">{totalNotes}</span>
+                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {tradOpen && trad.books.map(book => {
@@ -309,12 +309,12 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                       <div key={book.bookKey}>
                         {/* Book sub-header */}
                         <button
-                          className="w-full flex items-center gap-2 pl-9 pr-4 py-3 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
+                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
                           onClick={() => toggleBook(book.bookKey)}
                         >
-                          <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
                           <span className="flex-1 text-sm text-gray-700 truncate">{book.title}</span>
                           <span className="text-xs text-gray-400 shrink-0">{book.notes.length}</span>
+                          <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
                         </button>
 
                         {/* Note items */}
