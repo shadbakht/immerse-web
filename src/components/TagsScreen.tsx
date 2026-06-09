@@ -185,6 +185,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [exporting, setExporting] = useState(false);
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeXrefs, setIncludeXrefs] = useState(true);
+  const [selIdsWithNotes, setSelIdsWithNotes] = useState<Set<string>>(new Set());
+  const [selIdsWithXrefs, setSelIdsWithXrefs] = useState<Set<string>>(new Set());
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -222,6 +224,22 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         if (!s) continue;
         (selsByTag[st.tag_id] ??= []).push({ id: st.selection_id, ...s });
       }
+
+      // Check which selection IDs have notes or xrefs (for disabling export toggles)
+      const allSelIds = Object.values(selsByTag).flat().map(s => s.id);
+      if (allSelIds.length > 0) {
+        const [{ data: noteData }, { data: xrefsAData }, { data: xrefsBData }] = await Promise.all([
+          supabase.from('notes').select('selection_id').in('selection_id', allSelIds),
+          supabase.from('xrefs').select('selection_a_id').in('selection_a_id', allSelIds),
+          supabase.from('xrefs').select('selection_b_id').in('selection_b_id', allSelIds),
+        ]);
+        setSelIdsWithNotes(new Set((noteData ?? []).map((n: any) => n.selection_id as string)));
+        setSelIdsWithXrefs(new Set([
+          ...(xrefsAData ?? []).map((x: any) => x.selection_a_id as string),
+          ...(xrefsBData ?? []).map((x: any) => x.selection_b_id as string),
+        ]));
+      }
+
       // Build tree-ordered flat list: top-level first (sort_order), then children under parent
       const tagById = new Map((tagList as any[]).map(t => [t.id, t]));
       const ordered: any[] = [];
@@ -296,7 +314,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     setExporting(true);
     try {
       const selected = tags.filter(t => selectedTagIds.has(t.id));
-      const opts = { includeNotes, includeXrefs };
+      const opts = { includeNotes: includeNotes && hasNotesForSelectedTags, includeXrefs: includeXrefs && hasXrefsForSelectedTags };
       if (format === 'pdf')  await exportAsPdf(selected, opts);
       if (format === 'docx') await exportAsDocx(selected, opts);
       if (format === 'imm')  await exportAsImm(selected, opts);
@@ -313,6 +331,17 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     for (const t of tags) { if (t.parent_id) s.add(t.parent_id); }
     return s;
   }, [tags]);
+
+  // For the export panel: are any of the selected tags' selections linked to notes / xrefs?
+  const hasNotesForSelectedTags = useMemo(() =>
+    [...selectedTagIds].some(tagId =>
+      tags.find(t => t.id === tagId)?.selections.some(s => selIdsWithNotes.has(s.id)) ?? false
+    ), [selectedTagIds, tags, selIdsWithNotes]);
+
+  const hasXrefsForSelectedTags = useMemo(() =>
+    [...selectedTagIds].some(tagId =>
+      tags.find(t => t.id === tagId)?.selections.some(s => selIdsWithXrefs.has(s.id)) ?? false
+    ), [selectedTagIds, tags, selIdsWithXrefs]);
 
   function toggleOpenTag(id: string) {
     setOpenTagIds(prev => {
@@ -370,12 +399,17 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                   <div className="px-4 pt-3 pb-2 border-b border-gray-100">
                     <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mb-2">Include</p>
                     {([
-                      { label: 'Notes',            checked: includeNotes, set: () => setIncludeNotes(v => !v) },
-                      { label: 'Cross-references', checked: includeXrefs, set: () => setIncludeXrefs(v => !v) },
-                    ]).map(({ label, checked, set }) => (
-                      <div key={label} className="flex items-center gap-2 py-1 cursor-pointer select-none" onClick={e => { e.stopPropagation(); set(); }}>
-                        <div className={`w-[15px] h-[15px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${checked ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'}`}>
-                          {checked && <span className="text-white text-[9px] leading-none font-bold">✓</span>}
+                      { label: 'Notes',            checked: includeNotes, set: () => setIncludeNotes(v => !v), enabled: hasNotesForSelectedTags },
+                      { label: 'Cross-references', checked: includeXrefs, set: () => setIncludeXrefs(v => !v), enabled: hasXrefsForSelectedTags },
+                    ]).map(({ label, checked, set, enabled }) => (
+                      <div
+                        key={label}
+                        className={`flex items-center gap-2 py-1 select-none ${enabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}
+                        onClick={e => { if (!enabled) return; e.stopPropagation(); set(); }}
+                        title={enabled ? undefined : `None of the selected tags have ${label.toLowerCase()}`}
+                      >
+                        <div className={`w-[15px] h-[15px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${checked && enabled ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'}`}>
+                          {checked && enabled && <span className="text-white text-[9px] leading-none font-bold">✓</span>}
                         </div>
                         <span className="text-sm text-gray-700">{label}</span>
                       </div>
