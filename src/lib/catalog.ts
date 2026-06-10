@@ -2,10 +2,11 @@
  * Shared catalog helpers for LibraryPanel and HomePanel.
  *
  * catalog.json (75 KB, served from /public) is the source of truth for
- * book titles and category structure — it mirrors corpus.json exactly and
- * is always in sync with the iOS app.
+ * book titles and category structure — it mirrors the mobile corpus
+ * (assets/corpus.bin in the Immerse repo) and is always in sync with the iOS app.
+ * Books render in raw array order, so alphabetical sorting lives in the data.
  *
- * book_slug_map (Supabase, 527 rows) bridges corpus slugs ↔ Supabase UUIDs.
+ * book_slug_map (Supabase, 517 rows) bridges corpus slugs ↔ Supabase UUIDs.
  */
 
 export interface CatalogCategory {
