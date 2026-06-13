@@ -9,11 +9,11 @@ const geist = Geist({ subsets: ['latin'] });
 // iOS:     Set APP_STORE_ID to your numeric Apple ID (from App Store Connect →
 //          App Information → Apple ID) once the app is approved.
 //          Example: "6478293847"
-const APP_STORE_ID    = '';   // TODO: fill in after App Store approval
+const APP_STORE_ID    = '6774657926';
 
 // Android: Set PLAY_STORE_ID to your package name once the app is live.
 //          Example: "com.shadbakht.immerse"
-const PLAY_STORE_ID   = '';   // TODO: fill in after Play Store launch
+const PLAY_STORE_ID   = 'com.shadbakht.immerse';
 
 export const metadata: Metadata = {
   title: 'Immerse',
