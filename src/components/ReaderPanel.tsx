@@ -302,18 +302,17 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     setPassageToXrefs(new Map());
   }, [userId]);
 
-  // Realtime: refresh annotation indicators when selections change for this user.
-  // Catches annotations created on mobile while this web session is open.
+  // Realtime: refresh annotation indicators when selections or notes change.
+  // Catches annotations created/edited on mobile while this web session is open.
+  // notes is included so inline note edits (no new selection) still update the indicator.
   useEffect(() => {
     if (!userId || passages.length === 0) return;
     const passageIds = passages.map(p => p.id);
+    const reload = () => { loadAnnotations(passageIds).catch(() => {}); };
     const channel = supabase
       .channel(`reader-annot-${userId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'selections', filter: `user_id=eq.${userId}` },
-        () => { loadAnnotations(passageIds).catch(() => {}); },
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'selections', filter: `user_id=eq.${userId}` }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes',      filter: `user_id=eq.${userId}` }, reload)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, passages, loadAnnotations]);

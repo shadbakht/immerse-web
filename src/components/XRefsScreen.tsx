@@ -140,6 +140,19 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; });
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`xrefs-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'xrefs', filter: `user_id=eq.${userId}` },
+        () => { loadRef.current().catch(() => {}); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   async function load() {
     setLoading(true);
     try {

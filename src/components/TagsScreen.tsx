@@ -189,6 +189,19 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; });
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`tags-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tags', filter: `user_id=eq.${userId}` },
+        () => { loadRef.current().catch(() => {}); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   useEffect(() => {
     if (!showExportMenu) return;
     function handleMouseDown(e: MouseEvent) {

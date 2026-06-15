@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushNote, deleteRemote } from '@/lib/annotationSync';
@@ -104,6 +104,21 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [editContent, setEditContent] = useState('');
 
   useEffect(() => { if (userId) load(); }, [userId]);
+
+  // Keep a stable ref so the Realtime callback always calls the latest load()
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; });
+
+  // Realtime: re-fetch when notes change on any other platform
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`notes-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes', filter: `user_id=eq.${userId}` },
+        () => { loadRef.current().catch(() => {}); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
 
   async function load() {
     setLoading(true);
