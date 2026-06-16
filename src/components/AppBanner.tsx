@@ -6,9 +6,10 @@ import Image from 'next/image';
 interface AppBannerProps {
   playStoreId: string;   // e.g. "com.shadbakht.immerse" — empty = hidden
   appStoreId:  string;   // e.g. "6478293847"            — empty = hidden
-                         // (iOS also gets the native Safari Smart App Banner via the
-                         //  apple-itunes-app meta tag in layout.tsx — this component
-                         //  only shows a custom banner on Android.)
+                         // (Real Safari gets the native Smart App Banner via the
+                         //  apple-itunes-app meta tag in layout.tsx. This component
+                         //  shows a custom banner on Android and on non-Safari iOS
+                         //  browsers — Chrome/Firefox/Edge/Brave — which ignore that tag.)
 }
 
 export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
@@ -26,14 +27,30 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
     if (isAndroid && playStoreId) {
       setPlatform('android');
       setVisible(true);
-    } else if (isIos && appStoreId) {
-      // iOS: Safari shows the native Smart App Banner via the meta tag.
-      // Only show our custom banner in non-Safari browsers (Chrome on iOS, etc.)
-      const isSafari = /safari/i.test(ua) && !/chrome|crios|fxios/i.test(ua);
-      if (!isSafari) {
-        setPlatform('ios');
-        setVisible(true);
-      }
+      return;
+    }
+
+    if (isIos && appStoreId) {
+      // Real Safari renders the native Smart App Banner via the apple-itunes-app
+      // meta tag, so we defer to it there. Every OTHER iOS browser ignores that
+      // tag, so we must show our own banner instead.
+      //   - Chrome/Firefox/Edge/Opera carry a distinct UA token (CriOS, etc.).
+      //   - Brave deliberately uses a Safari-identical UA, so UA sniffing can't
+      //     catch it — detect it via the navigator.brave.isBrave() API.
+      const knownNonSafari = /crios|fxios|edgios|opios/i.test(ua);
+
+      (async () => {
+        let isBrave = false;
+        try {
+          const brave = (navigator as unknown as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
+          if (brave?.isBrave) isBrave = await brave.isBrave();
+        } catch { /* navigator.brave unavailable — treat as Safari */ }
+
+        if (knownNonSafari || isBrave) {
+          setPlatform('ios');
+          setVisible(true);
+        }
+      })();
     }
   }, [playStoreId, appStoreId]);
 
