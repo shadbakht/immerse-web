@@ -51,16 +51,16 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
   if (!visible) return null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-[#1C2B35] text-white w-full z-50">
+    <div className="flex items-center gap-3.5 px-5 py-3.5 bg-[#1C2B35] text-white w-full z-50">
       {/* App icon */}
-      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 shadow-md">
-        <Image src="/immerse-icon.png" alt="Immerse" width={48} height={48} />
+      <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 shadow-md">
+        <Image src="/immerse-icon.png" alt="Immerse" width={56} height={56} />
       </div>
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold leading-tight">Immerse</div>
-        <div className="text-xs text-white/60 mt-0.5">
+        <div className="text-base font-semibold leading-tight">Immerse</div>
+        <div className="text-sm text-white/60 mt-1">
           {platform === 'android' ? 'Get it on Google Play' : 'Download on the App Store'}
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
       {/* Open button */}
       <button
         onClick={openStore}
-        className="shrink-0 bg-[#1B6B7B] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#155a68] transition-colors"
+        className="shrink-0 bg-[#1B6B7B] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#155a68] transition-colors"
       >
         View
       </button>
@@ -76,7 +76,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
       {/* Dismiss */}
       <button
         onClick={dismiss}
-        className="shrink-0 text-white/40 hover:text-white/80 transition-colors text-lg leading-none ml-1"
+        className="shrink-0 text-white/40 hover:text-white/80 transition-colors text-xl leading-none ml-1.5"
         aria-label="Dismiss"
       >
         ✕
