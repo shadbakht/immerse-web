@@ -22,8 +22,9 @@ export const metadata: Metadata = {
     icon: '/favicon.png',
     apple: '/favicon.png',
   },
-  // iOS native Smart App Banner — Safari renders this automatically when APP_STORE_ID is set
-  other: APP_STORE_ID ? { 'apple-itunes-app': `app-id=${APP_STORE_ID}` } : undefined,
+  // Note: no apple-itunes-app meta tag. Safari's native Smart App Banner hides
+  // itself when the app is installed and only works in Safari — we instead show
+  // our own <AppBanner> on every mobile browser (see AppBanner.tsx).
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

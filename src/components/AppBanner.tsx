@@ -6,10 +6,8 @@ import Image from 'next/image';
 interface AppBannerProps {
   playStoreId: string;   // e.g. "com.shadbakht.immerse" — empty = hidden
   appStoreId:  string;   // e.g. "6478293847"            — empty = hidden
-                         // (Real Safari gets the native Smart App Banner via the
-                         //  apple-itunes-app meta tag in layout.tsx. This component
-                         //  shows a custom banner on Android and on non-Safari iOS
-                         //  browsers — Chrome/Firefox/Edge/Brave — which ignore that tag.)
+                         // Shows on every mobile browser (Android + all iOS browsers,
+                         // Safari included). The button routes to the store listing.
 }
 
 export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
@@ -20,6 +18,10 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
     // Don't show if dismissed this session
     if (sessionStorage.getItem('app_banner_dismissed')) return;
 
+    // Show on every mobile browser regardless of whether the app is installed.
+    // The button routes to the store listing, which itself shows "Open" if the
+    // app is installed or "Get" if not — so we don't need to detect install
+    // state (which iOS browsers can't do reliably anyway).
     const ua = navigator.userAgent;
     const isAndroid = /android/i.test(ua);
     const isIos     = /iphone|ipad|ipod/i.test(ua);
@@ -27,30 +29,9 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
     if (isAndroid && playStoreId) {
       setPlatform('android');
       setVisible(true);
-      return;
-    }
-
-    if (isIos && appStoreId) {
-      // Real Safari renders the native Smart App Banner via the apple-itunes-app
-      // meta tag, so we defer to it there. Every OTHER iOS browser ignores that
-      // tag, so we must show our own banner instead.
-      //   - Chrome/Firefox/Edge/Opera carry a distinct UA token (CriOS, etc.).
-      //   - Brave deliberately uses a Safari-identical UA, so UA sniffing can't
-      //     catch it — detect it via the navigator.brave.isBrave() API.
-      const knownNonSafari = /crios|fxios|edgios|opios/i.test(ua);
-
-      (async () => {
-        let isBrave = false;
-        try {
-          const brave = (navigator as unknown as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
-          if (brave?.isBrave) isBrave = await brave.isBrave();
-        } catch { /* navigator.brave unavailable — treat as Safari */ }
-
-        if (knownNonSafari || isBrave) {
-          setPlatform('ios');
-          setVisible(true);
-        }
-      })();
+    } else if (isIos && appStoreId) {
+      setPlatform('ios');
+      setVisible(true);
     }
   }, [playStoreId, appStoreId]);
 
@@ -89,7 +70,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
         onClick={openStore}
         className="shrink-0 bg-[#1B6B7B] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#155a68] transition-colors"
       >
-        {platform === 'android' ? 'Install' : 'Open'}
+        View
       </button>
 
       {/* Dismiss */}
