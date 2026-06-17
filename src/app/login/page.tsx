@@ -20,6 +20,7 @@ function LoginPageInner() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -42,6 +43,23 @@ function LoginPageInner() {
     setSuccess('');
     setUsername('');
     setUsernameStatus(null);
+  }
+
+  async function handleForgot() {
+    setError('');
+    if (!email) { setError('Please enter your email address.'); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+      });
+      if (error) throw error;
+      setSuccess(`We sent a password reset link to ${email}`);
+    } catch (err: any) {
+      setError(err.message ?? 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -106,7 +124,39 @@ function LoginPageInner() {
             <div className="text-4xl">📬</div>
             <p className="text-white font-semibold text-lg">Check your email</p>
             <p className="text-gray-400 text-sm leading-relaxed">{success}</p>
-            <button onClick={() => { setSuccess(''); setIsSignUp(false); }} className="text-[#1B6B7B] text-sm hover:underline">
+            <button onClick={() => { setSuccess(''); setIsSignUp(false); setForgotMode(false); }} className="text-[#1B6B7B] text-sm hover:underline">
+              Back to Sign In
+            </button>
+          </div>
+        ) : forgotMode ? (
+          <div className="space-y-3">
+            <p className="text-gray-400 text-sm leading-relaxed text-center mb-1">
+              Enter your email address and we&apos;ll send you a link to reset your password.
+            </p>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleForgot(); }}
+              autoFocus
+              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+            />
+
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+
+            <button
+              onClick={handleForgot}
+              disabled={loading}
+              className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
+            >
+              {loading ? 'Please wait…' : 'Send Reset Link'}
+            </button>
+
+            <button
+              onClick={() => { setForgotMode(false); setError(''); }}
+              className="w-full text-center text-gray-400 text-sm py-2 hover:text-white transition"
+            >
               Back to Sign In
             </button>
           </div>
@@ -175,6 +225,15 @@ function LoginPageInner() {
             >
               {loading ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
             </button>
+
+            {!isSignUp && (
+              <button
+                onClick={() => { setForgotMode(true); setError(''); }}
+                className="w-full text-center text-[#1B6B7B] text-sm py-1 hover:underline"
+              >
+                Forgot password?
+              </button>
+            )}
 
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/10" />
