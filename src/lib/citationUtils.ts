@@ -19,6 +19,22 @@ export function buildCitation(
     return bookPart ? `The Bible, ${bookPart}` : 'The Bible';
   }
 
+  if (fmt === 'tanakh') {
+    const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
+    const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';
+    const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || verse;
+    // Book titles are "Hebrew (English)" (e.g. "Bereishit (Genesis)"); cite by
+    // the English name to match the mobile app: "Tanakh, Genesis 3:16".
+    const title = book?.title ? (book.title.match(/\(([^)]+)\)\s*$/)?.[1] ?? book.title) : '';
+    const bookPart = title ? `${title}${loc ? ` ${loc}` : ''}` : loc;
+    return bookPart ? `Tanakh, ${bookPart}` : 'Tanakh';
+  }
+
+  // Guru Granth Sahib: paragraph_number == Ang (SGGS page). Cite by Ang.
+  if (fmt === 'numbered_sections') {
+    return passage?.paragraph_number ? `Guru Granth Sahib, Ang ${passage.paragraph_number}` : 'Guru Granth Sahib';
+  }
+
   if (fmt === 'scripture_sura_verse') {
     const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
     const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';

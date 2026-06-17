@@ -583,6 +583,17 @@ async function handleCopy() {
       const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || verse;
       const bookPart = book?.title ? `${book.title}${loc ? ` ${loc}` : ''}` : loc;
       citation = bookPart ? `— The Bible, ${bookPart}` : '— The Bible';
+    } else if (fmt === 'tanakh') {
+      const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
+      const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';
+      const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || verse;
+      // Titles are "Hebrew (English)"; cite the English name to match mobile.
+      const title = book?.title ? (book.title.match(/\(([^)]+)\)\s*$/)?.[1] ?? book.title) : '';
+      const bookPart = title ? `${title}${loc ? ` ${loc}` : ''}` : loc;
+      citation = bookPart ? `— Tanakh, ${bookPart}` : '— Tanakh';
+    } else if (fmt === 'numbered_sections') {
+      // Guru Granth Sahib: paragraph_number == Ang (SGGS page).
+      citation = passage?.paragraph_number ? `— Guru Granth Sahib, Ang ${passage.paragraph_number}` : '— Guru Granth Sahib';
     } else {
       const author = book?.authorName && book.authorName !== book?.title ? book.authorName : null;
       const location = passage?.chapter_label || passage?.section_title || null;
