@@ -31,6 +31,7 @@ interface BookMeta {
 interface TocEntry {
   label: string;
   passageId: string;
+  depth?: number;
 }
 
 interface SelectionBar {
@@ -463,14 +464,28 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         loadAnnotations(ps.map(p => p.id)).catch(() => {});
       }
 
-      // Build TOC from first passage of each unique chapter/section
-      const seen = new Set<string>();
+      // Build TOC. Native-numbered books (e.g. The Hidden Words) nest each
+      // numbered entry under its section (Arabic/Persian) as a depth-1 child,
+      // anchored to the number-only passage ("1.", paragraph_number null).
       const tocEntries: TocEntry[] = [];
-      for (const p of ps) {
-        const label = p.chapter_label || p.section_title;
-        if (label && !seen.has(label)) {
-          seen.add(label);
-          tocEntries.push({ label, passageId: p.id });
+      if ((bookData as any)?.citation_format === 'author_book_section_native_number') {
+        let lastChapter: string | null = null;
+        for (const p of ps) {
+          if (p.chapter_label && p.chapter_label !== lastChapter) {
+            lastChapter = p.chapter_label;
+            tocEntries.push({ label: p.chapter_label, passageId: p.id, depth: 0 });
+          }
+          const num = p.paragraph_number == null ? /^\s*(\d+)\.?\s*$/.exec(p.content || '') : null;
+          if (num) tocEntries.push({ label: num[1], passageId: p.id, depth: 1 });
+        }
+      } else {
+        const seen = new Set<string>();
+        for (const p of ps) {
+          const label = p.chapter_label || p.section_title;
+          if (label && !seen.has(label)) {
+            seen.add(label);
+            tocEntries.push({ label, passageId: p.id });
+          }
         }
       }
       setToc(tocEntries);
@@ -1033,7 +1048,9 @@ async function handleCopy() {
               <button
                 key={i}
                 onClick={() => scrollToPassage(entry.passageId)}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors"
+                className={`w-full text-left py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors ${
+                  entry.depth ? 'pl-10 pr-4 text-gray-500' : 'px-4 text-gray-700'
+                }`}
               >
                 {entry.label}
               </button>
