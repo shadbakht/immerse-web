@@ -594,6 +594,11 @@ async function handleCopy() {
     } else if (fmt === 'numbered_sections') {
       // Guru Granth Sahib: paragraph_number == Ang (SGGS page).
       citation = passage?.paragraph_number ? `— Guru Granth Sahib, Ang ${passage.paragraph_number}` : '— Guru Granth Sahib';
+    } else if (fmt === 'author_book_section_native_number') {
+      // The Hidden Words: section in chapter_label, native number in paragraph_number.
+      const author = book?.authorName && book.authorName !== book?.title ? book.authorName : null;
+      const loc = [passage?.chapter_label, passage?.paragraph_number].filter(v => v != null && v !== '').join(' ');
+      citation = '— ' + [author, book?.title, loc].filter(Boolean).join(', ');
     } else {
       const author = book?.authorName && book.authorName !== book?.title ? book.authorName : null;
       const location = passage?.chapter_label || passage?.section_title || null;

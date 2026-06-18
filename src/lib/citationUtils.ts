@@ -35,6 +35,13 @@ export function buildCitation(
     return passage?.paragraph_number ? `Guru Granth Sahib, Ang ${passage.paragraph_number}` : 'Guru Granth Sahib';
   }
 
+  // The Hidden Words: section (Arabic/Persian) in chapter_label, native number
+  // in paragraph_number. e.g. "Bahá'u'lláh, The Hidden Words, Persian 44".
+  if (fmt === 'author_book_section_native_number') {
+    const loc = [passage?.chapter_label, passage?.paragraph_number].filter(v => v != null && v !== '').join(' ');
+    return [authorName, book?.title, loc].filter(Boolean).join(', ');
+  }
+
   if (fmt === 'scripture_sura_verse') {
     const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
     const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';
