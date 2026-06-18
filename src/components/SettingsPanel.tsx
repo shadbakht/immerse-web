@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { isInTrial } from '@/lib/proStatus';
 import type { User } from '@supabase/supabase-js';
 
 type FontSize = 'Small' | 'Medium' | 'Large' | 'XL';
@@ -64,12 +65,14 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       .single();
     if (data) {
       setFontSize((data.font_size as FontSize) ?? 'Large');
-      setIsPro(data.is_pro ?? false);
+      setIsPro((data.is_pro ?? false) || isInTrial(user.created_at));
       const name = data.full_name || user.user_metadata?.full_name || '';
       setFullName(name);
       setNameInput(name);
       setUsername(data.username || user.user_metadata?.username || '');
     } else {
+      // No profiles row yet (e.g. brand-new account) — still honor the trial.
+      setIsPro(isInTrial(user.created_at));
       const name = user.user_metadata?.full_name || '';
       setFullName(name);
       setNameInput(name);

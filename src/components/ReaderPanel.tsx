@@ -12,6 +12,7 @@ import AiPanel from './AiPanel';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { TagIcon, NoteIcon, XRefIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
+import { resolveIsPro } from '@/lib/proStatus';
 
 interface Passage {
   id: string;
@@ -180,8 +181,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
   useEffect(() => {
     if (!userId) return;
-    supabase.from('profiles').select('is_pro').eq('id', userId).single()
-      .then(({ data }) => setIsPro(data?.is_pro ?? false));
+    resolveIsPro(supabase, userId).then(setIsPro);
   }, [userId]);
 
   // Pre-compute max sort_order once passages load (for fraction calculation)

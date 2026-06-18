@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
 import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
+import { resolveIsPro } from '@/lib/proStatus';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
@@ -62,8 +63,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   useEffect(() => {
     if (userId) {
-      supabase.from('profiles').select('is_pro').eq('id', userId).single()
-        .then(({ data }) => setIsPro(data?.is_pro ?? false));
+      resolveIsPro(supabase, userId).then(setIsPro);
     }
   }, [userId]);
 
