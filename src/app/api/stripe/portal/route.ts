@@ -20,7 +20,7 @@ export async function POST() {
     return NextResponse.json({ error: 'No subscription found' }, { status: 400 });
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerse-web.vercel.app';
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerseresearch.app';
 
   const session = await stripe.billingPortal.sessions.create({
     customer:   profile.stripe_customer_id,

@@ -28,7 +28,7 @@ export async function POST() {
     await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user.id);
   }
 
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerse-web.vercel.app';
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerseresearch.app';
 
   const session = await stripe.checkout.sessions.create({
     customer:            customerId,
