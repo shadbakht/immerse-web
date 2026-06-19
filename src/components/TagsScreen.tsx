@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
-import { exportAsImm, exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagExport';
+import { exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 
 interface TagsScreenProps {
@@ -320,7 +320,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     });
   }
 
-  async function handleExport(format: 'pdf' | 'docx' | 'imm') {
+  async function handleExport(format: 'pdf' | 'docx') {
     setShowExportMenu(false);
     setExporting(true);
     try {
@@ -328,7 +328,6 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
       const opts = { includeNotes: includeNotes && hasNotesForSelectedTags, includeXrefs: includeXrefs && hasXrefsForSelectedTags };
       if (format === 'pdf')  await exportAsPdf(selected, opts);
       if (format === 'docx') await exportAsDocx(selected, opts);
-      if (format === 'imm')  await exportAsImm(selected, opts);
     } catch (e) {
       console.error('[TagExport] failed:', e);
     } finally {
@@ -430,7 +429,6 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                     {([
                       { label: 'PDF',           format: 'pdf'  },
                       { label: 'Word (.docx)',   format: 'docx' },
-                      { label: 'Immerse (.imm)', format: 'imm'  },
                     ] as const).map(({ label, format }) => (
                       <button
                         key={format}

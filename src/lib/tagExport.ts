@@ -31,39 +31,6 @@ export interface TagRow {
   selections: SelRow[];
 }
 
-// ─── IMM payload types ────────────────────────────────────────────────────────
-
-interface ImmPayload {
-  version: '1';
-  exportedAt: string;
-  appId: 'com.shadbakht.immerse';
-  tags: ImmTagExport[];
-}
-
-interface ImmTagExport {
-  exportId: string;
-  name: string;
-  color: string | null;
-  parentExportId: string | null;
-  depth: number;
-  sortOrder: number;
-  selections: ImmSelectionExport[];
-}
-
-interface ImmSelectionExport {
-  snapshotText: string;
-  bookId: string;
-  bookTitle: string;
-  citation: string;
-  notes: string[];
-  xrefCitations: string[];
-  startPid: string;
-  startOffset: number;
-  endPid: string;
-  endOffset: number;
-  createdAt: string;
-}
-
 export interface ExportOptions {
   includeNotes: boolean;
   includeXrefs: boolean;
@@ -155,48 +122,6 @@ async function fetchEnrichedData(allSelIds: string[], opts: ExportOptions): Prom
   for (const s of (selFullData ?? []) as any[]) selFullMap[s.id] = s;
 
   return { notesBySelId, xrefsBySel, selFullMap };
-}
-
-// ─── Export: IMM ──────────────────────────────────────────────────────────────
-
-export async function exportAsImm(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
-  const allSelIds = selectedTags.flatMap(t => t.selections.map(s => s.id));
-  const { notesBySelId, xrefsBySel, selFullMap } = await fetchEnrichedData(allSelIds, opts);
-
-  const tagExports: ImmTagExport[] = selectedTags.map((tag, i) => ({
-    exportId: `t${i}`,
-    name: tag.name,
-    color: null,
-    parentExportId: null,
-    depth: 0,
-    sortOrder: i,
-    selections: tag.selections.map(sel => {
-      const full = selFullMap[sel.id];
-      return {
-        snapshotText: sel.snapshot_text,
-        bookId: sel.book_id,
-        bookTitle: sel.citation.replace(/^—\s*/, '').split(',')[0]?.trim() ?? sel.book_id,
-        citation: sel.citation,
-        notes: opts.includeNotes ? (notesBySelId[sel.id] ?? []) : [],
-        xrefCitations: opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [],
-        startPid: full?.start_pid ?? sel.passage_id,
-        startOffset: full?.start_offset ?? 0,
-        endPid: full?.end_pid ?? sel.passage_id,
-        endOffset: full?.end_offset ?? 0,
-        createdAt: full?.created_at ?? new Date().toISOString(),
-      };
-    }),
-  }));
-
-  const payload: ImmPayload = {
-    version: '1',
-    exportedAt: new Date().toISOString(),
-    appId: 'com.shadbakht.immerse',
-    tags: tagExports,
-  };
-
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  triggerDownload(blob, `${safeFilename(selectedTags[0]?.name ?? 'tags')}.imm`);
 }
 
 // ─── Export: DOCX ─────────────────────────────────────────────────────────────
