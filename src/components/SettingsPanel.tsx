@@ -25,6 +25,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [fontSize, setFontSize] = useState<FontSize>('Large');
   const [colorMode, setColorMode] = useState<ColorMode>('light');
   const [isPro, setIsPro] = useState(false);
+  const [isTrial, setIsTrial] = useState(false);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -65,14 +66,19 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       .single();
     if (data) {
       setFontSize((data.font_size as FontSize) ?? 'Large');
-      setIsPro((data.is_pro ?? false) || isInTrial(user.created_at));
+      const paidPro = data.is_pro ?? false;
+      const trial = !paidPro && isInTrial(user.created_at);
+      setIsPro(paidPro || trial);
+      setIsTrial(trial);
       const name = data.full_name || user.user_metadata?.full_name || '';
       setFullName(name);
       setNameInput(name);
       setUsername(data.username || user.user_metadata?.username || '');
     } else {
       // No profiles row yet (e.g. brand-new account) — still honor the trial.
-      setIsPro(isInTrial(user.created_at));
+      const trial = isInTrial(user.created_at);
+      setIsPro(trial);
+      setIsTrial(trial);
       const name = user.user_metadata?.full_name || '';
       setFullName(name);
       setNameInput(name);
@@ -191,9 +197,9 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 <span className="text-xs text-gray-400 w-24 shrink-0">Plan</span>
                 <div className="flex items-center gap-3">
                   <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-500'}`}>
-                    {isGuest ? 'Guest' : isPro ? 'Pro' : 'Standard'}
+                    {isGuest ? 'Guest' : isTrial ? 'Pro Trial' : isPro ? 'Pro' : 'Standard'}
                   </span>
-                  {!isGuest && (isPro ? (
+                  {!isGuest && (isPro && !isTrial ? (
                     <button
                       onClick={handleManageSubscription}
                       disabled={stripeLoading}
