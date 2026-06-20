@@ -222,6 +222,7 @@ function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenB
 function TagCard({
   ct,
   isImported,
+  isOwn,
   onImport,
   onProfilePress,
   onOpenBook,
@@ -231,6 +232,7 @@ function TagCard({
 }: {
   ct:             CommunityTag;
   isImported:     boolean;
+  isOwn?:         boolean;
   onImport:       (ct: CommunityTag) => void;
   onProfilePress: (ct: CommunityTag) => void;
   onOpenBook?:    OpenBookFn;
@@ -294,7 +296,15 @@ function TagCard({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {isImported ? (
+          {isOwn ? (
+            <button
+              disabled
+              title="This is your own tag"
+              className="text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1 rounded-full cursor-not-allowed"
+            >
+              Import
+            </button>
+          ) : isImported ? (
             <span className="text-xs font-medium text-[#1B6B7B] bg-[#1B6B7B]/10 px-2 py-1 rounded-full">
               Imported
             </span>
@@ -354,6 +364,7 @@ function FeedColumn({
   onOpenBook,
   selection,
   onToggleSelect,
+  currentUserId,
 }: {
   title:          string;
   tags:           CommunityTag[];
@@ -365,6 +376,7 @@ function FeedColumn({
   onOpenBook?:    OpenBookFn;
   selection:      Map<string, Set<string>>;
   onToggleSelect: (ct: CommunityTag, exportId: string) => void;
+  currentUserId?: string;
 }) {
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -399,6 +411,7 @@ function FeedColumn({
                 key={ct.id}
                 ct={ct}
                 isImported={subscribedIds.has(ct.id)}
+                isOwn={!!currentUserId && ct.user_id === currentUserId}
                 onImport={onImport}
                 onProfilePress={onProfilePress}
                 onOpenBook={onOpenBook}
@@ -551,6 +564,7 @@ function ProfileView({
                 key={ct.id}
                 ct={ct}
                 isImported={subscribedIds.has(ct.id)}
+                isOwn={ct.user_id === currentUserId}
                 onImport={onImport}
                 onProfilePress={() => {}}
                 onOpenBook={onOpenBook}
@@ -783,6 +797,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           onOpenBook={onOpenBook}
           selection={selectionIds}
           onToggleSelect={toggleSelect}
+          currentUserId={user?.id}
         />
         <div className="w-px bg-gray-200 shrink-0" />
         <FeedColumn
@@ -796,6 +811,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           onOpenBook={onOpenBook}
           selection={selectionIds}
           onToggleSelect={toggleSelect}
+          currentUserId={user?.id}
         />
       </div>
 
