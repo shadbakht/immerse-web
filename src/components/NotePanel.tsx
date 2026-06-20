@@ -55,7 +55,7 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
     >
       {/* Selection preview */}
       <div className="mx-5 mt-4 mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-        <p className="text-xs text-gray-500 line-clamp-2 italic">"{selectionText}"</p>
+        <p className="text-xs text-gray-500 line-clamp-2">"{selectionText}"</p>
       </div>
 
       {/* Note input */}

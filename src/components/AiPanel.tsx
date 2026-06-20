@@ -85,7 +85,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
           <div>
             {/* Selection preview */}
             <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100 mb-5">
-              <p className="text-xs text-gray-500 italic line-clamp-2">"{selectionText}"</p>
+              <p className="text-xs text-gray-500 line-clamp-2">"{selectionText}"</p>
             </div>
 
             {/* AI result */}

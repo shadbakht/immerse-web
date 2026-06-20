@@ -93,7 +93,7 @@ function XRefCard({
             {row.label}
           </button>
         ) : (
-          <button onClick={startEdit} className="flex-1 text-sm italic text-gray-400 text-left hover:text-gray-500 transition-colors">
+          <button onClick={startEdit} className="flex-1 text-sm text-gray-400 text-left hover:text-gray-500 transition-colors">
             Add label…
           </button>
         )}
@@ -110,7 +110,7 @@ function XRefCard({
       >
         {sides.map(side => (
           <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
-            <p className={`font-serif text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+            <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
             <p className="text-xs text-[#1B6B7B] font-medium leading-snug">

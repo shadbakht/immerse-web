@@ -194,7 +194,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
     >
       {/* Selection preview */}
       <div className="mx-5 mt-4 mb-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-        <p className="text-xs text-gray-500 line-clamp-2 italic">"{selectionText}"</p>
+        <p className="text-xs text-gray-500 line-clamp-2">"{selectionText}"</p>
       </div>
 
       {/* New tag input */}

@@ -110,7 +110,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Your selection</p>
             <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
-              <p className="text-sm text-gray-700 italic line-clamp-3">"{selectionText}"</p>
+              <p className="text-sm text-gray-700 line-clamp-3">"{selectionText}"</p>
             </div>
           </div>
 
@@ -136,7 +136,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
                   onClick={() => { setSelected(p); setStep(2); }}
                   className="w-full text-left bg-gray-50 hover:bg-[#1B6B7B]/5 border border-gray-100 hover:border-[#1B6B7B]/30 rounded-xl px-3 py-2.5 transition-colors"
                 >
-                  <p className="text-sm text-gray-800 line-clamp-2 italic">"{p.content.slice(0, 120)}…"</p>
+                  <p className="text-sm text-gray-800 line-clamp-2">"{p.content.slice(0, 120)}…"</p>
                   <p className="text-xs text-gray-400 mt-1">{citationFor(p)}</p>
                 </button>
               ))}
@@ -152,7 +152,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">From</p>
             <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
-              <p className="text-sm text-gray-700 italic">"{selectionText}"</p>
+              <p className="text-sm text-gray-700">"{selectionText}"</p>
             </div>
           </div>
 
@@ -167,7 +167,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">To</p>
               <div className="bg-[#1B6B7B]/5 rounded-xl px-3 py-2.5 border border-[#1B6B7B]/20">
-                <p className="text-sm text-gray-700 italic line-clamp-4">"{selected.content}"</p>
+                <p className="text-sm text-gray-700 line-clamp-4">"{selected.content}"</p>
                 <p className="text-xs text-[#1B6B7B] mt-1.5 font-medium">{citationFor(selected)}</p>
               </div>
             </div>
