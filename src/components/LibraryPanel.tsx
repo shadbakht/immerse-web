@@ -669,7 +669,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 <div className="bg-gray-50/30">
                   {importedBooks.length === 0 ? (
                     <p className="text-xs text-gray-400 pl-9 pr-4 py-3">
-                      No imported books yet. Use the upload button above to import a file.
+                      No imported books yet. Use the button near the search bar to import a book.
                     </p>
                   ) : (
                     importedBooks.map(book => (
