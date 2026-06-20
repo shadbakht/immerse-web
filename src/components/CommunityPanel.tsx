@@ -107,7 +107,7 @@ function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBo
   return (
     <div className="px-5 py-3">
       <p
-        className={`font-serif text-xs italic text-gray-700 leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
+        className={`font-serif text-sm italic text-gray-700 leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
         onClick={() => setExpanded(e => !e)}
       >
         &quot;{sel.snapshotText}&quot;
@@ -296,18 +296,14 @@ function TagCard({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {isOwn ? (
+          {(isOwn || isImported) ? (
             <button
               disabled
-              title="This is your own tag"
+              title={isOwn ? 'This is your own tag' : 'Already imported'}
               className="text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1 rounded-full cursor-not-allowed"
             >
-              Import
+              {isOwn ? 'Import' : 'Imported'}
             </button>
-          ) : isImported ? (
-            <span className="text-xs font-medium text-[#1B6B7B] bg-[#1B6B7B]/10 px-2 py-1 rounded-full">
-              Imported
-            </span>
           ) : (
             <button
               onClick={handleImport}

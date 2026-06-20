@@ -54,7 +54,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
     <div className="pl-9 pr-4 py-3 border-t border-gray-100 flex items-start gap-2">
       <div className="flex-1 min-w-0">
         <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-          <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+          <p className={`font-serif text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
             "<Highlight text={sel.snapshot_text} q={searchQuery} />"
           </p>
         </div>
@@ -281,6 +281,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     if (tag?.visibility === 'published') {
       await unpublishTag(id, userId).catch(() => {});
     }
+    // If this was an imported community tag, drop the subscription so its
+    // Import button re-activates in the Community screen.
+    await supabase.from('community_tag_subscriptions')
+      .delete().eq('subscriber_id', userId).eq('local_tag_id', id).then(undefined, () => {});
     await deleteRemote('tags', id).catch(() => {});
     setTags(tags.filter(t => t.id !== id));
     setSelectedTagIds(prev => { const n = new Set(prev); n.delete(id); return n; });
