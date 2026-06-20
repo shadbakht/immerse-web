@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   importCommunityTag,
@@ -10,6 +10,33 @@ import {
   unfollowUser,
   type CommunityTagRow,
 } from '@/lib/communitySync';
+import { exportAsDocx, exportAsPdf, type TagRow } from '@/lib/tagExport';
+
+const EMPTY_SET: Set<string> = new Set();
+
+/** Build export-ready TagRow[] from a community tag's payload, keeping only the
+ *  selected nodes (quotes + citations only — no notes/xrefs). */
+function payloadToTagRows(ct: CommunityTag, exportIds: Set<string>): TagRow[] {
+  const payload = Array.isArray(ct.payload) ? ct.payload : [];
+  return (payload as any[])
+    .filter(t => exportIds.has(t.exportId))
+    .map(t => ({
+      id:         `${ct.id}:${t.exportId}`,
+      name:       t.name,
+      parent_id:  t.parentExportId ? `${ct.id}:${t.parentExportId}` : null,
+      depth:      t.depth ?? 0,
+      sort_order: t.sortOrder ?? 0,
+      created_at: '',
+      visibility: 'published',
+      selections: (t.selections ?? []).map((s: any, i: number) => ({
+        id:            `${ct.id}:${t.exportId}:${i}`,
+        snapshot_text: s.snapshotText ?? '',
+        passage_id:    '',
+        book_id:       '',
+        citation:      s.citation ?? s.bookTitle ?? '',
+      })),
+    }));
+}
 
 interface CommunityTag extends CommunityTagRow {
   import_count: number;
@@ -109,6 +136,87 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// ── Payload tree helpers + tri-state checkbox ────────────────────────────────
+
+type CheckState = 'checked' | 'indeterminate' | 'unchecked';
+
+function childrenOf(payload: any[], exportId: string | null) {
+  return (payload ?? [])
+    .filter((t: any) => (t.parentExportId ?? null) === exportId)
+    .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.name).localeCompare(String(b.name)));
+}
+
+function rootNodeOf(payload: any[]) {
+  return (payload ?? []).find((t: any) => (t.parentExportId ?? null) === null) ?? (payload ?? [])[0];
+}
+
+function subtreeExportIds(payload: any[], exportId: string): string[] {
+  const out = [exportId];
+  const queue = [exportId];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const c of childrenOf(payload, cur)) { out.push(c.exportId); queue.push(c.exportId); }
+  }
+  return out;
+}
+
+function nodeCheckState(payload: any[], exportId: string, selectedIds: Set<string>): CheckState {
+  const ids = subtreeExportIds(payload, exportId);
+  const n = ids.filter(id => selectedIds.has(id)).length;
+  if (n === 0) return 'unchecked';
+  if (n === ids.length) return 'checked';
+  return 'indeterminate';
+}
+
+function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onChange(); }}
+      className="flex items-center justify-center shrink-0 w-7 h-7 -ml-1"
+    >
+      <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
+        state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
+        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300'
+      }`}>
+        {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+        {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}
+      </div>
+    </button>
+  );
+}
+
+// One sub-tag node (depth ≥ 1) inside a card: checkbox + name + count + chevron,
+// expandable into its own selections and nested children.
+function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenBook }: {
+  node: any; payload: any[]; depth: number;
+  selectedIds: Set<string>;
+  onToggleSelect: (exportId: string) => void;
+  onOpenBook?: OpenBookFn;
+}) {
+  const [open, setOpen] = useState(false);
+  const kids = childrenOf(payload, node.exportId);
+  const sels = node.selections ?? [];
+  return (
+    <div>
+      <div className="flex items-center gap-2 py-2 pr-4" style={{ paddingLeft: 16 + depth * 16 }}>
+        <Checkbox state={nodeCheckState(payload, node.exportId, selectedIds)} onChange={() => onToggleSelect(node.exportId)} />
+        <button className="flex-1 min-w-0 text-left text-sm text-gray-700 truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
+        <span className="text-xs text-gray-400 shrink-0">{sels.length}</span>
+        <span className={`text-gray-400 text-xs shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
+      </div>
+      {open && (
+        <div className="divide-y divide-gray-50 border-t border-gray-50">
+          {sels.map((sel: any, i: number) => <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />)}
+          {kids.map((c: any) => (
+            <SubTagNode key={c.exportId} node={c} payload={payload} depth={depth + 1}
+              selectedIds={selectedIds} onToggleSelect={onToggleSelect} onOpenBook={onOpenBook} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tag card (feed + profile views) ──────────────────────────────────────────
 
 function TagCard({
@@ -117,6 +225,8 @@ function TagCard({
   onImport,
   onProfilePress,
   onOpenBook,
+  selectedIds,
+  onToggleSelect,
   showAuthor = true,
 }: {
   ct:             CommunityTag;
@@ -124,16 +234,20 @@ function TagCard({
   onImport:       (ct: CommunityTag) => void;
   onProfilePress: (ct: CommunityTag) => void;
   onOpenBook?:    OpenBookFn;
+  selectedIds:    Set<string>;
+  onToggleSelect: (ct: CommunityTag, exportId: string) => void;
   showAuthor?:    boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [importing, setImporting] = useState(false);
   const displayName = ct.profiles?.username ?? 'Anonymous';
 
-  const allSelections = useMemo(() => {
-    if (!Array.isArray(ct.payload)) return [];
-    return ct.payload.flatMap((t: any) => t.selections ?? []);
-  }, [ct.payload]);
+  const payload = Array.isArray(ct.payload) ? ct.payload : [];
+  const root = rootNodeOf(payload);
+  const rootSels = root?.selections ?? [];
+  const childTags = root ? childrenOf(payload, root.exportId) : [];
+
+  const allSelections = useMemo(() => payload.flatMap((t: any) => t.selections ?? []), [payload]);
 
   const lastAddedAt = useMemo(() => {
     const dates = allSelections.map((s: any) => s.createdAt).filter(Boolean);
@@ -151,6 +265,12 @@ function TagCard({
   return (
     <div className="border-b border-gray-100">
       <div className="flex items-center px-4 py-3.5 gap-2">
+        {root && (
+          <Checkbox
+            state={nodeCheckState(payload, root.exportId, selectedIds)}
+            onChange={() => onToggleSelect(ct, root.exportId)}
+          />
+        )}
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => setExpanded(e => !e)}
@@ -174,8 +294,6 @@ function TagCard({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-gray-400">{ct.selection_count}</span>
-
           {isImported ? (
             <span className="text-xs font-medium text-[#1B6B7B] bg-[#1B6B7B]/10 px-2 py-1 rounded-full">
               Imported
@@ -190,6 +308,8 @@ function TagCard({
             </button>
           )}
 
+          <span className="text-xs text-gray-400">{ct.selection_count}</span>
+
           <span
             className={`text-gray-400 text-xs transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
             onClick={() => setExpanded(e => !e)}
@@ -199,10 +319,21 @@ function TagCard({
         </div>
       </div>
 
-      {expanded && allSelections.length > 0 && (
+      {expanded && (
         <div className="border-t border-gray-50 divide-y divide-gray-50">
-          {allSelections.map((sel: any, i: number) => (
+          {rootSels.map((sel: any, i: number) => (
             <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />
+          ))}
+          {childTags.map((c: any) => (
+            <SubTagNode
+              key={c.exportId}
+              node={c}
+              payload={payload}
+              depth={1}
+              selectedIds={selectedIds}
+              onToggleSelect={(exportId) => onToggleSelect(ct, exportId)}
+              onOpenBook={onOpenBook}
+            />
           ))}
         </div>
       )}
@@ -221,6 +352,8 @@ function FeedColumn({
   onImport,
   onProfilePress,
   onOpenBook,
+  selection,
+  onToggleSelect,
 }: {
   title:          string;
   tags:           CommunityTag[];
@@ -230,6 +363,8 @@ function FeedColumn({
   onImport:       (ct: CommunityTag) => void;
   onProfilePress: (ct: CommunityTag) => void;
   onOpenBook?:    OpenBookFn;
+  selection:      Map<string, Set<string>>;
+  onToggleSelect: (ct: CommunityTag, exportId: string) => void;
 }) {
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -267,6 +402,8 @@ function FeedColumn({
                 onImport={onImport}
                 onProfilePress={onProfilePress}
                 onOpenBook={onOpenBook}
+                selectedIds={selection.get(ct.id) ?? EMPTY_SET}
+                onToggleSelect={onToggleSelect}
               />
             ))}
           </div>
@@ -285,6 +422,8 @@ function ProfileView({
   onImport,
   onBack,
   onOpenBook,
+  selection,
+  onToggleSelect,
 }: {
   profile:       ProfileUser;
   currentUserId: string;
@@ -292,6 +431,8 @@ function ProfileView({
   onImport:      (ct: CommunityTagRow) => void;
   onBack:        () => void;
   onOpenBook?:   OpenBookFn;
+  selection:      Map<string, Set<string>>;
+  onToggleSelect: (ct: CommunityTag, exportId: string) => void;
 }) {
   const supabase      = createClient();
   const [tags, setTags]               = useState<CommunityTag[]>([]);
@@ -413,6 +554,8 @@ function ProfileView({
                 onImport={onImport}
                 onProfilePress={() => {}}
                 onOpenBook={onOpenBook}
+                selectedIds={selection.get(ct.id) ?? EMPTY_SET}
+                onToggleSelect={onToggleSelect}
                 showAuthor={false}
               />
             ))}
@@ -434,6 +577,65 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   const [searchQuery, setSearchQuery]     = useState('');
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [profileView, setProfileView]     = useState<ProfileUser | null>(null);
+
+  // Export selection: ctId → set of selected exportIds (tag nodes within that card).
+  const [selection, setSelection] = useState<Map<string, { ct: CommunityTag; ids: Set<string> }>>(new Map());
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Per-ct view of the selection (just the id sets) for passing to cards.
+  const selectionIds = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const [ctId, { ids }] of selection) m.set(ctId, ids);
+    return m;
+  }, [selection]);
+
+  const selectedCount = useMemo(
+    () => [...selection.values()].reduce((sum, { ids }) => sum + ids.size, 0),
+    [selection],
+  );
+
+  const toggleSelect = useCallback((ct: CommunityTag, exportId: string) => {
+    const payload = Array.isArray(ct.payload) ? ct.payload : [];
+    const ids = subtreeExportIds(payload, exportId);
+    setSelection(prev => {
+      const next = new Map(prev);
+      const cur = new Set(next.get(ct.id)?.ids ?? []);
+      const allSel = ids.every(id => cur.has(id));
+      if (allSel) ids.forEach(id => cur.delete(id));
+      else ids.forEach(id => cur.add(id));
+      if (cur.size === 0) next.delete(ct.id);
+      else next.set(ct.id, { ct, ids: cur });
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelection(new Map()), []);
+
+  async function handleExport(format: 'pdf' | 'docx') {
+    setShowExportMenu(false);
+    setExporting(true);
+    try {
+      const tagRows = [...selection.values()].flatMap(({ ct, ids }) => payloadToTagRows(ct, ids));
+      const opts = { includeNotes: false, includeXrefs: false };
+      if (format === 'pdf') await exportAsPdf(tagRows, opts);
+      else                  await exportAsDocx(tagRows, opts);
+    } catch (e) {
+      console.warn('[Community] export error:', e);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function onDown(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setShowExportMenu(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showExportMenu]);
 
   const loadSubscribedIds = useCallback(async () => {
     if (!user?.id) return;
@@ -508,6 +710,8 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         onImport={handleImport}
         onBack={() => setProfileView(null)}
         onOpenBook={onOpenBook}
+        selection={selectionIds}
+        onToggleSelect={toggleSelect}
       />
     );
   }
@@ -517,7 +721,42 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     <div className="h-full flex flex-col w-full relative">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
-        <h1 className="text-lg font-semibold text-gray-900 mb-3">Community</h1>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-semibold text-gray-900">Community</h1>
+          {selectedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <button onClick={clearSelection} className="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu(v => !v)}
+                  disabled={exporting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 disabled:opacity-60 transition-colors"
+                  title="Export selected tags"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  {exporting ? 'Exporting…' : `Export (${selectedCount})`}
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-20 min-w-[160px] py-1">
+                    {([{ label: 'PDF', format: 'pdf' }, { label: 'Word (.docx)', format: 'docx' }] as const).map(({ label, format }) => (
+                      <button
+                        key={format}
+                        onClick={() => handleExport(format)}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -525,7 +764,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search tags and users…"
+            placeholder={selectedCount > 0 ? 'Search selected tags…' : 'Search tags and users…'}
             className="w-full pl-9 pr-4 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
           />
         </div>
@@ -542,6 +781,8 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           onImport={handleImport}
           onProfilePress={handleProfilePress}
           onOpenBook={onOpenBook}
+          selection={selectionIds}
+          onToggleSelect={toggleSelect}
         />
         <div className="w-px bg-gray-200 shrink-0" />
         <FeedColumn
@@ -553,6 +794,8 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           onImport={handleImport}
           onProfilePress={handleProfilePress}
           onOpenBook={onOpenBook}
+          selection={selectionIds}
+          onToggleSelect={toggleSelect}
         />
       </div>
 

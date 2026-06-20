@@ -275,17 +275,14 @@ async function buildCommunityPayload(
       const primary = group.reduce((best, cur) =>
         cur.snapshotText.length > best.snapshotText.length ? cur : best,
       );
-      const notes = group.map(s => s._note).filter((n): n is string => n !== null);
-      const xrefSet = new Set<string>();
-      for (const s of group) s.xrefCitations.forEach(xc => xrefSet.add(xc));
-
+      // Privacy: notes and cross-references are never made public.
       selExports.push({
         snapshotText:  primary.snapshotText,
         bookId:        primary.bookId,
         bookTitle:     primary.bookTitle,
         citation:      primary.citation,
-        notes,
-        xrefCitations: [...xrefSet],
+        notes:         [],
+        xrefCitations: [],
         startPid:      primary.startPid,
         startOffset:   primary.startOffset,
         endPid:        primary.endPid,
