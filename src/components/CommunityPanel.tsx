@@ -107,7 +107,8 @@ function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBo
   return (
     <div className="px-5 py-3">
       <p
-        className={`font-serif text-sm text-gray-700 leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
+        className={`font-serif text-gray-700 leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
+        style={{ fontSize: 'var(--quote-font-size)' }}
         onClick={() => setExpanded(e => !e)}
       >
         &quot;{sel.snapshotText}&quot;

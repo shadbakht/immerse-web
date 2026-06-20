@@ -54,7 +54,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
     <div className="pl-9 pr-4 py-3 border-t border-gray-100 flex items-start gap-2">
       <div className="flex-1 min-w-0">
         <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-          <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+          <p className={`font-serif text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
             "<Highlight text={sel.snapshot_text} q={searchQuery} />"
           </p>
         </div>

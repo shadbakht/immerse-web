@@ -595,7 +595,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
                           {result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
-                        <p className="font-serif text-sm text-gray-700 leading-relaxed">
+                        <p className="font-serif text-gray-700 leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
                           {isExpanded ? highlightQuery(result.content, searchQuery) : highlightQuery(snippet, searchQuery)}
                         </p>
                         {isExpanded && (

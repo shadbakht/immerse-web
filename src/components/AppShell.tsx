@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { syncSubscribedTags, syncFollowedUsers } from '@/lib/communitySync';
+import { initFontSize } from '@/lib/fontSize';
 import type { User } from '@supabase/supabase-js';
 import Sidebar from './Sidebar';
 import LibraryPanel from './LibraryPanel';
@@ -51,6 +53,11 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   // Library is the only split-panel tab; everything else is full-width
   const isFullWidth = activeTab !== 'library';
   const userId = user?.id ?? '';
+
+  // Apply the reading/quote font size app-wide (local value first, then profile).
+  useEffect(() => {
+    initFontSize(createClient(), userId || null);
+  }, [userId]);
 
   // Silently sync subscribed and followed community tags on every page load
   useEffect(() => {

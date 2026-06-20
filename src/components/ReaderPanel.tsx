@@ -1201,7 +1201,8 @@ async function handleCopy() {
                   )}
                   <p
                     data-pid={passage.id}
-                    className="font-serif text-gray-800 leading-relaxed mb-4 text-[17px]"
+                    className="font-serif text-gray-800 leading-relaxed mb-4"
+                    style={{ fontSize: 'var(--quote-font-size)' }}
                   >
                     <PassageContent
                       text={passage.content}

@@ -110,7 +110,7 @@ function XRefCard({
       >
         {sides.map(side => (
           <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
-            <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+            <p className={`font-serif text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
             <p className="text-xs text-[#1B6B7B] font-medium leading-snug">

@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
+import { applyFontSize, type FontSize } from '@/lib/fontSize';
 import type { User } from '@supabase/supabase-js';
 
-type FontSize = 'Small' | 'Medium' | 'Large' | 'XL';
 type ColorMode = 'light' | 'dark' | 'system';
 
 const FONT_OPTIONS: { key: FontSize; size: number }[] = [
@@ -40,7 +40,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       loadProfile();
     } else if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('immerse_font_size') as FontSize | null;
-      if (saved) setFontSize(saved);
+      if (saved) { setFontSize(saved); applyFontSize(saved); }
       const savedColor = localStorage.getItem('immerse_color_mode');
       if (savedColor) setColorMode(savedColor as ColorMode);
     }
@@ -65,7 +65,9 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       .eq('id', user.id)
       .single();
     if (data) {
-      setFontSize((data.font_size as FontSize) ?? 'Large');
+      const loadedSize = (data.font_size as FontSize) ?? 'Large';
+      setFontSize(loadedSize);
+      applyFontSize(loadedSize);
       const paidPro = data.is_pro ?? false;
       const trial = !paidPro && isInTrial(user.created_at);
       setIsPro(paidPro || trial);
@@ -91,10 +93,9 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
 
   async function handleFontChange(size: FontSize) {
     setFontSize(size);
+    applyFontSize(size);   // updates --quote-font-size + localStorage immediately, app-wide
     if (user) {
       await supabase.from('profiles').update({ font_size: size }).eq('id', user.id);
-    } else {
-      if (typeof window !== 'undefined') localStorage.setItem('immerse_font_size', size);
     }
   }
 
