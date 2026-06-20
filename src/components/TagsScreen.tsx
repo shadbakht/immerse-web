@@ -505,7 +505,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         </div>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tags and passages…" className="w-full pl-9 pr-4 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50" />
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tags and passages…" className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50" />
+          {(searchQuery || selectedTagIds.size > 0) && (
+            <button onClick={() => { setSearchQuery(''); setSelectedTagIds(new Set()); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]">Clear</button>
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">

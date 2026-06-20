@@ -547,13 +547,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={selectedSlugs.size > 0 ? `Search ${selectedSlugs.size} selected book${selectedSlugs.size !== 1 ? 's' : ''}…` : 'Search all books…'}
-            className="w-full pl-9 pr-8 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
+            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
           />
-          {searchQuery && (
+          {(searchQuery || selectedSlugs.size > 0 || checkedResultIds.size > 0) && (
             <button
-              onClick={() => { setSearchQuery(''); setSearchResults([]); }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
-            >✕</button>
+              onClick={() => { setSearchQuery(''); setSearchResults([]); setSelectedSlugs(new Set()); setCheckedResultIds(new Set()); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]"
+            >Clear</button>
           )}
         </div>
       </div>
