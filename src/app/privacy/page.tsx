@@ -65,7 +65,7 @@ export default function PrivacyPage() {
         <p className="text-sm text-gray-600 leading-relaxed">We retain your data for as long as your account is active and as necessary to provide the App&apos;s services. If you delete your account, we will delete or anonymize your data within a reasonable timeframe, except where retention is required by law.</p>
 
         <Section title="11. Your Rights and Controls" />
-        <p className="text-sm text-gray-600 leading-relaxed">At any time, you may access, edit, or delete your annotations and content; change content between public and private; or delete your account. For assistance, contact us at <a href="mailto:immerseinterfaith@gmail.com" className="text-[#1B6B7B] hover:underline">immerseinterfaith@gmail.com</a>.</p>
+        <p className="text-sm text-gray-600 leading-relaxed">At any time, you may access, edit, or delete your annotations and content; change content between public and private; or delete your account. For assistance, contact us at <a href="mailto:support@immerseresearch.app" className="text-[#1B6B7B] hover:underline">support@immerseresearch.app</a>.</p>
 
         <Section title="12. Children's Privacy" />
         <p className="text-sm text-gray-600 leading-relaxed">Immerse is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that such data has been collected, we will delete it promptly.</p>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
         <p className="text-sm text-gray-600 leading-relaxed">We may update this Privacy Policy from time to time. Changes will be reflected by updating the &ldquo;Effective Date&rdquo; above. Continued use of the App constitutes acceptance of the updated policy.</p>
 
         <Section title="16. Contact Us" />
-        <p className="text-sm text-gray-600 leading-relaxed">If you have any questions about this Privacy Policy, contact us at: <a href="mailto:immerseinterfaith@gmail.com" className="text-[#1B6B7B] hover:underline">immerseinterfaith@gmail.com</a></p>
+        <p className="text-sm text-gray-600 leading-relaxed">If you have any questions about this Privacy Policy, contact us at: <a href="mailto:support@immerseresearch.app" className="text-[#1B6B7B] hover:underline">support@immerseresearch.app</a></p>
 
         {/* ── Terms of Service ── */}
         <hr className="my-10 border-gray-200" />
@@ -109,7 +109,7 @@ export default function PrivacyPage() {
         <p className="text-sm text-gray-600 leading-relaxed">You are solely responsible for content you make public. You agree not to post content that violates any applicable law, infringes intellectual property rights, is abusive, defamatory, hateful, or harmful, or is otherwise offensive or inappropriate. We reserve the right to remove any public content and to restrict or terminate accounts that violate these Terms.</p>
 
         <Section title="7. Intellectual Property" />
-        <p className="text-sm text-gray-600 leading-relaxed">The texts in the Immerse library are either in the public domain or used with permission. We do not claim ownership of these works. You agree not to upload or share content you do not have the legal right to use. If you believe content in the App infringes your rights, contact us at <a href="mailto:immerseinterfaith@gmail.com" className="text-[#1B6B7B] hover:underline">immerseinterfaith@gmail.com</a>.</p>
+        <p className="text-sm text-gray-600 leading-relaxed">The texts in the Immerse library are either in the public domain or used with permission. We do not claim ownership of these works. You agree not to upload or share content you do not have the legal right to use. If you believe content in the App infringes your rights, contact us at <a href="mailto:support@immerseresearch.app" className="text-[#1B6B7B] hover:underline">support@immerseresearch.app</a>.</p>
 
         <Section title="8. User-Imported Content" />
         <p className="text-sm text-gray-600 leading-relaxed">Pro subscribers may import their own books or documents. Imported files and their annotations remain on your device only and are not synced to our servers. You are responsible for ensuring you have the legal right to use and store any imported content. We do not verify ownership or licensing of imported materials.</p>
@@ -139,7 +139,7 @@ export default function PrivacyPage() {
         <p className="text-sm text-gray-600 leading-relaxed">These Terms are governed by and interpreted in accordance with the laws of the Province of British Columbia, Canada.</p>
 
         <Section title="17. Contact" />
-        <p className="text-sm text-gray-600 leading-relaxed">If you have any questions about these Terms, contact us at: <a href="mailto:immerseinterfaith@gmail.com" className="text-[#1B6B7B] hover:underline">immerseinterfaith@gmail.com</a></p>
+        <p className="text-sm text-gray-600 leading-relaxed">If you have any questions about these Terms, contact us at: <a href="mailto:support@immerseresearch.app" className="text-[#1B6B7B] hover:underline">support@immerseresearch.app</a></p>
 
         {/* ── Community Guidelines ── */}
         <hr className="my-10 border-gray-200" />
