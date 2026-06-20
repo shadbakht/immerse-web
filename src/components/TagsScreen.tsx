@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
@@ -13,16 +13,20 @@ interface TagsScreenProps {
   onOpenBook: (bookId: string, passageId?: string) => void;
 }
 
-function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+type CheckState = 'checked' | 'indeterminate' | 'unchecked';
+
+function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void }) {
   return (
     <button
       onClick={e => { e.stopPropagation(); onChange(); }}
       className="flex items-center justify-center shrink-0 w-8 h-8 -ml-1"
     >
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
-        checked ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'
+        state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
+        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300'
       }`}>
-        {checked && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+        {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+        {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}
       </div>
     </button>
   );
@@ -73,9 +77,9 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   );
 }
 
-function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth, hasChildren, isOpen, onToggleOpen }: {
+function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth, hasChildren, isOpen, onToggleOpen }: {
   tag: TagRow;
-  isSelected: boolean;
+  selectState: CheckState;
   onToggleSelect: () => void;
   searchQuery: string;
   onOpenBook: (b: string, p?: string) => void;
@@ -150,7 +154,7 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
         style={{ paddingLeft: rowPaddingLeft }}
         onClick={() => onToggleOpen?.()}
       >
-        <Checkbox checked={isSelected} onChange={onToggleSelect} />
+        <Checkbox state={selectState} onChange={onToggleSelect} />
         <span className="flex-1 text-sm font-medium text-gray-800 truncate ml-1 min-w-0">
           <Highlight text={tag.name} q={searchQuery} />
         </span>
@@ -328,10 +332,15 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     }
   }
 
+  // Toggle a tag and its whole subtree together (cascade), mirroring the Library
+  // checkboxes: if every tag in the subtree is selected, clear them; else select all.
   function toggleSelectTag(id: string) {
+    const ids = subtreeIds(id);
     setSelectedTagIds(prev => {
+      const allChecked = ids.every(i => prev.has(i));
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (allChecked) ids.forEach(i => next.delete(i));
+      else ids.forEach(i => next.add(i));
       return next;
     });
   }
@@ -357,6 +366,36 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     for (const t of tags) { if (t.parent_id) s.add(t.parent_id); }
     return s;
   }, [tags]);
+
+  // Map each tag to its direct children, for cascading selection over a subtree.
+  const childrenByParent = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const t of tags) {
+      const p = t.parent_id ?? null;
+      if (p) { if (!m.has(p)) m.set(p, []); m.get(p)!.push(t.id); }
+    }
+    return m;
+  }, [tags]);
+
+  // A tag's own id plus all descendant ids (BFS).
+  const subtreeIds = useCallback((id: string): string[] => {
+    const out = [id];
+    const queue = [id];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const c of (childrenByParent.get(cur) ?? [])) { out.push(c); queue.push(c); }
+    }
+    return out;
+  }, [childrenByParent]);
+
+  // Checkbox state for a tag, derived from its subtree (like the Library panel).
+  const tagCheckState = useCallback((id: string): CheckState => {
+    const ids = subtreeIds(id);
+    const n = ids.filter(i => selectedTagIds.has(i)).length;
+    if (n === 0) return 'unchecked';
+    if (n === ids.length) return 'checked';
+    return 'indeterminate';
+  }, [subtreeIds, selectedTagIds]);
 
   // For the export panel: are any of the selected tags' selections linked to notes / xrefs?
   const hasNotesForSelectedTags = useMemo(() =>
@@ -480,7 +519,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                 hasChildren={hasChildrenSet.has(tag.id)}
                 isOpen={openTagIds.has(tag.id)}
                 onToggleOpen={() => toggleOpenTag(tag.id)}
-                isSelected={selectedTagIds.has(tag.id)}
+                selectState={tagCheckState(tag.id)}
                 onToggleSelect={() => toggleSelectTag(tag.id)}
                 searchQuery={searchQuery}
                 onOpenBook={onOpenBook}
