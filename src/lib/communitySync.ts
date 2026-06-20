@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { buildCitation } from '@/lib/citationUtils';
 
 export interface ImmTagExport {
   exportId:       string;
@@ -66,6 +67,290 @@ function buildTagIdMap(
     match(rootExport.exportId, rootLocal.id);
   }
   return result;
+}
+
+// ─── Publisher ──────────────────────────────────────────────────────────────────
+// Mirrors mobile buildImmPayload + publishTag/unpublishTag so a tag published from
+// the web produces a byte-compatible payload that subscribers on either platform
+// import identically.
+
+interface PublishSelection {
+  snapshotText:  string;
+  bookId:        string;
+  bookTitle:     string;
+  citation:      string;      // raw "— …." form, matching mobile formatCitation
+  notes:         string[];
+  xrefCitations: string[];
+  startPid:      string;
+  startOffset:   number;
+  endPid:        string;
+  endOffset:     number;
+  createdAt:     string;
+}
+
+interface PublishTagExport {
+  exportId:       string;
+  name:           string;
+  color:          string | null;
+  parentExportId: string | null;
+  depth:          number;
+  sortOrder:      number;
+  selections:     PublishSelection[];
+}
+
+type TagSubtreeRow = { id: string; parent_id: string | null };
+
+/** Collect a tag's id plus all descendant ids from a flat parent_id list (BFS). */
+function getSubtreeIds(rootId: string, allTags: TagSubtreeRow[]): string[] {
+  const result = [rootId];
+  const queue  = [rootId];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const k of allTags.filter(t => t.parent_id === cur)) {
+      result.push(k.id);
+      queue.push(k.id);
+    }
+  }
+  return result;
+}
+
+/** Wrap a passage+book into the mobile "— …." citation form. */
+function rawCitation(passage: any, book: any): string {
+  return `— ${buildCitation(passage, book, book?.authors?.name ?? null)}.`;
+}
+
+/**
+ * Build the ImmTagExport[] community payload for a tag subtree.
+ * Groups selections by paragraph (startPid) and attaches citations, notes, and
+ * xref citations — exactly like mobile buildImmPayload. Selections whose book is
+ * user-imported are stripped (privacy: imported books never reach the community).
+ */
+async function buildCommunityPayload(
+  subtreeTagIds: string[],
+  userId: string,
+): Promise<{ tags: PublishTagExport[]; selectionCount: number }> {
+  const supabase = createClient();
+
+  // 1. Subtree tag rows, kept in subtree (BFS) order for stable exportIds.
+  const { data: tagRows } = await supabase
+    .from('tags')
+    .select('id, name, parent_id, depth, sort_order')
+    .in('id', subtreeTagIds);
+  const tagById = new Map<string, any>();
+  for (const t of (tagRows ?? []) as any[]) tagById.set(t.id, t);
+  const orderedTags = subtreeTagIds.map(id => tagById.get(id)).filter(Boolean);
+
+  const exportIdMap: Record<string, string> = {};
+  orderedTags.forEach((t, i) => { exportIdMap[t.id] = `t${i}`; });
+
+  // 2. selection_tags for the subtree → selection ids per tag.
+  const { data: stRows } = await supabase
+    .from('selection_tags')
+    .select('tag_id, selection_id')
+    .in('tag_id', subtreeTagIds);
+  const selIdsByTag = new Map<string, string[]>();
+  const subtreeSelIds = new Set<string>();
+  for (const st of (stRows ?? []) as any[]) {
+    if (!selIdsByTag.has(st.tag_id)) selIdsByTag.set(st.tag_id, []);
+    selIdsByTag.get(st.tag_id)!.push(st.selection_id);
+    subtreeSelIds.add(st.selection_id);
+  }
+  const subtreeSelIdList = [...subtreeSelIds];
+
+  // 3. xrefs touching the subtree selections (need the "other" side for citations).
+  const xrefTargetsBySel = new Map<string, Set<string>>();
+  const xrefTargetIds = new Set<string>();
+  if (subtreeSelIdList.length) {
+    const inList = subtreeSelIdList.join(',');
+    const { data: xrefRows } = await supabase
+      .from('xrefs')
+      .select('selection_a_id, selection_b_id')
+      .or(`selection_a_id.in.(${inList}),selection_b_id.in.(${inList})`);
+    for (const x of (xrefRows ?? []) as any[]) {
+      const link = (selId: string, otherId: string) => {
+        if (!subtreeSelIds.has(selId)) return;
+        if (!xrefTargetsBySel.has(selId)) xrefTargetsBySel.set(selId, new Set());
+        xrefTargetsBySel.get(selId)!.add(otherId);
+        xrefTargetIds.add(otherId);
+      };
+      link(x.selection_a_id, x.selection_b_id);
+      link(x.selection_b_id, x.selection_a_id);
+    }
+  }
+
+  // 4. Bulk-fetch every selection we touch (subtree + xref targets) and its metadata.
+  const allSelIds = [...new Set([...subtreeSelIdList, ...xrefTargetIds])];
+  const selMap: Record<string, any> = {};
+  if (allSelIds.length) {
+    const { data: selData } = await supabase
+      .from('selections')
+      .select('id, book_local_id, start_pid, end_pid, start_offset, end_offset, snapshot_text, created_at, passage_id')
+      .in('id', allSelIds);
+    for (const s of (selData ?? []) as any[]) selMap[s.id] = s;
+  }
+
+  const passageIds = [...new Set(Object.values(selMap).map((s: any) => s.passage_id).filter(Boolean))];
+  const passMap: Record<string, any> = {};
+  if (passageIds.length) {
+    const { data: passData } = await supabase
+      .from('passages')
+      .select('id, book_id, chapter_label, section_title, paragraph_number')
+      .in('id', passageIds);
+    for (const p of (passData ?? []) as any[]) passMap[p.id] = p;
+  }
+
+  const bookIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
+  const bookMap: Record<string, any> = {};
+  if (bookIds.length) {
+    const { data: bookData } = await supabase
+      .from('books')
+      .select('id, title, citation_format, is_user_imported, authors(name)')
+      .in('id', bookIds);
+    for (const b of (bookData ?? []) as any[]) bookMap[b.id] = b;
+  }
+
+  const noteMap: Record<string, string> = {};
+  if (subtreeSelIdList.length) {
+    const { data: noteData } = await supabase
+      .from('notes')
+      .select('selection_id, content')
+      .in('selection_id', subtreeSelIdList);
+    for (const n of (noteData ?? []) as any[]) noteMap[n.selection_id] = n.content;
+  }
+
+  // 5. Assemble each tag's selections, grouped by paragraph like mobile.
+  const tagExports: PublishTagExport[] = [];
+  let selectionCount = 0;
+
+  for (const tag of orderedTags) {
+    type RawSel = PublishSelection & { _note: string | null };
+    const rawSels: RawSel[] = [];
+
+    for (const selId of (selIdsByTag.get(tag.id) ?? [])) {
+      const sel = selMap[selId];
+      if (!sel) continue;
+      const passage = sel.passage_id ? passMap[sel.passage_id] : null;
+      const book    = passage ? bookMap[passage.book_id] : null;
+      if (book?.is_user_imported) continue;   // privacy: imported books stay local
+
+      const xrefCitations: string[] = [];
+      for (const targetId of (xrefTargetsBySel.get(selId) ?? [])) {
+        const ts = selMap[targetId];
+        if (!ts) continue;
+        const tp = ts.passage_id ? passMap[ts.passage_id] : null;
+        const tb = tp ? bookMap[tp.book_id] : null;
+        if (!tb) continue;
+        xrefCitations.push(rawCitation(tp, tb));
+      }
+
+      rawSels.push({
+        snapshotText:  sel.snapshot_text ?? '',
+        bookId:        sel.book_local_id ?? '',
+        bookTitle:     book?.title ?? sel.book_local_id ?? '',
+        citation:      rawCitation(passage, book),
+        notes:         [],
+        _note:         noteMap[selId] ?? null,
+        xrefCitations,
+        startPid:      sel.start_pid ?? '',
+        startOffset:   sel.start_offset ?? 0,
+        endPid:        sel.end_pid ?? sel.start_pid ?? '',
+        endOffset:     sel.end_offset ?? 0,
+        createdAt:     sel.created_at,
+      });
+    }
+
+    // Newest first, matching the Tags screen order.
+    rawSels.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    // Group by startPid: merge same-paragraph selections into one block, keeping
+    // the longest quote and collecting each sub-selection's note + xref citations.
+    const pidGroups = new Map<string, RawSel[]>();
+    for (const s of rawSels) {
+      if (!pidGroups.has(s.startPid)) pidGroups.set(s.startPid, []);
+      pidGroups.get(s.startPid)!.push(s);
+    }
+
+    const selExports: PublishSelection[] = [];
+    for (const group of pidGroups.values()) {
+      const primary = group.reduce((best, cur) =>
+        cur.snapshotText.length > best.snapshotText.length ? cur : best,
+      );
+      const notes = group.map(s => s._note).filter((n): n is string => n !== null);
+      const xrefSet = new Set<string>();
+      for (const s of group) s.xrefCitations.forEach(xc => xrefSet.add(xc));
+
+      selExports.push({
+        snapshotText:  primary.snapshotText,
+        bookId:        primary.bookId,
+        bookTitle:     primary.bookTitle,
+        citation:      primary.citation,
+        notes,
+        xrefCitations: [...xrefSet],
+        startPid:      primary.startPid,
+        startOffset:   primary.startOffset,
+        endPid:        primary.endPid,
+        endOffset:     primary.endOffset,
+        createdAt:     group[0].createdAt,
+      });
+    }
+
+    selectionCount += selExports.length;
+    tagExports.push({
+      exportId:       exportIdMap[tag.id],
+      name:           tag.name,
+      color:          null,
+      parentExportId: tag.parent_id ? (exportIdMap[tag.parent_id] ?? null) : null,
+      depth:          tag.depth,
+      sortOrder:      tag.sort_order,
+      selections:     selExports,
+    });
+  }
+
+  return { tags: tagExports, selectionCount };
+}
+
+/**
+ * Push a tag + its full subtree to the community (idempotent upsert).
+ * Mirrors mobile publishTag.
+ */
+export async function publishTag(rootTag: { id: string; name: string }, userId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: allTagsData } = await supabase
+    .from('tags')
+    .select('id, parent_id')
+    .eq('user_id', userId);
+  const subtreeIds = getSubtreeIds(rootTag.id, (allTagsData ?? []) as TagSubtreeRow[]);
+
+  const { tags, selectionCount } = await buildCommunityPayload(subtreeIds, userId);
+
+  const { error } = await supabase
+    .from('community_tags')
+    .upsert(
+      {
+        user_id:         userId,
+        tag_id:          rootTag.id,
+        name:            rootTag.name,
+        payload:         tags,
+        selection_count: selectionCount,
+        updated_at:      new Date().toISOString(),
+      },
+      { onConflict: 'user_id,tag_id' },
+    );
+  if (error) throw error;
+}
+
+/**
+ * Remove a tag from the community feed. Subscribers keep their local copies.
+ * Mirrors mobile unpublishTag.
+ */
+export async function unpublishTag(rootTagId: string, userId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('community_tags')
+    .delete()
+    .eq('user_id', userId)
+    .eq('tag_id', rootTagId);
+  if (error) throw error;
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────

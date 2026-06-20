@@ -110,11 +110,11 @@ function XRefCard({
       >
         {sides.map(side => (
           <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
-            <p className="text-xs text-[#1B6B7B] font-medium leading-snug truncate">
-              <Highlight text={side.citation} q={searchQuery} />
-            </p>
             <p className={`font-serif text-sm italic text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
+            </p>
+            <p className="text-xs text-[#1B6B7B] font-medium leading-snug">
+              <Highlight text={side.citation} q={searchQuery} />
             </p>
             {expanded && side.bookId && (
               <button

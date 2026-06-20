@@ -106,7 +106,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
           {activeTab === 'notes'     && !user && <SignInPrompt message="Attach personal notes to any passage you've highlighted." />}
           {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBook} />}
           {activeTab === 'xrefs'     && !user && <SignInPrompt message="Link passages across different books and traditions." />}
-          {activeTab === 'community' && <CommunityPanel user={user} />}
+          {activeTab === 'community' && <CommunityPanel user={user} onOpenBook={openBook} />}
         </div>
       ) : (
         <>

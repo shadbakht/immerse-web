@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
+import { publishTag, unpublishTag } from '@/lib/communitySync';
 import { exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 
@@ -48,14 +49,14 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   return (
     <div className="pl-9 pr-4 py-3 border-t border-gray-100 flex items-start gap-2">
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
-          <Highlight text={sel.citation} q={searchQuery} />
-        </p>
         <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
           <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
             "<Highlight text={sel.snapshot_text} q={searchQuery} />"
           </p>
         </div>
+        <p className="text-xs text-[#1B6B7B] font-medium mt-1">
+          <Highlight text={sel.citation} q={searchQuery} />
+        </p>
         {expanded && sel.book_id && (
           <button
             onClick={() => onOpenBook(sel.book_id, sel.passage_id)}
@@ -98,9 +99,9 @@ function TagCard({ tag, isSelected, onToggleSelect, searchQuery, onOpenBook, onD
       onClick: () => setRenaming(true),
     },
     {
-      label: tag.visibility === 'public' ? 'Set Private' : 'Set Public',
-      icon: tag.visibility === 'public' ? '🔓' : '🔒',
-      onClick: () => onToggleVisibility(tag.id, tag.visibility === 'public' ? 'private' : 'public'),
+      label: tag.visibility === 'published' ? 'Set Private' : 'Set Public',
+      icon: tag.visibility === 'published' ? '🔓' : '🔒',
+      onClick: () => onToggleVisibility(tag.id, tag.visibility === 'published' ? 'private' : 'published'),
     },
     {
       label: 'Delete',
@@ -272,6 +273,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   }
 
   async function handleDeleteTag(id: string) {
+    const tag = tags.find(t => t.id === id);
+    if (tag?.visibility === 'published') {
+      await unpublishTag(id, userId).catch(() => {});
+    }
     await deleteRemote('tags', id).catch(() => {});
     setTags(tags.filter(t => t.id !== id));
     setSelectedTagIds(prev => { const n = new Set(prev); n.delete(id); return n; });
@@ -300,15 +305,26 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
 
   async function handleToggleVisibility(id: string, visibility: string) {
     const tag = tags.find(t => t.id === id);
-    if (tag) {
-      await pushTag({
-        id: tag.id,
-        user_id: userId,
-        name: tag.name,
-        visibility,
-        updated_at: new Date().toISOString(),
-      }).catch(() => {});
-      setTags(tags.map(t => t.id === id ? { ...t, visibility } : t));
+    if (!tag) return;
+    const wasPublished = tag.visibility === 'published';
+    await pushTag({
+      id: tag.id,
+      user_id: userId,
+      name: tag.name,
+      visibility,
+      updated_at: new Date().toISOString(),
+    }).catch(() => {});
+    setTags(tags.map(t => t.id === id ? { ...t, visibility } : t));
+
+    // Add/remove the community_tags row so Community membership stays in sync.
+    try {
+      if (visibility === 'published') {
+        await publishTag({ id: tag.id, name: tag.name }, userId);
+      } else if (wasPublished) {
+        await unpublishTag(tag.id, userId);
+      }
+    } catch (e) {
+      console.warn('[Community] publish/unpublish error:', e);
     }
   }
 

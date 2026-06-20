@@ -24,9 +24,80 @@ interface ProfileUser {
 
 interface CommunityPanelProps {
   user: import('@supabase/supabase-js').User | null;
+  onOpenBook?: (bookId: string, passageId?: string) => void;
 }
 
+type OpenBookFn = (bookId: string, passageId?: string) => void;
+
 const PAGE_SIZE = 20;
+
+/**
+ * Open a community-payload selection in the reader. The payload carries mobile
+ * slugs (`bookId`) and text pids (`startPid`), so resolve them to the web's
+ * book/passage UUIDs via book_slug_map + passage_pid_map. Falls back to opening
+ * the book at the top if the pid isn't mapped.
+ */
+async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
+  const slug = sel?.bookId as string | undefined;
+  const pid  = sel?.startPid as string | undefined;
+  if (!slug) return;
+
+  const supabase = createClient();
+  const { data: bookRow } = await supabase
+    .from('book_slug_map')
+    .select('book_id')
+    .eq('local_id', slug)
+    .maybeSingle();
+  const bookUuid = (bookRow as { book_id?: string } | null)?.book_id;
+  if (!bookUuid) return;
+
+  let passageUuid: string | undefined;
+  if (pid) {
+    const { data: pidRow } = await supabase
+      .from('passage_pid_map')
+      .select('passage_id')
+      .eq('pid', pid)
+      .maybeSingle();
+    passageUuid = (pidRow as { passage_id?: string } | null)?.passage_id;
+  }
+  onOpenBook(bookUuid, passageUuid);
+}
+
+// ── One expandable quote (feed + profile) ────────────────────────────────────
+
+function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBookFn }) {
+  const [expanded, setExpanded] = useState(false);
+  const [opening, setOpening]   = useState(false);
+  const citation = sel.citation ?? sel.bookTitle;
+
+  async function handleOpen() {
+    if (!onOpenBook || opening) return;
+    setOpening(true);
+    try { await openCommunitySelection(sel, onOpenBook); }
+    finally { setOpening(false); }
+  }
+
+  return (
+    <div className="px-5 py-3">
+      <p
+        className={`font-serif text-xs italic text-gray-700 leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
+        onClick={() => setExpanded(e => !e)}
+      >
+        &quot;{sel.snapshotText}&quot;
+      </p>
+      {citation && <p className="text-xs text-gray-400 mt-1">{citation}</p>}
+      {expanded && onOpenBook && sel.bookId && (
+        <button
+          onClick={handleOpen}
+          disabled={opening}
+          className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline disabled:opacity-60"
+        >
+          {opening ? 'Opening…' : 'Open in reader →'}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function formatDate(iso: string) {
   const d    = new Date(iso);
@@ -45,12 +116,14 @@ function TagCard({
   isImported,
   onImport,
   onProfilePress,
+  onOpenBook,
   showAuthor = true,
 }: {
   ct:             CommunityTag;
   isImported:     boolean;
   onImport:       (ct: CommunityTag) => void;
   onProfilePress: (ct: CommunityTag) => void;
+  onOpenBook?:    OpenBookFn;
   showAuthor?:    boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -129,12 +202,7 @@ function TagCard({
       {expanded && allSelections.length > 0 && (
         <div className="border-t border-gray-50 divide-y divide-gray-50">
           {allSelections.map((sel: any, i: number) => (
-            <div key={i} className="px-5 py-3">
-              <p className="font-serif text-xs italic text-gray-700 leading-relaxed line-clamp-3">"{sel.snapshotText}"</p>
-              {(sel.citation || sel.bookTitle) && (
-                <p className="text-xs text-gray-400 mt-1">{sel.citation ?? sel.bookTitle}</p>
-              )}
-            </div>
+            <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />
           ))}
         </div>
       )}
@@ -152,6 +220,7 @@ function FeedColumn({
   subscribedIds,
   onImport,
   onProfilePress,
+  onOpenBook,
 }: {
   title:          string;
   tags:           CommunityTag[];
@@ -160,6 +229,7 @@ function FeedColumn({
   subscribedIds:  Set<string>;
   onImport:       (ct: CommunityTag) => void;
   onProfilePress: (ct: CommunityTag) => void;
+  onOpenBook?:    OpenBookFn;
 }) {
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -196,6 +266,7 @@ function FeedColumn({
                 isImported={subscribedIds.has(ct.id)}
                 onImport={onImport}
                 onProfilePress={onProfilePress}
+                onOpenBook={onOpenBook}
               />
             ))}
           </div>
@@ -213,12 +284,14 @@ function ProfileView({
   subscribedIds,
   onImport,
   onBack,
+  onOpenBook,
 }: {
   profile:       ProfileUser;
   currentUserId: string;
   subscribedIds: Set<string>;
   onImport:      (ct: CommunityTagRow) => void;
   onBack:        () => void;
+  onOpenBook?:   OpenBookFn;
 }) {
   const supabase      = createClient();
   const [tags, setTags]               = useState<CommunityTag[]>([]);
@@ -296,19 +369,26 @@ function ProfileView({
           </div>
         </div>
 
-        {profile.userId !== currentUserId && (
+        <div className="flex items-center gap-2 shrink-0">
+          {profile.userId !== currentUserId && (
+            <span className="text-[10px] leading-tight text-gray-400 text-right max-w-[120px]">
+              Auto-imports user&apos;s public tags to your app
+            </span>
+          )}
           <button
-            onClick={handleFollowToggle}
-            disabled={followLoading}
-            className={`shrink-0 text-xs font-semibold px-4 py-1.5 rounded-full border-[1.5px] transition-colors disabled:opacity-50 ${
-              isFollowing
-                ? 'bg-[#1B6B7B] border-[#1B6B7B] text-white'
-                : 'border-[#1B6B7B] text-[#1B6B7B] hover:bg-[#1B6B7B]/5'
+            onClick={profile.userId === currentUserId ? undefined : handleFollowToggle}
+            disabled={profile.userId === currentUserId || followLoading}
+            className={`text-xs font-semibold px-4 py-1.5 rounded-full border-[1.5px] transition-colors disabled:opacity-60 ${
+              profile.userId === currentUserId
+                ? 'border-gray-300 text-gray-400 cursor-not-allowed'
+                : isFollowing
+                  ? 'bg-[#1B6B7B] border-[#1B6B7B] text-white'
+                  : 'border-[#1B6B7B] text-[#1B6B7B] hover:bg-[#1B6B7B]/5'
             }`}
           >
-            {followLoading ? '…' : isFollowing ? 'Following' : 'Follow'}
+            {profile.userId === currentUserId ? 'Follow' : followLoading ? '…' : isFollowing ? 'Unfollow' : 'Follow'}
           </button>
-        )}
+        </div>
       </div>
 
       {/* Tag list */}
@@ -332,6 +412,7 @@ function ProfileView({
                 isImported={subscribedIds.has(ct.id)}
                 onImport={onImport}
                 onProfilePress={() => {}}
+                onOpenBook={onOpenBook}
                 showAuthor={false}
               />
             ))}
@@ -344,7 +425,7 @@ function ProfileView({
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function CommunityPanel({ user }: CommunityPanelProps) {
+export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps) {
   const supabase = createClient();
   const [recentTags, setRecentTags]       = useState<CommunityTag[]>([]);
   const [trendingTags, setTrendingTags]   = useState<CommunityTag[]>([]);
@@ -426,6 +507,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
         subscribedIds={subscribedIds}
         onImport={handleImport}
         onBack={() => setProfileView(null)}
+        onOpenBook={onOpenBook}
       />
     );
   }
@@ -459,6 +541,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
           subscribedIds={subscribedIds}
           onImport={handleImport}
           onProfilePress={handleProfilePress}
+          onOpenBook={onOpenBook}
         />
         <div className="w-px bg-gray-200 shrink-0" />
         <FeedColumn
@@ -469,6 +552,7 @@ export default function CommunityPanel({ user }: CommunityPanelProps) {
           subscribedIds={subscribedIds}
           onImport={handleImport}
           onProfilePress={handleProfilePress}
+          onOpenBook={onOpenBook}
         />
       </div>
 
