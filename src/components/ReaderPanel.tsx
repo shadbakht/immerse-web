@@ -587,7 +587,16 @@ async function handleCopy() {
 
     let citation = '';
     const fmt = book?.citationFormat ?? 'author_book_paragraph';
-    if (fmt === 'scripture_sura_verse') {
+    // Bahá'í Prayers: cite by sub-chapter only (no author), e.g.
+    // "— Bahá'í Prayers, Aid and Assistance, p.3." Mirrors the mobile app.
+    const BAHAI_PRAYERS_ID = '0585a670-a168-49e5-a748-44c040ec33d4';
+    if (target?.bookId === BAHAI_PRAYERS_ID) {
+      const cl = passage?.chapter_label ?? '';
+      const ci = cl.indexOf(',');
+      const sub = (ci >= 0 ? cl.slice(ci + 1) : cl).trim();
+      const para = passage?.paragraph_number ? `p.${passage.paragraph_number}` : null;
+      citation = '— ' + [book?.title, sub || null, para].filter(Boolean).join(', ');
+    } else if (fmt === 'scripture_sura_verse') {
       const chapterNum = passage?.chapter_label?.match(/\d+/)?.[0] ?? '';
       const verse = passage?.paragraph_number ? String(passage.paragraph_number) : '';
       const loc = chapterNum && verse ? `${chapterNum}:${verse}` : chapterNum || verse;
