@@ -286,7 +286,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
               <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
                 <span className="text-xs text-gray-400">Version</span>
-                <span className="text-sm text-gray-500">1.0.4</span>
+                <span className="text-sm text-gray-500">1.0.6</span>
               </div>
               <div className="px-5 py-4 flex items-center justify-between">
                 <span className="text-xs text-gray-400">Privacy Policy</span>
