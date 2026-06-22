@@ -35,6 +35,7 @@ interface BookMeta {
 const NESTED_TOC_BOOKS = new Set<string>([
   '560e3d01-91f7-4cb6-9d88-5d9689ec353e', // The World Order of Bahá'u'lláh
   '19962b29-69bf-4c6a-b93c-7a885c50ad16', // Paris Talks (3 Parts → talks)
+  '723f4d43-cb81-4e72-b6f0-c74211586048', // The Summons of the Lord of Hosts (Súriy-i-Haykal → 5 king tablets)
 ]);
 
 interface TocEntry {
