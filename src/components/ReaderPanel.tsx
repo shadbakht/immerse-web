@@ -34,6 +34,7 @@ interface BookMeta {
 // keep their flat TOC.
 const NESTED_TOC_BOOKS = new Set<string>([
   '560e3d01-91f7-4cb6-9d88-5d9689ec353e', // The World Order of Bahá'u'lláh
+  '19962b29-69bf-4c6a-b93c-7a885c50ad16', // Paris Talks (3 Parts → talks)
 ]);
 
 interface TocEntry {
