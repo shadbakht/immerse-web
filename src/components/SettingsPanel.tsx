@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
 import { applyFontSize, type FontSize } from '@/lib/fontSize';
 import type { User } from '@supabase/supabase-js';
+import pkg from '../../package.json';
+
+// Single source of truth for the displayed version: package.json.
+const APP_VERSION = pkg.version;
 
 type ColorMode = 'light' | 'dark' | 'system';
 
@@ -286,7 +290,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
               <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50">
                 <span className="text-xs text-gray-400">Version</span>
-                <span className="text-sm text-gray-500">1.0.6</span>
+                <span className="text-sm text-gray-500">{APP_VERSION}</span>
               </div>
               <div className="px-5 py-4 flex items-center justify-between">
                 <span className="text-xs text-gray-400">Privacy Policy</span>
