@@ -29,6 +29,13 @@ interface BookMeta {
   citationFormat: string;
 }
 
+// Books whose TOC is genuinely two-level (chapter_label = chapter, section_title =
+// sub-chapter). Opt-in by UUID so other books that use section_title for rubrics
+// keep their flat TOC.
+const NESTED_TOC_BOOKS = new Set<string>([
+  '560e3d01-91f7-4cb6-9d88-5d9689ec353e', // The World Order of Bahá'u'lláh
+]);
+
 interface TocEntry {
   label: string;
   passageId: string;
@@ -477,6 +484,22 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
           }
           const num = p.paragraph_number == null ? /^\s*(\d+)\.?\s*$/.exec(p.content || '') : null;
           if (num) tocEntries.push({ label: num[1], passageId: p.id, depth: 1 });
+        }
+      } else if (NESTED_TOC_BOOKS.has(bookId)) {
+        // Books with a real two-level structure: chapter_label = chapter (depth 0),
+        // section_title = sub-chapter (depth 1).
+        let lastChapter: string | null = null;
+        let lastSection: string | null = null;
+        for (const p of ps) {
+          if (p.chapter_label && p.chapter_label !== lastChapter) {
+            lastChapter = p.chapter_label;
+            lastSection = null;
+            tocEntries.push({ label: p.chapter_label, passageId: p.id, depth: 0 });
+          }
+          if (p.section_title && p.section_title !== lastSection) {
+            lastSection = p.section_title;
+            tocEntries.push({ label: p.section_title, passageId: p.id, depth: 1 });
+          }
         }
       } else {
         const seen = new Set<string>();
