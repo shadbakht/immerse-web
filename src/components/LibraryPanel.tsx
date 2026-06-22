@@ -10,6 +10,25 @@ import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 
+// Categories whose books have no canonical order and should display
+// alphabetically (mirrors the mobile LibraryScreen normalised sort).
+// Scripture categories (Bible, Tanakh, Qur'an, GGS, etc.) are left in their
+// catalog (canonical) order.
+const ALPHA_SORTED_CATEGORIES = new Set([
+  'cat-bahai-bahullh',        // Bahá'u'lláh
+  'cat-bahai-abdulbah',       // ‘Abdu'l-Bahá
+  'cat-bahai-shoghi-effendi', // Shoghi Effendi
+]);
+
+// Normalised alphabetical key: strip diacritics and leading punctuation
+// (e.g. the curly apostrophe in "‘Abdu'l-Bahá in London") so titles sort by
+// their first letter rather than by code point.
+const titleSortKey = (s: string): string => (s || '')
+  .normalize('NFD')
+  .replace(/\p{M}/gu, '')
+  .replace(/^[^\p{L}\p{N}]+/u, '')
+  .toLowerCase();
+
 interface SearchResult {
   passageId:    string;
   bookId:       string;   // Supabase UUID
@@ -142,8 +161,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   }, [catalog]);
 
   const booksInCategory = useCallback((catId: string): CatalogBook[] => {
-    return (catalog?.books ?? [])
-      .filter(b => b.categoryId === catId);
+    const books = (catalog?.books ?? []).filter(b => b.categoryId === catId);
+    if (ALPHA_SORTED_CATEGORIES.has(catId)) {
+      return [...books].sort((a, b) => {
+        const ak = titleSortKey(a.title), bk = titleSortKey(b.title);
+        return ak < bk ? -1 : ak > bk ? 1 : 0;
+      });
+    }
+    return books;
   }, [catalog]);
 
   // Recursively collect all book slugs under a category at any depth

@@ -1180,6 +1180,9 @@ async function handleCopy() {
             if (showChapter) lastChapter = passage.chapter_label!;
             if (showSection) lastSection = passage.section_title!;
 
+            // Letter date-lines ("19 December 1922 …") render as bold sub-headings.
+            const isLetterDate = /^\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/.test(passage.content);
+
             return (
               <div key={passage.id} id={`p-${passage.id}`} data-pid={passage.id}>
                 {showChapter && (
@@ -1227,14 +1230,14 @@ async function handleCopy() {
                       )}
                     </div>
                   )}
-                  {passage.paragraph_number != null && (
+                  {passage.paragraph_number != null && !isLetterDate && (
                     <span className="absolute -right-8 top-[3px] text-[11px] text-gray-300 select-none w-7 text-right leading-relaxed tabular-nums">
                       {passage.paragraph_number}
                     </span>
                   )}
                   <p
                     data-pid={passage.id}
-                    className="font-serif text-gray-800 leading-relaxed mb-4"
+                    className={`font-serif text-gray-800 leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}`}
                     style={{ fontSize: 'var(--quote-font-size)' }}
                   >
                     <PassageContent
