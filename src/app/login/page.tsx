@@ -169,7 +169,7 @@ function LoginPageInner() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Username"
+                    placeholder="Username *"
                     value={username}
                     onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     autoCapitalize="none"
@@ -203,7 +203,7 @@ function LoginPageInner() {
 
             <input
               type="email"
-              placeholder="Email"
+              placeholder="Email *"
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
@@ -211,7 +211,7 @@ function LoginPageInner() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder={isSignUp ? 'Create Password' : 'Password'}
+                placeholder={isSignUp ? 'Create Password *' : 'Password *'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
