@@ -176,7 +176,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="min-w-0 mr-4">
-                            <div className="text-sm font-medium text-gray-900 truncate">{book.title}</div>
+                            <div className="text-sm text-gray-800 truncate">{book.title}</div>
                             {book.subtitle && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate">{book.subtitle}</div>
                             )}
