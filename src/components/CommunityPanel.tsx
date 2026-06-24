@@ -733,7 +733,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-semibold text-gray-900">Community</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Discover</h1>
           {selectedCount > 0 && (
             <div className="flex items-center gap-2">
               <div className="relative" ref={exportMenuRef}>
@@ -819,7 +819,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-8">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
             <div className="text-4xl mb-4">✦</div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Sign In to Access Community</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Sign In to Access Discover</h2>
             <p className="text-sm text-gray-500 leading-relaxed mb-6">
               See what other readers are discovering across all traditions.
             </p>
