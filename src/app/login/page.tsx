@@ -136,7 +136,7 @@ function LoginPageInner() {
             </p>
             <input
               type="email"
-              placeholder="Email"
+              placeholder="Email *"
               value={email}
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleForgot(); }}
