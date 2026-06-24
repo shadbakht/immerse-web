@@ -105,7 +105,7 @@ export default function PrivacyPage() {
         <Section title="5. User Content" />
         <p className="text-sm text-gray-600 leading-relaxed">You retain ownership of all content you create in the App. By using the App, you grant Immerse Research a limited, non-exclusive license to store, process, and display your content solely to operate the App. If you make content public, it may be viewed by other Immerse users and associated with your username.</p>
 
-        <Section title="6. Community Feature" />
+        <Section title="6. Discover Feature" />
         <p className="text-sm text-gray-600 leading-relaxed">You are solely responsible for content you make public. You agree not to post content that violates any applicable law, infringes intellectual property rights, is abusive, defamatory, hateful, or harmful, or is otherwise offensive or inappropriate. We reserve the right to remove any public content and to restrict or terminate accounts that violate these Terms.</p>
 
         <Section title="7. Intellectual Property" />
@@ -115,7 +115,7 @@ export default function PrivacyPage() {
         <p className="text-sm text-gray-600 leading-relaxed">Pro subscribers may import their own books or documents. Imported files and their annotations remain on your device only and are not synced to our servers. You are responsible for ensuring you have the legal right to use and store any imported content. We do not verify ownership or licensing of imported materials.</p>
 
         <Section title="9. Acceptable Use" />
-        <p className="text-sm text-gray-600 leading-relaxed">You agree not to use the App for unlawful purposes, interfere with the operation or security of the App, attempt to access other users&apos; private data without authorization, or abuse the community feature.</p>
+        <p className="text-sm text-gray-600 leading-relaxed">You agree not to use the App for unlawful purposes, interfere with the operation or security of the App, attempt to access other users&apos; private data without authorization, or abuse the Discover feature.</p>
 
         <Section title="10. Privacy" />
         <p className="text-sm text-gray-600 leading-relaxed">Your use of the App is also governed by our Privacy Policy above, which is incorporated into these Terms by reference.</p>
