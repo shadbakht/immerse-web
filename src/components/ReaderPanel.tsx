@@ -74,12 +74,33 @@ interface ReaderPanelProps {
   onXrefPickDone?: () => void;
 }
 
+// Render a text fragment, turning [N] markers into tappable footnote sups.
+function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp: string) {
+  return text.split(/(\[\d+\])/g).map((part, i) => {
+    const m = part.match(/^\[(\d+)\]$/);
+    if (m) {
+      return (
+        <sup
+          key={kp + i}
+          onClick={e => { e.stopPropagation(); onFootnoteClick(m[1]); }}
+          className="text-[10px] text-[#1B6B7B] font-medium ml-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
+          title={`Footnote ${m[1]}`}
+        >
+          {m[1]}
+        </sup>
+      );
+    }
+    return <span key={kp + i}>{part}</span>;
+  });
+}
+
 function PassageContent({ text, onFootnoteClick, highlight }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string }) {
   const clean = text.replace(/\/\*[^*]*\*\//g, '');
   if (highlight) {
+    const plain = clean.replace(/<\/?em>/g, '');
     const words = highlight.trim().split(/\s+/).filter(Boolean);
     const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-    const parts = clean.split(pattern);
+    const parts = plain.split(pattern);
     return (
       <>
         {parts.map((part, i) =>
@@ -90,25 +111,14 @@ function PassageContent({ text, onFootnoteClick, highlight }: { text: string; on
       </>
     );
   }
-  const parts = clean.split(/(\[\d+\])/g);
+  const segs = clean.split(/<em>([\s\S]*?)<\/em>/g);
   return (
     <>
-      {parts.map((part, i) => {
-        const match = part.match(/^\[(\d+)\]$/);
-        if (match) {
-          return (
-            <sup
-              key={i}
-              onClick={e => { e.stopPropagation(); onFootnoteClick(match[1]); }}
-              className="text-[10px] text-[#1B6B7B] font-medium ml-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
-              title={`Footnote ${match[1]}`}
-            >
-              {match[1]}
-            </sup>
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
+      {segs.map((seg, i) =>
+        i % 2 === 1
+          ? <em key={`i${i}`}>{renderFootnotes(seg, onFootnoteClick, `i${i}-`)}</em>
+          : <span key={`n${i}`}>{renderFootnotes(seg, onFootnoteClick, `n${i}-`)}</span>
+      )}
     </>
   );
 }
@@ -1296,7 +1306,7 @@ async function handleCopy() {
                   )}
                   <p
                     data-pid={passage.id}
-                    className={`font-serif text-gray-800 leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}`}
+                    className={`font-serif text-gray-800 leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
                     style={{ fontSize: 'var(--quote-font-size)' }}
                   >
                     <PassageContent
