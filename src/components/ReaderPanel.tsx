@@ -46,6 +46,18 @@ const PRAYER_STYLE_BOOKS = new Set<string>([
   '0585a670-a168-49e5-a748-44c040ec33d4', // Bahá'í Prayers
 ]);
 
+// Genuine two-level books (chapter_label = chapter, section_title = subchapter)
+// that get the same centered divider + title layout — driven straight from the
+// metadata columns (no comma-split, no attribution/rubric handling). Curated:
+// only books with multiple passages per subchapter (not flat 1:1 books).
+const PRAYER_LAYOUT_BOOKS = new Set<string>([
+  '19962b29-69bf-4c6a-b93c-7a885c50ad16', // Paris Talks
+  '723f4d43-cb81-4e72-b6f0-c74211586048', // The Summons of the Lord of Hosts
+  '560e3d01-91f7-4cb6-9d88-5d9689ec353e', // The World Order of Bahá'u'lláh
+  '94f79149-ac9f-43b1-b004-20224eb7cb4c', // The Vishnu Purana
+  'c40c3e99-32fc-418a-b12f-4df5b06951ca', // Riḍván 1992
+]);
+
 // Trailing attribution at the end of a prayer paragraph, e.g. "\n—Bahá'u'lláh".
 const ATTRIBUTION_RE = /\n(—(?:Bahá’u’lláh|The Báb|‘Abdu’l-Bahá|Shoghi Effendi)[^\n]{0,4})\s*$/;
 
@@ -1071,6 +1083,7 @@ async function handleCopy() {
   let lastChapter = '';
   let lastSection = '';
   const isPrayerStyle = !!target?.bookId && PRAYER_STYLE_BOOKS.has(target.bookId);
+  const isLayoutStyle = !isPrayerStyle && !!target?.bookId && PRAYER_LAYOUT_BOOKS.has(target.bookId);
   let lastPrayerSection = '';
 
   return (
@@ -1248,6 +1261,21 @@ async function handleCopy() {
                       <h3 className="text-center text-xs font-normal text-gray-400 uppercase tracking-wide mb-5">
                         {passage.section_title}
                       </h3>
+                    )}
+                  </>
+                ) : isLayoutStyle ? (
+                  <>
+                    {showChapter && passage.chapter_label && (
+                      <div className="flex items-center gap-3 mt-12 mb-1">
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{passage.chapter_label}</span>
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                      </div>
+                    )}
+                    {showSection && (
+                      <h2 className="text-center text-xl font-semibold text-gray-900 mt-3 mb-4">
+                        {passage.section_title}
+                      </h2>
                     )}
                   </>
                 ) : (
