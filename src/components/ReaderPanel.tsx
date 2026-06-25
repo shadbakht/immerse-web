@@ -1253,12 +1253,12 @@ async function handleCopy() {
                 ) : (
                   <>
                     {showChapter && (
-                      <h2 className="text-lg font-semibold text-[#1B6B7B] mt-10 mb-4">
+                      <h2 className="text-xl font-semibold text-[#1B6B7B] text-center mt-10 mb-4">
                         {passage.chapter_label}
                       </h2>
                     )}
                     {showSection && (
-                      <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide mt-8 mb-3">
+                      <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide text-center mt-8 mb-3">
                         {passage.section_title}
                       </h3>
                     )}
