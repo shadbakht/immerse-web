@@ -1320,7 +1320,7 @@ async function handleCopy() {
                     {showPrayerDivider && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25" />
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{prayerSection}</span>
+                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{prayerSection}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25" />
                       </div>
                     )}
@@ -1340,7 +1340,7 @@ async function handleCopy() {
                     {showChapter && passage.chapter_label && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25" />
-                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{passage.chapter_label}</span>
+                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{passage.chapter_label}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25" />
                       </div>
                     )}
@@ -1353,9 +1353,11 @@ async function handleCopy() {
                 ) : (
                   <>
                     {showChapter && (
-                      <h2 className="text-xl font-semibold text-[#1B6B7B] text-center mt-10 mb-4">
-                        {passage.chapter_label}
-                      </h2>
+                      <div className="flex items-center gap-3 mt-12 mb-4">
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{passage.chapter_label}</span>
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                      </div>
                     )}
                     {showSection && (
                       <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide text-center mt-8 mb-3">
