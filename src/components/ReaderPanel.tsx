@@ -38,6 +38,17 @@ const NESTED_TOC_BOOKS = new Set<string>([
   '723f4d43-cb81-4e72-b6f0-c74211586048', // The Summons of the Lord of Hosts (Súriy-i-Haykal → 5 king tablets)
 ]);
 
+// Books rendered in the centered "prayer book" style: a comma-joined chapter_label
+// ("Section, Title") is split into a centered section divider + title, the
+// section_title becomes a muted subtitle, and a trailing "—Author" line in the
+// content renders as a right-aligned italic attribution. Mirrors the mobile reader.
+const PRAYER_STYLE_BOOKS = new Set<string>([
+  '0585a670-a168-49e5-a748-44c040ec33d4', // Bahá'í Prayers
+]);
+
+// Trailing attribution at the end of a prayer paragraph, e.g. "\n—Bahá'u'lláh".
+const ATTRIBUTION_RE = /\n(—(?:Bahá’u’lláh|The Báb|‘Abdu’l-Bahá|Shoghi Effendi)[^\n]{0,4})\s*$/;
+
 interface TocEntry {
   label: string;
   passageId: string;
@@ -1049,6 +1060,8 @@ async function handleCopy() {
 
   let lastChapter = '';
   let lastSection = '';
+  const isPrayerStyle = !!target?.bookId && PRAYER_STYLE_BOOKS.has(target.bookId);
+  let lastPrayerSection = '';
 
   return (
     <div className="h-full flex flex-col relative" ref={readerRef}>
@@ -1181,20 +1194,65 @@ async function handleCopy() {
             if (showChapter) lastChapter = passage.chapter_label!;
             if (showSection) lastSection = passage.section_title!;
 
+            // Prayer-style books: split "Section, Title" into a centered divider +
+            // title, and peel a trailing attribution off the body.
+            let prayerSection: string | null = null;
+            let prayerTitle: string | null = null;
+            let showPrayerDivider = false;
+            let bodyText = passage.content;
+            let attribution: string | null = null;
+            if (isPrayerStyle) {
+              if (passage.chapter_label) {
+                const ci = passage.chapter_label.indexOf(', ');
+                prayerSection = ci !== -1 ? passage.chapter_label.slice(0, ci) : null;
+                prayerTitle   = ci !== -1 ? passage.chapter_label.slice(ci + 2) : passage.chapter_label;
+                if (showChapter && prayerSection && prayerSection !== lastPrayerSection) {
+                  showPrayerDivider = true;
+                  lastPrayerSection = prayerSection;
+                }
+              }
+              const m = passage.content.match(ATTRIBUTION_RE);
+              if (m) { attribution = m[1]; bodyText = passage.content.slice(0, m.index!); }
+            }
+
             // Letter date-lines ("19 December 1922 …") render as bold sub-headings.
             const isLetterDate = /^\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/.test(passage.content);
 
             return (
               <div key={passage.id} id={`p-${passage.id}`} data-pid={passage.id}>
-                {showChapter && (
-                  <h2 className="text-lg font-semibold text-[#1B6B7B] mt-10 mb-4">
-                    {passage.chapter_label}
-                  </h2>
-                )}
-                {showSection && (
-                  <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide mt-8 mb-3">
-                    {passage.section_title}
-                  </h3>
+                {isPrayerStyle ? (
+                  <>
+                    {showPrayerDivider && (
+                      <div className="flex items-center gap-3 mt-12 mb-1">
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{prayerSection}</span>
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                      </div>
+                    )}
+                    {showChapter && prayerTitle && (
+                      <h2 className="text-center text-xl font-semibold text-gray-900 mt-3 mb-1">
+                        {prayerTitle}
+                      </h2>
+                    )}
+                    {showSection && (
+                      <h3 className="text-center text-xs font-normal text-gray-400 uppercase tracking-wide mb-5">
+                        {passage.section_title}
+                      </h3>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {showChapter && (
+                      <h2 className="text-lg font-semibold text-[#1B6B7B] mt-10 mb-4">
+                        {passage.chapter_label}
+                      </h2>
+                    )}
+                    {showSection && (
+                      <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide mt-8 mb-3">
+                        {passage.section_title}
+                      </h3>
+                    )}
+                  </>
                 )}
                 <div
                   className="relative"
@@ -1242,12 +1300,15 @@ async function handleCopy() {
                     style={{ fontSize: 'var(--quote-font-size)' }}
                   >
                     <PassageContent
-                      text={passage.content}
+                      text={bodyText}
                       onFootnoteClick={n => {
                         setActiveFootnote({ num: n, text: footnoteMap[n] ?? '' });
                       }}
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                     />
+                    {attribution && (
+                      <span className="block text-right italic text-gray-500 mt-2">{attribution}</span>
+                    )}
                   </p>
                 </div>
               </div>
