@@ -36,6 +36,8 @@ const NESTED_TOC_BOOKS = new Set<string>([
   '560e3d01-91f7-4cb6-9d88-5d9689ec353e', // The World Order of Bahá'u'lláh
   '19962b29-69bf-4c6a-b93c-7a885c50ad16', // Paris Talks (3 Parts → talks)
   '723f4d43-cb81-4e72-b6f0-c74211586048', // The Summons of the Lord of Hosts (Súriy-i-Haykal → 5 king tablets)
+  '94f79149-ac9f-43b1-b004-20224eb7cb4c', // The Vishnu Purana
+  'c40c3e99-32fc-418a-b12f-4df5b06951ca', // Riḍván 1992
 ]);
 
 // Books rendered in the centered "prayer book" style: a comma-joined chapter_label
@@ -186,6 +188,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const [loading, setLoading] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [toc, setToc] = useState<TocEntry[]>([]);
+  // Section keys (depth-0 passageIds) collapsed in the TOC. Default expanded;
+  // persisted per book in localStorage.
+  const [collapsedToc, setCollapsedToc] = useState<Set<string>>(new Set());
   const [footnoteMap, setFootnoteMap] = useState<Record<string, string>>({});
   const [activeFootnote, setActiveFootnote] = useState<{ num: string; text: string } | null>(null);
   const [selectionBar, setSelectionBar] = useState<SelectionBar | null>(null);
@@ -519,6 +524,24 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
           }
           const num = p.paragraph_number == null ? /^\s*(\d+)\.?\s*$/.exec(p.content || '') : null;
           if (num) tocEntries.push({ label: num[1], passageId: p.id, depth: 1 });
+        }
+      } else if (PRAYER_STYLE_BOOKS.has(bookId)) {
+        // Bahá'í Prayers: chapter_label = "Chapter, Subchapter" → split into two levels.
+        let lastChapter: string | null = null;
+        let lastSub: string | null = null;
+        for (const p of ps) {
+          const cl = p.chapter_label || '';
+          const ci = cl.indexOf(', ');
+          const chap = ci !== -1 ? cl.slice(0, ci) : cl;
+          const sub = ci !== -1 ? cl.slice(ci + 2).trim() : '';
+          if (chap && chap !== lastChapter) {
+            lastChapter = chap; lastSub = null;
+            tocEntries.push({ label: chap, passageId: p.id, depth: 0 });
+          }
+          if (sub && sub !== lastSub) {
+            lastSub = sub;
+            tocEntries.push({ label: sub, passageId: p.id, depth: 1 });
+          }
         }
       } else if (NESTED_TOC_BOOKS.has(bookId)) {
         // Books with a real two-level structure: chapter_label = chapter (depth 0),
@@ -1072,6 +1095,23 @@ async function handleCopy() {
     );
   }
 
+  useEffect(() => {
+    if (!target?.bookId) return;
+    try {
+      const raw = localStorage.getItem(`immerse.toc.collapsed.${target.bookId}`);
+      setCollapsedToc(raw ? new Set(JSON.parse(raw)) : new Set());
+    } catch { setCollapsedToc(new Set()); }
+  }, [target?.bookId]);
+
+  function toggleTocSection(key: string) {
+    setCollapsedToc(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem(`immerse.toc.collapsed.${target?.bookId}`, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1085,6 +1125,27 @@ async function handleCopy() {
   const isPrayerStyle = !!target?.bookId && PRAYER_STYLE_BOOKS.has(target.bookId);
   const isLayoutStyle = !isPrayerStyle && !!target?.bookId && PRAYER_LAYOUT_BOOKS.has(target.bookId);
   let lastPrayerSection = '';
+
+  // Build collapsible TOC rows: each depth-1 entry is keyed to its parent section
+  // (depth-0 passageId); hide children of collapsed sections.
+  const tocSectionChildren = new Set<string>();
+  {
+    let cur: string | null = null;
+    for (const e of toc) { if (!e.depth) cur = e.passageId; else if (cur) tocSectionChildren.add(cur); }
+  }
+  const tocDisplay: { entry: TocEntry; i: number; key: string; isSection: boolean; hasChildren: boolean }[] = [];
+  {
+    let cur: string | null = null;
+    toc.forEach((entry, i) => {
+      if (!entry.depth) {
+        cur = entry.passageId;
+        tocDisplay.push({ entry, i, key: entry.passageId, isSection: true, hasChildren: tocSectionChildren.has(entry.passageId) });
+      } else {
+        const key = cur ?? entry.passageId;
+        if (!collapsedToc.has(key)) tocDisplay.push({ entry, i, key, isSection: false, hasChildren: false });
+      }
+    });
+  }
 
   return (
     <div className="h-full flex flex-col relative" ref={readerRef}>
@@ -1114,16 +1175,27 @@ async function handleCopy() {
             <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
               Table of Contents
             </div>
-            {toc.map((entry, i) => (
-              <button
-                key={i}
-                onClick={() => scrollToPassage(entry.passageId)}
-                className={`w-full text-left py-2.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0 transition-colors ${
-                  entry.depth ? 'pl-10 pr-4 text-gray-500' : 'px-4 text-gray-700'
-                }`}
-              >
-                {entry.label}
-              </button>
+            {tocDisplay.map(({ entry, i, key, hasChildren }) => (
+              <div key={i} className="flex items-stretch border-b border-gray-50 last:border-0">
+                <button
+                  onClick={() => scrollToPassage(entry.passageId)}
+                  className={`flex-1 text-left py-2.5 text-sm hover:bg-gray-50 transition-colors ${
+                    entry.depth ? 'pl-10 pr-2 text-gray-500' : 'px-4 text-gray-700 font-medium'
+                  }`}
+                >
+                  {entry.label}
+                </button>
+                {hasChildren && (
+                  <button
+                    onClick={() => toggleTocSection(key)}
+                    className="w-10 shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                    title={collapsedToc.has(key) ? 'Expand' : 'Collapse'}
+                    aria-label={collapsedToc.has(key) ? 'Expand section' : 'Collapse section'}
+                  >
+                    <span className="text-xs">{collapsedToc.has(key) ? '▸' : '▾'}</span>
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </>
