@@ -298,7 +298,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags' | 'xrefs'; passageId: string } | null>(null);
   const [editNoteContent, setEditNoteContent] = useState('');
   // "Edit text selection": re-anchor an existing selection by highlighting new text.
-  const [editingSel, setEditingSel] = useState<{ selectionId: string; reopen: { type: 'note' | 'tags' | 'xrefs'; passageId: string } } | null>(null);
+  const [editingSel, setEditingSel] = useState<{ selectionIds: string[]; reopen: { type: 'note' | 'tags' | 'xrefs'; passageId: string } } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   // Full tag tree (id/name/parent) for the tags view panel's collapsible subtags.
   const [allTags, setAllTags] = useState<Array<{ id: string; name: string; parent_id: string | null }>>([]);
@@ -823,8 +823,11 @@ async function handleCopy() {
   // ── Edit text selection (re-anchor) ──────────────────────────────────────────
   // Hide the panel and enter "highlight new text" mode; the next selection updates
   // the existing selection row (same id, new passage/offsets/snapshot).
-  function startEditSelection(selectionId: string, reopen: { type: 'note' | 'tags' | 'xrefs'; passageId: string }) {
-    setEditingSel({ selectionId, reopen });
+  // selectionIds may hold more than one row: a single highlighted quote can spawn a
+  // duplicate source selection per xref, and they must all re-anchor together.
+  function startEditSelection(selectionIds: string[], reopen: { type: 'note' | 'tags' | 'xrefs'; passageId: string }) {
+    if (selectionIds.length === 0) return;
+    setEditingSel({ selectionIds, reopen });
     setAnnotationPanel(null);
     setSelectionBar(null);
     window.getSelection()?.removeAllRanges();
@@ -847,6 +850,7 @@ async function handleCopy() {
         .from('passage_pid_map').select('pid').eq('passage_id', bar.startPassageId).maybeSingle();
       const mobilePid = pidRow?.pid ?? null;
       const now = new Date().toISOString();
+      // Re-anchor every selection row in the group (xref duplicates of one quote).
       await supabase.from('selections').update({
         passage_id:    bar.startPassageId,
         start_pid:     mobilePid,
@@ -855,7 +859,7 @@ async function handleCopy() {
         end_offset:    bar.endOffset,
         snapshot_text: bar.text,
         updated_at:    now,
-      }).eq('id', editingSel.selectionId);
+      }).in('id', editingSel.selectionIds);
       // No pushSelection here: the direct update above already writes to the shared
       // Supabase selections table (source of truth; mobile pulls from it) and preserves
       // book_local_id, which pushSelection's upsert would null out.
@@ -1709,7 +1713,7 @@ async function handleCopy() {
                   <p className="font-serif text-xs text-gray-500 line-clamp-2">"{data.snapshotText}"</p>
                 </div>
                 <button
-                  onClick={() => startEditSelection(data.selectionId, { type: 'tags', passageId: annotationPanel!.passageId })}
+                  onClick={() => startEditSelection([data.selectionId], { type: 'tags', passageId: annotationPanel!.passageId })}
                   className="mx-5 mb-3 text-xs text-[#1B6B7B] font-medium hover:underline"
                 >
                   Edit text selection
@@ -1767,7 +1771,7 @@ async function handleCopy() {
                   <p className="font-serif text-xs text-gray-500 line-clamp-2">"{data.snapshotText}"</p>
                 </div>
                 <button
-                  onClick={() => startEditSelection(data.selectionId, { type: 'note', passageId: annotationPanel!.passageId })}
+                  onClick={() => startEditSelection([data.selectionId], { type: 'note', passageId: annotationPanel!.passageId })}
                   className="mb-4 text-xs text-[#1B6B7B] font-medium hover:underline"
                 >
                   Edit text selection
@@ -1789,9 +1793,12 @@ async function handleCopy() {
       {(() => {
         const entries = annotationPanel?.type === 'xrefs' ? (passageToXrefs.get(annotationPanel.passageId) ?? []) : [];
         const thisSnap = entries[0]?.thisSnapshotText ?? '';
-        // Edit re-anchors the passage's source selection (the one shown above), matching
-        // how the tags/note panels edit their single per-passage selection.
-        const editableSelId = entries[0]?.thisSelectionId ?? null;
+        // Edit re-anchors the source quote shown at top. One highlight can spawn a
+        // duplicate source selection per xref, so gather every source selection whose
+        // snapshot matches the displayed quote and move them all together.
+        const editSelIds = [...new Set(
+          entries.filter(e => e.thisSnapshotText === thisSnap).map(e => e.thisSelectionId),
+        )];
         return (
           <PanelSheet
             visible={annotationPanel?.type === 'xrefs'}
@@ -1804,9 +1811,9 @@ async function handleCopy() {
                   <p className="text-xs text-gray-500 line-clamp-2">"{thisSnap}"</p>
                 </div>
               )}
-              {editableSelId && (
+              {editSelIds.length > 0 && (
                 <button
-                  onClick={() => startEditSelection(editableSelId, { type: 'xrefs', passageId: annotationPanel!.passageId })}
+                  onClick={() => startEditSelection(editSelIds, { type: 'xrefs', passageId: annotationPanel!.passageId })}
                   className="mb-4 text-xs text-[#1B6B7B] font-medium hover:underline"
                 >
                   Edit text selection
