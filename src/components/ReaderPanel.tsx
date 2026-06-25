@@ -137,14 +137,103 @@ function PassageContent({ text, onFootnoteClick, highlight }: { text: string; on
   );
 }
 
+interface TagQuote {
+  id: string;
+  text: string;
+  citation: string;
+  bookId: string | null;
+  passageId: string;
+}
+
 interface XrefViewEntry {
   xrefId: string;
+  thisSelectionId: string;
   thisSnapshotText: string;
   otherPassageId: string;
   otherSnapshotText: string;
   otherBookId: string | null;
   otherBookTitle: string;
   otherCitation: string;
+}
+
+// A tag row in the tags view panel: tap to reveal its quotes + subtags (collapsed),
+// with a rotating chevron — mirrors the mobile reader tag panel.
+function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
+  tag: { id: string; name: string };
+  allTags: Array<{ id: string; name: string; parent_id: string | null }>;
+  depth: number;
+  fetchQuotes: (tagId: string) => Promise<TagQuote[]>;
+  onOpenBook?: (bookId: string, passageId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [quotes, setQuotes] = useState<TagQuote[] | null>(null);
+  const children = allTags.filter(t => t.parent_id === tag.id);
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && quotes === null) {
+      try { setQuotes(await fetchQuotes(tag.id)); } catch { setQuotes([]); }
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={toggle}
+        className="w-full flex items-center gap-2 py-2.5 pr-4 hover:bg-gray-50 transition-colors text-left"
+        style={{ paddingLeft: 20 + depth * 18 }}
+      >
+        <TagIcon size={16} />
+        <span className="flex-1 text-sm font-medium text-gray-800 truncate">{tag.name}</span>
+        <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+      </button>
+      {open && (
+        <div>
+          <div style={{ paddingLeft: 20 + depth * 18 + 24 }} className="pr-4">
+            {quotes === null ? (
+              <p className="py-1.5 text-xs text-gray-400">Loading…</p>
+            ) : quotes.length === 0 ? (
+              <p className="py-1.5 text-xs text-gray-400">No quotes filed here.</p>
+            ) : (
+              <div className="space-y-1.5 pb-1.5">
+                {quotes.map(q => <TagQuoteRow key={q.id} quote={q} onOpenBook={onOpenBook} />)}
+              </div>
+            )}
+          </div>
+          {children.map(c => (
+            <TagViewNode key={c.id} tag={c} allTags={allTags} depth={depth + 1} fetchQuotes={fetchQuotes} onOpenBook={onOpenBook} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (bookId: string, passageId: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+      <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
+        <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+          "{quote.text}"
+        </p>
+      </div>
+      {expanded && (
+        <>
+          {quote.citation && <p className="text-xs text-[#1B6B7B] font-medium mt-1.5">{quote.citation}</p>}
+          {quote.bookId && onOpenBook && (
+            <button
+              onClick={() => onOpenBook(quote.bookId!, quote.passageId)}
+              className="mt-1.5 text-xs text-[#1B6B7B] font-medium hover:underline"
+            >
+              Open in reader →
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
@@ -159,10 +248,11 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
       <div className="px-4 py-3 flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-xs text-[#1B6B7B] font-medium mb-1.5 truncate">{entry.otherCitation}</p>
-          <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-            <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+          <div className="cursor-pointer select-none flex items-start gap-2" onClick={() => setExpanded(v => !v)}>
+            <p className={`flex-1 font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
               "{entry.otherSnapshotText}"
             </p>
+            <span className={`text-gray-400 text-xs shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
           </div>
           {expanded && entry.otherBookId && onOpenBook && (
             <button
@@ -207,6 +297,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const [passageToXrefs, setPassageToXrefs] = useState<Map<string, XrefViewEntry[]>>(new Map());
   const [annotationPanel, setAnnotationPanel] = useState<{ type: 'note' | 'tags' | 'xrefs'; passageId: string } | null>(null);
   const [editNoteContent, setEditNoteContent] = useState('');
+  // "Edit text selection": re-anchor an existing selection by highlighting new text.
+  const [editingSel, setEditingSel] = useState<{ selectionId: string; reopen: { type: 'note' | 'tags' | 'xrefs'; passageId: string } } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  // Full tag tree (id/name/parent) for the tags view panel's collapsible subtags.
+  const [allTags, setAllTags] = useState<Array<{ id: string; name: string; parent_id: string | null }>>([]);
   const [pdfUrl, setPdfUrl]         = useState<string | null>(null);
   const [isImported, setIsImported] = useState(false);
   const pdfUrlRef = useRef<string | null>(null);
@@ -717,9 +812,97 @@ async function handleCopy() {
     window.getSelection()?.removeAllRanges();
   }
 
-  function handleTagIconClick(passageId: string) {
+  async function handleTagIconClick(passageId: string) {
+    // Load the full tag tree so the panel can show collapsible subtags.
+    const { data } = await supabase
+      .from('tags').select('id, name, parent_id').eq('user_id', userId);
+    setAllTags((data ?? []) as Array<{ id: string; name: string; parent_id: string | null }>);
     setAnnotationPanel({ type: 'tags', passageId });
   }
+
+  // ── Edit text selection (re-anchor) ──────────────────────────────────────────
+  // Hide the panel and enter "highlight new text" mode; the next selection updates
+  // the existing selection row (same id, new passage/offsets/snapshot).
+  function startEditSelection(selectionId: string, reopen: { type: 'note' | 'tags' | 'xrefs'; passageId: string }) {
+    setEditingSel({ selectionId, reopen });
+    setAnnotationPanel(null);
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+  }
+
+  function cancelEditSelection() {
+    const reopen = editingSel?.reopen ?? null;
+    setEditingSel(null);
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+    if (reopen) setAnnotationPanel(reopen);
+  }
+
+  async function confirmEditSelection() {
+    if (!editingSel || !selectionBar || !target) return;
+    setSavingEdit(true);
+    try {
+      const bar = selectionBar;
+      const { data: pidRow } = await supabase
+        .from('passage_pid_map').select('pid').eq('passage_id', bar.startPassageId).maybeSingle();
+      const mobilePid = pidRow?.pid ?? null;
+      const now = new Date().toISOString();
+      await supabase.from('selections').update({
+        passage_id:    bar.startPassageId,
+        start_pid:     mobilePid,
+        end_pid:       mobilePid,
+        start_offset:  bar.startOffset,
+        end_offset:    bar.endOffset,
+        snapshot_text: bar.text,
+        updated_at:    now,
+      }).eq('id', editingSel.selectionId);
+      // No pushSelection here: the direct update above already writes to the shared
+      // Supabase selections table (source of truth; mobile pulls from it) and preserves
+      // book_local_id, which pushSelection's upsert would null out.
+      const reopen = editingSel.reopen;
+      setEditingSel(null);
+      setSelectionBar(null);
+      window.getSelection()?.removeAllRanges();
+      await loadAnnotations(passages.map(p => p.id));
+      // Reopen the panel under the (possibly new) passage. Xrefs need a refetch.
+      if (reopen.type === 'xrefs') await handleXrefIconClick(bar.startPassageId);
+      else setAnnotationPanel({ type: reopen.type, passageId: bar.startPassageId });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // Fetch all quotes (selections) filed under a tag, with citations, for the tags view.
+  const fetchTagQuotes = useCallback(async (tagId: string): Promise<TagQuote[]> => {
+    const { data: st } = await supabase.from('selection_tags').select('selection_id').eq('tag_id', tagId);
+    const selIds = [...new Set((st ?? []).map((r: any) => r.selection_id as string))];
+    if (selIds.length === 0) return [];
+    const { data: sels } = await supabase
+      .from('selections').select('id, snapshot_text, passage_id').in('id', selIds);
+    const pIds = [...new Set((sels ?? []).map((s: any) => s.passage_id).filter(Boolean))];
+    const { data: pass } = pIds.length > 0
+      ? await supabase.from('passages').select('id, chapter_label, section_title, paragraph_number, book_id').in('id', pIds)
+      : { data: [] as any[] };
+    const passMap: Record<string, any> = {};
+    for (const p of (pass ?? []) as any[]) passMap[p.id] = p;
+    const bIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
+    const { data: bks } = bIds.length > 0
+      ? await supabase.from('books').select('id, title, citation_format').in('id', bIds)
+      : { data: [] as any[] };
+    const bookMap: Record<string, any> = {};
+    for (const b of (bks ?? []) as any[]) bookMap[b.id] = b;
+    return (sels ?? []).map((s: any) => {
+      const p = passMap[s.passage_id];
+      const b = p ? bookMap[p.book_id] : null;
+      return {
+        id: s.id,
+        text: s.snapshot_text ?? '',
+        citation: p ? buildCitation(p, b) : '',
+        bookId: b?.id ?? null,
+        passageId: s.passage_id as string,
+      };
+    });
+  }, [supabase]);
 
   function handleNoteIconClick(passageId: string) {
     const data = passageToNote.get(passageId);
@@ -811,6 +994,7 @@ async function handleCopy() {
       const bookObj = passage ? bookMap[passage.book_id] : null;
       entries.push({
         xrefId,
+        thisSelectionId: thisSelId,
         thisSnapshotText: selSnaps.get(thisSelId) ?? '',
         otherPassageId: other.passage_id,
         otherSnapshotText: other.snapshot_text ?? '',
@@ -1208,7 +1392,9 @@ async function handleCopy() {
           className="absolute z-30 flex items-center bg-gray-900 rounded-2xl px-1.5 py-1.5 shadow-xl"
           style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
-          {(xrefPickFrom
+          {(editingSel
+            ? [{ label: savingEdit ? 'Updating…' : 'Update selection', onClick: confirmEditSelection }]
+            : xrefPickFrom
             ? [{ label: 'Pick as X-Ref', onClick: handlePickFromSelection }]
             : [
                 { label: 'Tag',  onClick: () => openPanel('tag') },
@@ -1221,7 +1407,7 @@ async function handleCopy() {
             <div key={label} className="flex items-center">
               <button
                 onClick={onClick}
-                disabled={savingAnnotation || pickSaving}
+                disabled={savingAnnotation || pickSaving || savingEdit}
                 className="px-[15px] py-[7px] text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
               >
                 {label}
@@ -1229,6 +1415,21 @@ async function handleCopy() {
               {i < arr.length - 1 && <div className="w-px h-4 bg-white/20" />}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit-text-selection banner */}
+      {editingSel && (
+        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 px-5 py-3 flex items-center justify-between gap-3 z-10">
+          <p className="flex-1 min-w-0 text-sm text-[#1B6B7B]">
+            Highlight the new text for this annotation, then choose <span className="font-semibold">Update selection</span>.
+          </p>
+          <button
+            onClick={cancelEditSelection}
+            className="shrink-0 text-sm text-gray-500 hover:text-gray-700 font-medium"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
@@ -1503,19 +1704,29 @@ async function handleCopy() {
             title="Tags"
           >
             {data && (
-              <div className="px-5 pt-4 pb-4">
-                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="pt-4 pb-4">
+                <div className="mx-5 mb-1 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="font-serif text-xs text-gray-500 line-clamp-2">"{data.snapshotText}"</p>
                 </div>
+                <button
+                  onClick={() => startEditSelection(data.selectionId, { type: 'tags', passageId: annotationPanel!.passageId })}
+                  className="mx-5 mb-3 text-xs text-[#1B6B7B] font-medium hover:underline"
+                >
+                  Edit text selection
+                </button>
                 {data.tags.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">No tags on this selection.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div>
                     {data.tags.map(tag => (
-                      <div key={tag.id} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                        <TagIcon size={16} />
-                        <span className="text-sm font-medium text-gray-800">{tag.name}</span>
-                      </div>
+                      <TagViewNode
+                        key={tag.id}
+                        tag={tag}
+                        allTags={allTags}
+                        depth={0}
+                        fetchQuotes={fetchTagQuotes}
+                        onOpenBook={onOpenBook ? (bookId, passageId) => { onOpenBook(bookId, passageId); closeAnnotationPanel(); } : undefined}
+                      />
                     ))}
                   </div>
                 )}
@@ -1552,9 +1763,15 @@ async function handleCopy() {
           >
             {data && (
               <div className="px-5 pt-4 pb-2">
-                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="mb-1 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="font-serif text-xs text-gray-500 line-clamp-2">"{data.snapshotText}"</p>
                 </div>
+                <button
+                  onClick={() => startEditSelection(data.selectionId, { type: 'note', passageId: annotationPanel!.passageId })}
+                  className="mb-4 text-xs text-[#1B6B7B] font-medium hover:underline"
+                >
+                  Edit text selection
+                </button>
                 <textarea
                   autoFocus
                   value={editNoteContent}
@@ -1572,6 +1789,9 @@ async function handleCopy() {
       {(() => {
         const entries = annotationPanel?.type === 'xrefs' ? (passageToXrefs.get(annotationPanel.passageId) ?? []) : [];
         const thisSnap = entries[0]?.thisSnapshotText ?? '';
+        // The source selection is editable only when every xref shares one "from" selection.
+        const sourceSelIds = new Set(entries.map(e => e.thisSelectionId));
+        const editableSelId = sourceSelIds.size === 1 ? entries[0]?.thisSelectionId : null;
         return (
           <PanelSheet
             visible={annotationPanel?.type === 'xrefs'}
@@ -1580,9 +1800,17 @@ async function handleCopy() {
           >
             <div className="px-5 pt-4 pb-4">
               {thisSnap && (
-                <div className="mb-4 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="mb-1 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-xs text-gray-500 line-clamp-2">"{thisSnap}"</p>
                 </div>
+              )}
+              {editableSelId && (
+                <button
+                  onClick={() => startEditSelection(editableSelId, { type: 'xrefs', passageId: annotationPanel!.passageId })}
+                  className="mb-4 text-xs text-[#1B6B7B] font-medium hover:underline"
+                >
+                  Edit text selection
+                </button>
               )}
               {entries.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-4">No cross-references found.</p>
