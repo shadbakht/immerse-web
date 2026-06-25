@@ -1192,7 +1192,7 @@ async function handleCopy() {
                     title={collapsedToc.has(key) ? 'Expand' : 'Collapse'}
                     aria-label={collapsedToc.has(key) ? 'Expand section' : 'Collapse section'}
                   >
-                    <span className="text-xs">{collapsedToc.has(key) ? '▸' : '▾'}</span>
+                    <span className={`text-base inline-block transition-transform duration-150 ${collapsedToc.has(key) ? '' : 'rotate-90'}`}>›</span>
                   </button>
                 )}
               </div>
