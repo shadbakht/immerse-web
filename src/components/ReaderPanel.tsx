@@ -1789,9 +1789,9 @@ async function handleCopy() {
       {(() => {
         const entries = annotationPanel?.type === 'xrefs' ? (passageToXrefs.get(annotationPanel.passageId) ?? []) : [];
         const thisSnap = entries[0]?.thisSnapshotText ?? '';
-        // The source selection is editable only when every xref shares one "from" selection.
-        const sourceSelIds = new Set(entries.map(e => e.thisSelectionId));
-        const editableSelId = sourceSelIds.size === 1 ? entries[0]?.thisSelectionId : null;
+        // Edit re-anchors the passage's source selection (the one shown above), matching
+        // how the tags/note panels edit their single per-passage selection.
+        const editableSelId = entries[0]?.thisSelectionId ?? null;
         return (
           <PanelSheet
             visible={annotationPanel?.type === 'xrefs'}
