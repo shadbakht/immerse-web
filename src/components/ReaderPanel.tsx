@@ -149,6 +149,8 @@ interface XrefViewEntry {
   xrefId: string;
   thisSelectionId: string;
   thisSnapshotText: string;
+  thisStartOffset: number;
+  thisEndOffset: number;
   otherPassageId: string;
   otherSnapshotText: string;
   otherBookId: string | null;
@@ -952,9 +954,10 @@ async function handleCopy() {
       return;
     }
     const { data: sels } = await supabase
-      .from('selections').select('id, snapshot_text').eq('user_id', userId).eq('passage_id', passageId);
+      .from('selections').select('id, snapshot_text, start_offset, end_offset').eq('user_id', userId).eq('passage_id', passageId);
     const selIds = (sels ?? []).map((s: any) => s.id as string);
     const selSnaps = new Map((sels ?? []).map((s: any) => [s.id as string, (s.snapshot_text as string) ?? '']));
+    const selAnchors = new Map((sels ?? []).map((s: any) => [s.id as string, { startOffset: (s.start_offset as number) ?? 0, endOffset: (s.end_offset as number) ?? 0 }]));
     if (selIds.length === 0) return;
     const [{ data: xrefsA }, { data: xrefsB }] = await Promise.all([
       supabase.from('xrefs').select('id, selection_a_id, selection_b_id').in('selection_a_id', selIds),
@@ -1000,6 +1003,8 @@ async function handleCopy() {
         xrefId,
         thisSelectionId: thisSelId,
         thisSnapshotText: selSnaps.get(thisSelId) ?? '',
+        thisStartOffset: selAnchors.get(thisSelId)?.startOffset ?? 0,
+        thisEndOffset: selAnchors.get(thisSelId)?.endOffset ?? 0,
         otherPassageId: other.passage_id,
         otherSnapshotText: other.snapshot_text ?? '',
         otherBookId: bookObj?.id ?? null,
@@ -1096,7 +1101,22 @@ async function handleCopy() {
   }
 
   // Creates selection A (the "from") using stored pick-from data
+  // Find an existing selection covering the same range so a highlight cross-referenced
+  // (or also tagged/noted) more than once shares one selection row instead of duplicating it.
+  async function findSelectionIdByAnchor(passageId: string, startOffset: number, endOffset: number): Promise<string | null> {
+    const { data } = await supabase
+      .from('selections').select('id')
+      .eq('user_id', userId)
+      .eq('passage_id', passageId)
+      .eq('start_offset', startOffset)
+      .eq('end_offset', endOffset)
+      .limit(1);
+    return data?.[0]?.id ?? null;
+  }
+
   async function createSelectionFrom(from: XRefPickFrom): Promise<string> {
+    const existing = await findSelectionIdByAnchor(from.startPassageId, from.startOffset, from.endOffset);
+    if (existing) return existing;
     const now = new Date().toISOString();
     const [{ data: pidRow }, { data: bookRow }] = await Promise.all([
       supabase.from('passage_pid_map').select('pid').eq('passage_id', from.startPassageId).maybeSingle(),
@@ -1144,31 +1164,38 @@ async function handleCopy() {
       const { data: targetBookRow } = passageDataB?.book_id
         ? await supabase.from('book_slug_map').select('local_id').eq('book_id', passageDataB.book_id).maybeSingle()
         : { data: null };
-      const { data: selB } = await supabase.from('selections').insert({
-        user_id:               userId,
-        passage_id:            targetPassageId,
-        start_pid:             pidRowB?.pid ?? null,
-        end_pid:               pidRowB?.pid ?? null,
-        book_local_id:         targetBookRow?.local_id ?? null,
-        anchor_schema_version: 1,
-        start_offset:          0,
-        end_offset:            snapshotText.length,
-        snapshot_text:         snapshotText,
-        created_at:            now,
-        updated_at:            now,
-      }).select('id').single();
-      if (!selB) throw new Error('Could not create target selection');
+      const existingB = await findSelectionIdByAnchor(targetPassageId, 0, snapshotText.length);
+      let selBId: string;
+      if (existingB) {
+        selBId = existingB;
+      } else {
+        const { data: selB } = await supabase.from('selections').insert({
+          user_id:               userId,
+          passage_id:            targetPassageId,
+          start_pid:             pidRowB?.pid ?? null,
+          end_pid:               pidRowB?.pid ?? null,
+          book_local_id:         targetBookRow?.local_id ?? null,
+          anchor_schema_version: 1,
+          start_offset:          0,
+          end_offset:            snapshotText.length,
+          snapshot_text:         snapshotText,
+          created_at:            now,
+          updated_at:            now,
+        }).select('id').single();
+        if (!selB) throw new Error('Could not create target selection');
+        selBId = selB.id;
+      }
 
       // Xref linking both selections
       const { data: xrefData } = await supabase.from('xrefs').insert({
         user_id:        userId,
         selection_a_id: selIdA,
-        selection_b_id: selB.id,
+        selection_b_id: selBId,
         created_at:     now,
         updated_at:     now,
       }).select('id').single();
       if (xrefData) {
-        await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, updated_at: now }).catch(() => {});
+        await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selBId, updated_at: now }).catch(() => {});
         // Auto-generate label in background
         supabase.functions.invoke('generate-xref-label', {
           body: { text_a: from.text, text_b: snapshotText },
@@ -1222,31 +1249,38 @@ async function handleCopy() {
       const { data: targetBookRow } = passageDataB?.book_id
         ? await supabase.from('book_slug_map').select('local_id').eq('book_id', passageDataB.book_id).maybeSingle()
         : { data: null };
-      const { data: selB } = await supabase.from('selections').insert({
-        user_id:               userId,
-        passage_id:            bar.startPassageId,
-        start_pid:             pidRowB?.pid ?? null,
-        end_pid:               endPidRow?.pid ?? null,
-        book_local_id:         targetBookRow?.local_id ?? null,
-        anchor_schema_version: 1,
-        start_offset:          bar.startOffset,
-        end_offset:            bar.endOffset,
-        snapshot_text:         snapshotText,
-        created_at:            now,
-        updated_at:            now,
-      }).select('id').single();
-      if (!selB) throw new Error('Could not create target selection');
+      const existingB = await findSelectionIdByAnchor(bar.startPassageId, bar.startOffset, bar.endOffset);
+      let selBId: string;
+      if (existingB) {
+        selBId = existingB;
+      } else {
+        const { data: selB } = await supabase.from('selections').insert({
+          user_id:               userId,
+          passage_id:            bar.startPassageId,
+          start_pid:             pidRowB?.pid ?? null,
+          end_pid:               endPidRow?.pid ?? null,
+          book_local_id:         targetBookRow?.local_id ?? null,
+          anchor_schema_version: 1,
+          start_offset:          bar.startOffset,
+          end_offset:            bar.endOffset,
+          snapshot_text:         snapshotText,
+          created_at:            now,
+          updated_at:            now,
+        }).select('id').single();
+        if (!selB) throw new Error('Could not create target selection');
+        selBId = selB.id;
+      }
 
       // Xref linking both selections
       const { data: xrefData } = await supabase.from('xrefs').insert({
         user_id:        userId,
         selection_a_id: selIdA,
-        selection_b_id: selB.id,
+        selection_b_id: selBId,
         created_at:     now,
         updated_at:     now,
       }).select('id').single();
       if (xrefData) {
-        await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selB.id, updated_at: now }).catch(() => {});
+        await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selBId, updated_at: now }).catch(() => {});
         supabase.functions.invoke('generate-xref-label', {
           body: { text_a: from.text, text_b: snapshotText },
         }).then(async ({ data }) => {
@@ -1794,11 +1828,18 @@ async function handleCopy() {
         const entries = annotationPanel?.type === 'xrefs' ? (passageToXrefs.get(annotationPanel.passageId) ?? []) : [];
         const thisSnap = entries[0]?.thisSnapshotText ?? '';
         // Edit re-anchors the source quote shown at top. One highlight can spawn a
-        // duplicate source selection per xref, so gather every source selection whose
-        // snapshot matches the displayed quote and move them all together.
-        const editSelIds = [...new Set(
-          entries.filter(e => e.thisSnapshotText === thisSnap).map(e => e.thisSelectionId),
-        )];
+        // duplicate source selection per xref, so gather every source selection covering
+        // the same range (offsets) as the displayed quote and move them all together.
+        // Matching on offsets (not snapshot text) avoids touching a different highlight
+        // that happens to share identical text.
+        const first = entries[0];
+        const editSelIds = first
+          ? [...new Set(
+              entries
+                .filter(e => e.thisStartOffset === first.thisStartOffset && e.thisEndOffset === first.thisEndOffset)
+                .map(e => e.thisSelectionId),
+            )]
+          : [];
         return (
           <PanelSheet
             visible={annotationPanel?.type === 'xrefs'}
