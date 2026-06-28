@@ -39,5 +39,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Exempt static public assets (incl. catalog.json / slug-map.json) so they
+  // serve directly without an auth check or a redirect-to-login for guests.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|txt|ico|woff2?|map)$).*)'],
 };

@@ -95,12 +95,23 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     syncFollowedUsers(userId).catch(e => console.warn('[AppShell] syncFollowed error:', e));
   }, [userId]);
 
-  async function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false) {
-    const id = await resolveBookId(bookId);
-    setReaderTarget({ bookId: id, passageId, highlightQuery });
+  function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false) {
+    // Switch to the reader IMMEDIATELY — never block the tab change on slug
+    // resolution. The reader (loadBook) resolves a slug→uuid itself for
+    // rendering; we also resolve in the background so reading_progress writes
+    // use the uuid.
     setActiveTab('library');
     setLibraryCollapsed(collapseLibrary);
-    history.replaceState(null, '', `/read/${id}`);
+    setReaderTarget({ bookId, passageId, highlightQuery });
+    history.replaceState(null, '', `/read/${bookId}`);
+    if (!UUID_RE.test(bookId) && !bookId.startsWith('imported:')) {
+      resolveBookId(bookId).then(id => {
+        if (id !== bookId) {
+          setReaderTarget(t => (t && t.bookId === bookId ? { ...t, bookId: id } : t));
+          history.replaceState(null, '', `/read/${id}`);
+        }
+      });
+    }
   }
 
   function openBookFromHome(bookId: string, passageId?: string, highlightQuery?: string) {
