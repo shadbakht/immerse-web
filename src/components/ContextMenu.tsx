@@ -40,16 +40,16 @@ export function ContextMenu({ options }: { options: MenuOption[] }) {
       <button
         ref={buttonRef}
         onClick={handleOpen}
-        className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#272e36] rounded-lg transition-colors shrink-0"
+        className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg transition-colors shrink-0"
         title="Options"
       >
-        <span className="text-gray-400 dark:text-gray-500 text-lg">⋮</span>
+        <span className="text-gray-400 dark:text-[#5C7A8E] text-lg">⋮</span>
       </button>
       {open && pos && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: pos.top, right: pos.right }}
-          className="w-48 bg-white dark:bg-[#1b2128] rounded-lg shadow-lg border border-gray-200 dark:border-white/10 z-[9999] overflow-hidden"
+          className="w-48 bg-white dark:bg-[#1B2A38] rounded-lg shadow-lg border border-gray-200 dark:border-[#2D4050] z-[9999] overflow-hidden"
         >
           {options.map((option, i) => (
             <button
@@ -58,8 +58,8 @@ export function ContextMenu({ options }: { options: MenuOption[] }) {
                 option.onClick();
                 setOpen(false);
               }}
-              className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors border-b border-gray-100 dark:border-white/10 last:border-b-0 ${
-                option.color === 'danger' ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 dark:text-gray-300'
+              className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors border-b border-gray-100 dark:border-[#2D4050] last:border-b-0 ${
+                option.color === 'danger' ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 dark:text-[#B8C7D6]'
               }`}
             >
               {option.icon && <span className="text-base">{option.icon}</span>}

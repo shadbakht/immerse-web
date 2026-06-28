@@ -113,11 +113,11 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-2xl mx-auto px-8 py-10">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-8">Home</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">Home</h1>
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <>
@@ -127,9 +127,9 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                 <button
                   key={label}
                   onClick={() => onTabChange(tab)}
-                  className="bg-white dark:bg-[#1b2128] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-white/10 text-left hover:border-[#1B6B7B]/30 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-[#1B2A38] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-[#2D4050] text-left hover:border-[#1B6B7B]/30 dark:hover:border-[#2D9DB3]/30 hover:shadow-md transition-all"
                 >
-                  <div className="text-5xl font-light text-gray-900 dark:text-gray-100 mb-1">{count}</div>
+                  <div className="text-5xl font-light text-gray-900 dark:text-[#E2EAF2] mb-1">{count}</div>
                   <div className="text-xs font-bold tracking-widest uppercase" style={{ color }}>
                     {label}
                   </div>
@@ -138,23 +138,23 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
             </div>
 
             {/* Recently read */}
-            <h2 className="text-sm font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-4">
+            <h2 className="text-sm font-semibold text-gray-400 dark:text-[#5C7A8E] uppercase tracking-widest mb-4">
               Recently Read
             </h2>
             {!userId ? (
-              <div className="bg-white dark:bg-[#1b2128] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm px-6 py-8 text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
+              <div className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm px-6 py-8 text-center">
+                <p className="text-sm text-gray-600 dark:text-[#8FA4B8] leading-relaxed mb-4">
                   Sign in to see your recently read books, annotations, and more across all your devices.
                 </p>
                 <a
                   href="/login"
-                  className="inline-block bg-[#1B6B7B] text-white font-semibold py-2.5 px-6 rounded-xl hover:bg-[#155a68] transition-colors text-sm"
+                  className="inline-block bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-2.5 px-6 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
                 >
                   Sign In or Create Account
                 </a>
               </div>
             ) : recentBooks.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-gray-500">No reading history yet. Open a book from the Library to get started.</p>
+              <p className="text-sm text-gray-400 dark:text-[#5C7A8E]">No reading history yet. Open a book from the Library to get started.</p>
             ) : (
               <div className="space-y-2">
                 {recentBooks.map(book => {
@@ -168,7 +168,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                   return (
                     <div
                       key={book.bookId}
-                      className="flex items-center bg-white dark:bg-[#1b2128] rounded-xl shadow-sm border border-gray-100 dark:border-white/10 hover:border-[#1B6B7B]/30 hover:bg-[#1B6B7B]/5 transition-colors"
+                      className="flex items-center bg-white dark:bg-[#1B2A38] rounded-xl shadow-sm border border-gray-100 dark:border-[#2D4050] hover:border-[#1B6B7B]/30 dark:hover:border-[#2D9DB3]/30 hover:bg-[#1B6B7B]/5 dark:hover:bg-[#2D9DB3]/5 transition-colors"
                     >
                       <button
                         onClick={() => onOpenBook(book.bookId, book.passageId ?? undefined)}
@@ -176,19 +176,19 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="min-w-0 mr-4">
-                            <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{book.title}</div>
+                            <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
                             {book.subtitle && (
-                              <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{book.subtitle}</div>
+                              <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 truncate">{book.subtitle}</div>
                             )}
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-xs font-medium text-[#1B6B7B]">{pct}%</div>
-                            <div className="text-xs text-gray-300 dark:text-gray-600 mt-0.5">{formatDate(book.updatedAt)}</div>
+                            <div className="text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">{pct}%</div>
+                            <div className="text-xs text-gray-300 dark:text-[#4A6478] mt-0.5">{formatDate(book.updatedAt)}</div>
                           </div>
                         </div>
-                        <div className="h-1 bg-gray-100 dark:bg-[#272e36] rounded-full overflow-hidden">
+                        <div className="h-1 bg-gray-100 dark:bg-[#2D4050] rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-[#1B6B7B] rounded-full transition-all"
+                            className="h-full bg-[#1B6B7B] dark:bg-[#2D9DB3] rounded-full transition-all"
                             style={{ width: `${pct}%` }}
                           />
                         </div>

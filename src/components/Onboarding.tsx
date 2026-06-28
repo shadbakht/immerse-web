@@ -53,32 +53,32 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 py-6" onClick={onClose}>
       <div
-        className="relative bg-white dark:bg-[#1b2128] rounded-2xl shadow-2xl w-full max-w-3xl max-h-full flex flex-col overflow-hidden"
+        className="relative bg-white dark:bg-[#1B2A38] rounded-2xl shadow-2xl w-full max-w-3xl max-h-full flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-gray-500 dark:text-gray-400 hover:bg-black/10 transition-colors"
+          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-gray-500 dark:text-[#8FA4B8] hover:bg-black/10 transition-colors"
           aria-label="Close intro"
         >
           ✕
         </button>
 
         {/* Screenshot */}
-        <div className="flex-1 min-h-0 bg-gray-50 dark:bg-[#20262d] flex items-center justify-center p-4">
+        <div className="flex-1 min-h-0 bg-gray-50 dark:bg-[#243040] flex items-center justify-center p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/onboarding/${step.img}`}
             alt={step.title}
-            className="max-w-full max-h-[55vh] object-contain rounded-lg shadow-sm border border-gray-200 dark:border-white/10"
+            className="max-w-full max-h-[55vh] object-contain rounded-lg shadow-sm border border-gray-200 dark:border-[#2D4050]"
           />
         </div>
 
         {/* Caption + controls */}
-        <div className="shrink-0 px-6 pt-4 pb-5 border-t border-gray-100 dark:border-white/10">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">{step.title}</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-1 leading-relaxed min-h-[2.5rem]">{step.caption}</p>
+        <div className="shrink-0 px-6 pt-4 pb-5 border-t border-gray-100 dark:border-[#2D4050]">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] text-center">{step.title}</h3>
+          <p className="text-sm text-gray-500 dark:text-[#8FA4B8] text-center mt-1 leading-relaxed min-h-[2.5rem]">{step.caption}</p>
 
           {/* Dots */}
           <div className="flex justify-center gap-1.5 mt-3">
@@ -87,7 +87,7 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
                 key={idx}
                 onClick={() => go(idx)}
                 aria-label={`Go to step ${idx + 1}`}
-                className={`h-1.5 rounded-full transition-all ${idx === i ? 'w-5 bg-[#1B6B7B]' : 'w-1.5 bg-gray-300 hover:bg-gray-400 dark:hover:bg-[#3a434d]'}`}
+                className={`h-1.5 rounded-full transition-all ${idx === i ? 'w-5 bg-[#1B6B7B] dark:bg-[#2D9DB3]' : 'w-1.5 bg-gray-300 hover:bg-gray-400 dark:hover:bg-[#3F5468]'}`}
               />
             ))}
           </div>
@@ -97,21 +97,21 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
             <button
               onClick={() => go(i - 1)}
               disabled={i === 0}
-              className="text-sm text-gray-500 dark:text-gray-400 font-medium px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#272e36] transition-colors disabled:opacity-0"
+              className="text-sm text-gray-500 dark:text-[#8FA4B8] font-medium px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#2D4050] transition-colors disabled:opacity-0"
             >
               ← Back
             </button>
             {i < last ? (
               <button
                 onClick={() => go(i + 1)}
-                className="text-sm font-semibold bg-[#1B6B7B] text-white px-5 py-2 rounded-xl hover:bg-[#155a68] transition-colors"
+                className="text-sm font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-5 py-2 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
               >
                 Next →
               </button>
             ) : (
               <button
                 onClick={onClose}
-                className="text-sm font-semibold bg-[#1B6B7B] text-white px-5 py-2 rounded-xl hover:bg-[#155a68] transition-colors"
+                className="text-sm font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-5 py-2 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
               >
                 Done
               </button>

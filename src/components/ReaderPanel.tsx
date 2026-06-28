@@ -98,7 +98,7 @@ function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp:
         <sup
           key={kp + i}
           onClick={e => { e.stopPropagation(); onFootnoteClick(m[1]); }}
-          className="text-[10px] text-[#1B6B7B] font-medium ml-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
+          className="text-[10px] text-[#1B6B7B] dark:text-[#2D9DB3] font-medium ml-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
           title={`Footnote ${m[1]}`}
         >
           {m[1]}
@@ -184,20 +184,20 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
     <div>
       <button
         onClick={toggle}
-        className="w-full flex items-center gap-2 py-2.5 pr-4 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left"
+        className="w-full flex items-center gap-2 py-2.5 pr-4 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left"
         style={{ paddingLeft: 20 + depth * 18 }}
       >
         <TagIcon size={16} />
-        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{tag.name}</span>
-        <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{tag.name}</span>
+        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
       </button>
       {open && (
         <div>
           <div style={{ paddingLeft: 20 + depth * 18 + 24 }} className="pr-4">
             {quotes === null ? (
-              <p className="py-1.5 text-xs text-gray-400 dark:text-gray-500">Loading…</p>
+              <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">Loading…</p>
             ) : quotes.length === 0 ? (
-              <p className="py-1.5 text-xs text-gray-400 dark:text-gray-500">No quotes filed here.</p>
+              <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">No quotes filed here.</p>
             ) : (
               <div className="space-y-1.5 pb-1.5">
                 {quotes.map(q => <TagQuoteRow key={q.id} quote={q} onOpenBook={onOpenBook} />)}
@@ -216,19 +216,19 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
 function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (bookId: string, passageId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="px-3 py-2 bg-gray-50 dark:bg-[#20262d] rounded-lg border border-gray-100 dark:border-white/10">
+    <div className="px-3 py-2 bg-gray-50 dark:bg-[#243040] rounded-lg border border-gray-100 dark:border-[#2D4050]">
       <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-        <p className={`font-serif text-sm text-gray-700 dark:text-gray-300 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+        <p className={`font-serif text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
           "{quote.text}"
         </p>
       </div>
       {expanded && (
         <>
-          {quote.citation && <p className="text-xs text-[#1B6B7B] font-medium mt-1.5">{quote.citation}</p>}
+          {quote.citation && <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mt-1.5">{quote.citation}</p>}
           {quote.bookId && onOpenBook && (
             <button
               onClick={() => onOpenBook(quote.bookId!, quote.passageId)}
-              className="mt-1.5 text-xs text-[#1B6B7B] font-medium hover:underline"
+              className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
               Open in reader →
             </button>
@@ -247,20 +247,20 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
   const [expanded, setExpanded] = useState(false);
   const menuOptions: MenuOption[] = [{ label: 'Delete', icon: '🗑️', color: 'danger', onClick: onDelete }];
   return (
-    <div className="bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+    <div className="bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050] overflow-hidden">
       <div className="px-4 py-3 flex items-start gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-[#1B6B7B] font-medium mb-1.5 truncate">{entry.otherCitation}</p>
+          <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mb-1.5 truncate">{entry.otherCitation}</p>
           <div className="cursor-pointer select-none flex items-start gap-2" onClick={() => setExpanded(v => !v)}>
-            <p className={`flex-1 font-serif text-sm text-gray-700 dark:text-gray-300 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+            <p className={`flex-1 font-serif text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
               "{entry.otherSnapshotText}"
             </p>
-            <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
+            <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
           </div>
           {expanded && entry.otherBookId && onOpenBook && (
             <button
               onClick={() => onOpenBook(entry.otherBookId!, entry.otherPassageId)}
-              className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline"
+              className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
               Open in reader →
             </button>
@@ -1334,7 +1334,7 @@ async function handleCopy() {
 
   if (!target) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+      <div className="h-full flex items-center justify-center text-gray-300 dark:text-[#4A6478]">
         <div className="text-center">
           <div className="text-5xl mb-3">✦</div>
           <p className="text-sm">Select a book to begin reading</p>
@@ -1363,7 +1363,7 @@ async function handleCopy() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -1401,16 +1401,16 @@ async function handleCopy() {
       {toc.length > 0 && (
         <button
           onClick={() => setTocOpen(o => !o)}
-          className="absolute top-4 right-4 z-20 p-2 bg-white dark:bg-[#1b2128] border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors shadow-sm"
+          className="absolute top-4 right-4 z-20 p-2 bg-white dark:bg-[#1B2A38] border border-gray-200 dark:border-[#2D4050] rounded-lg hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors shadow-sm"
           title="Table of Contents"
         >
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
-            <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-gray-400" />
-            <line x1="6" y1="4"  x2="20" y2="4"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-gray-400" />
-            <circle cx="3" cy="9"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-gray-400" />
-            <line x1="6" y1="9"  x2="20" y2="9"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-gray-400" />
-            <circle cx="3" cy="14" r="1.5" fill="currentColor" className="text-gray-600 dark:text-gray-400" />
-            <line x1="6" y1="14" x2="20" y2="14" stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-gray-400" />
+            <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-[#8FA4B8]" />
+            <line x1="6" y1="4"  x2="20" y2="4"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-[#8FA4B8]" />
+            <circle cx="3" cy="9"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-[#8FA4B8]" />
+            <line x1="6" y1="9"  x2="20" y2="9"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-[#8FA4B8]" />
+            <circle cx="3" cy="14" r="1.5" fill="currentColor" className="text-gray-600 dark:text-[#8FA4B8]" />
+            <line x1="6" y1="14" x2="20" y2="14" stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-[#8FA4B8]" />
           </svg>
         </button>
       )}
@@ -1419,16 +1419,16 @@ async function handleCopy() {
       {tocOpen && (
         <>
           <div className="absolute inset-0 z-10" onClick={() => setTocOpen(false)} />
-          <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white dark:bg-[#1b2128] rounded-xl shadow-xl border border-gray-200 dark:border-white/10">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10 font-semibold text-sm text-gray-700 dark:text-gray-300">
+          <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white dark:bg-[#1B2A38] rounded-xl shadow-xl border border-gray-200 dark:border-[#2D4050]">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-[#2D4050] font-semibold text-sm text-gray-700 dark:text-[#B8C7D6]">
               Table of Contents
             </div>
             {tocDisplay.map(({ entry, i, key, hasChildren }) => (
-              <div key={i} className="flex items-stretch border-b border-gray-50 dark:border-white/5 last:border-0">
+              <div key={i} className="flex items-stretch border-b border-gray-50 dark:border-[#2D4050]/60 last:border-0">
                 <button
                   onClick={() => scrollToPassage(entry.passageId)}
-                  className={`flex-1 text-left py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors ${
-                    entry.depth ? 'pl-10 pr-2 text-gray-500 dark:text-gray-400' : 'px-4 text-gray-700 dark:text-gray-300 font-medium'
+                  className={`flex-1 text-left py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors ${
+                    entry.depth ? 'pl-10 pr-2 text-gray-500 dark:text-[#8FA4B8]' : 'px-4 text-gray-700 dark:text-[#B8C7D6] font-medium'
                   }`}
                 >
                   {entry.label}
@@ -1436,7 +1436,7 @@ async function handleCopy() {
                 {hasChildren && (
                   <button
                     onClick={() => toggleTocSection(key)}
-                    className="w-10 shrink-0 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
+                    className="w-10 shrink-0 flex items-center justify-center text-gray-400 dark:text-[#5C7A8E] hover:text-gray-700 dark:hover:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
                     title={collapsedToc.has(key) ? 'Expand' : 'Collapse'}
                     aria-label={collapsedToc.has(key) ? 'Expand section' : 'Collapse section'}
                   >
@@ -1484,13 +1484,13 @@ async function handleCopy() {
 
       {/* Edit-text-selection banner */}
       {editingSel && (
-        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
-          <p className="flex-1 min-w-0 text-sm text-[#1B6B7B]">
+        <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
+          <p className="flex-1 min-w-0 text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">
             Highlight the new text for this annotation, then choose <span className="font-semibold">Update selection</span>.
           </p>
           <button
             onClick={cancelEditSelection}
-            className="shrink-0 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium"
+            className="shrink-0 text-sm text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] font-medium"
           >
             Cancel
           </button>
@@ -1499,17 +1499,17 @@ async function handleCopy() {
 
       {/* Xref pick-mode banner */}
       {xrefPickFrom && (
-        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
+        <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">
             {pickSaving ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="text-sm text-[#1B6B7B] font-medium">Saving cross-reference…</span>
+                <div className="w-4 h-4 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin shrink-0" />
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] font-medium">Saving cross-reference…</span>
               </div>
             ) : (
               <>
-                <p className="text-sm font-semibold text-[#1B6B7B]">Select text or click a passage to link</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                <p className="text-sm font-semibold text-[#1B6B7B] dark:text-[#2D9DB3]">Select text or click a passage to link</p>
+                <p className="text-xs text-gray-500 dark:text-[#8FA4B8] truncate mt-0.5">
                   "{xrefPickFrom.text.length > 80 ? xrefPickFrom.text.slice(0, 80) + '…' : xrefPickFrom.text}"
                 </p>
               </>
@@ -1518,7 +1518,7 @@ async function handleCopy() {
           {!pickSaving && (
             <button
               onClick={onXrefPickDone}
-              className="shrink-0 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#272e36] transition-colors"
+              className="shrink-0 text-xs text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2D4050] transition-colors"
             >
               Cancel
             </button>
@@ -1530,8 +1530,8 @@ async function handleCopy() {
       {pdfUrl && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {book && (
-            <div className="px-6 py-3 border-b border-gray-100 dark:border-white/10 shrink-0">
-              <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{book.title}</h1>
+            <div className="px-6 py-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
+              <h1 className="text-base font-semibold text-gray-900 dark:text-[#E2EAF2] truncate">{book.title}</h1>
             </div>
           )}
           <embed src={pdfUrl} type="application/pdf" className="flex-1 w-full" />
@@ -1543,8 +1543,8 @@ async function handleCopy() {
         <div className="max-w-[70ch] mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
-              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 leading-snug">{book.title}</h1>
-              {book.authorName && <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">{book.authorName}</p>}
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] leading-snug">{book.title}</h1>
+              {book.authorName && <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">{book.authorName}</p>}
             </div>
           )}
 
@@ -1584,18 +1584,18 @@ async function handleCopy() {
                   <>
                     {showPrayerDivider && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
-                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
-                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{prayerSection}</span>
-                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
+                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B] dark:text-[#2D9DB3]">{prayerSection}</span>
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
                     {showChapter && prayerTitle && (
-                      <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-1">
+                      <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-[#E2EAF2] mt-3 mb-1">
                         {prayerTitle}
                       </h2>
                     )}
                     {showSection && (
-                      <h3 className="text-center text-xs font-normal text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-5">
+                      <h3 className="text-center text-xs font-normal text-gray-400 dark:text-[#5C7A8E] uppercase tracking-wide mb-5">
                         {passage.section_title}
                       </h3>
                     )}
@@ -1604,13 +1604,13 @@ async function handleCopy() {
                   <>
                     {showChapter && passage.chapter_label && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
-                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
-                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{passage.chapter_label}</span>
-                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
+                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B] dark:text-[#2D9DB3]">{passage.chapter_label}</span>
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
                     {showSection && (
-                      <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-4">
+                      <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-[#E2EAF2] mt-3 mb-4">
                         {passage.section_title}
                       </h2>
                     )}
@@ -1619,13 +1619,13 @@ async function handleCopy() {
                   <>
                     {showChapter && (
                       <div className="flex items-center gap-3 mt-12 mb-4">
-                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
-                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B]">{passage.chapter_label}</span>
-                        <span className="flex-1 h-px bg-[#1B6B7B]/25" />
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
+                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B] dark:text-[#2D9DB3]">{passage.chapter_label}</span>
+                        <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
                     {showSection && (
-                      <h3 className="text-sm font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide text-center mt-8 mb-3">
+                      <h3 className="text-sm font-medium text-gray-400 dark:text-[#5C7A8E] uppercase tracking-wide text-center mt-8 mb-3">
                         {passage.section_title}
                       </h3>
                     )}
@@ -1667,13 +1667,13 @@ async function handleCopy() {
                     </div>
                   )}
                   {passage.paragraph_number != null && !isLetterDate && (
-                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 dark:text-gray-500 select-none w-7 text-right leading-relaxed tabular-nums">
+                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-right leading-relaxed tabular-nums">
                       {passage.paragraph_number}
                     </span>
                   )}
                   <p
                     data-pid={passage.id}
-                    className={`font-serif text-gray-800 dark:text-gray-200 leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
+                    className={`font-serif text-gray-800 dark:text-[#D2DCE8] leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
                     style={{ fontSize: 'var(--quote-font-size)' }}
                   >
                     <PassageContent
@@ -1684,7 +1684,7 @@ async function handleCopy() {
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                     />
                     {attribution && (
-                      <span className="block text-right italic text-gray-500 dark:text-gray-400 mt-2">{attribution}</span>
+                      <span className="block text-right italic text-gray-500 dark:text-[#8FA4B8] mt-2">{attribution}</span>
                     )}
                   </p>
                 </div>
@@ -1698,19 +1698,19 @@ async function handleCopy() {
       {activeFootnote && (
         <>
           <div className="absolute inset-0 z-30" onClick={() => setActiveFootnote(null)} />
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#1b2128] border-t border-gray-200 dark:border-white/10 shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#1B2A38] border-t border-gray-200 dark:border-[#2D4050] shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className="text-xs font-bold text-[#1B6B7B] uppercase tracking-widest mb-2 block">
+                <span className="text-xs font-bold text-[#1B6B7B] dark:text-[#2D9DB3] uppercase tracking-widest mb-2 block">
                   Footnote {activeFootnote.num}
                 </span>
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                  {activeFootnote.text || <span className="text-gray-400 dark:text-gray-500">Footnote text not available in the web version.</span>}
+                <p className="text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed">
+                  {activeFootnote.text || <span className="text-gray-400 dark:text-[#5C7A8E]">Footnote text not available in the web version.</span>}
                 </p>
               </div>
               <button
                 onClick={() => setActiveFootnote(null)}
-                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-lg shrink-0 mt-0.5"
+                className="text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8] text-lg shrink-0 mt-0.5"
               >
                 ✕
               </button>
@@ -1723,12 +1723,12 @@ async function handleCopy() {
       <PanelSheet visible={activePanel === 'signin'} onClose={closePanel} title="Sign In Required">
         <div className="px-5 py-8 text-center">
           <div className="text-4xl mb-4">✦</div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-6">
+          <p className="text-sm text-gray-600 dark:text-[#8FA4B8] leading-relaxed mb-6">
             Sign in to tag, annotate, and save passages across all your devices.
           </p>
           <a
             href="/login"
-            className="block w-full bg-[#1B6B7B] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] transition-colors text-sm"
+            className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
           >
             Sign In or Create Account
           </a>
@@ -1769,17 +1769,17 @@ async function handleCopy() {
           >
             {data && (
               <div className="pt-4 pb-4">
-                <div className="mx-5 mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
-                  <p className="font-serif text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{data.snapshotText}"</p>
+                <div className="mx-5 mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050]">
+                  <p className="font-serif text-xs text-gray-500 dark:text-[#8FA4B8] line-clamp-2">"{data.snapshotText}"</p>
                 </div>
                 <button
                   onClick={() => startEditSelection([data.selectionId], { type: 'tags', passageId: annotationPanel!.passageId })}
-                  className="mx-5 mb-3 text-xs text-[#1B6B7B] font-medium hover:underline"
+                  className="mx-5 mb-3 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                 >
                   Edit text selection
                 </button>
                 {data.tags.length === 0 ? (
-                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No tags on this selection.</p>
+                  <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-4">No tags on this selection.</p>
                 ) : (
                   <div>
                     {data.tags.map(tag => (
@@ -1818,7 +1818,7 @@ async function handleCopy() {
                 </button>
                 <button
                   onClick={handleSaveEditNote}
-                  className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] text-white text-sm font-semibold hover:bg-[#155a68] transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
                 >
                   Save
                 </button>
@@ -1827,12 +1827,12 @@ async function handleCopy() {
           >
             {data && (
               <div className="px-5 pt-4 pb-2">
-                <div className="mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
-                  <p className="font-serif text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{data.snapshotText}"</p>
+                <div className="mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050]">
+                  <p className="font-serif text-xs text-gray-500 dark:text-[#8FA4B8] line-clamp-2">"{data.snapshotText}"</p>
                 </div>
                 <button
                   onClick={() => startEditSelection([data.selectionId], { type: 'note', passageId: annotationPanel!.passageId })}
-                  className="mb-4 text-xs text-[#1B6B7B] font-medium hover:underline"
+                  className="mb-4 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                 >
                   Edit text selection
                 </button>
@@ -1841,7 +1841,7 @@ async function handleCopy() {
                   value={editNoteContent}
                   onChange={e => setEditNoteContent(e.target.value)}
                   rows={5}
-                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
+                  className="w-full border border-gray-200 dark:border-[#2D4050] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-[#E2EAF2] outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] resize-none leading-relaxed"
                 />
               </div>
             )}
@@ -1874,20 +1874,20 @@ async function handleCopy() {
           >
             <div className="px-5 pt-4 pb-4">
               {thisSnap && (
-                <div className="mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{thisSnap}"</p>
+                <div className="mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050]">
+                  <p className="text-xs text-gray-500 dark:text-[#8FA4B8] line-clamp-2">"{thisSnap}"</p>
                 </div>
               )}
               {editSelIds.length > 0 && (
                 <button
                   onClick={() => startEditSelection(editSelIds, { type: 'xrefs', passageId: annotationPanel!.passageId })}
-                  className="mb-4 text-xs text-[#1B6B7B] font-medium hover:underline"
+                  className="mb-4 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                 >
                   Edit text selection
                 </button>
               )}
               {entries.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No cross-references found.</p>
+                <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-4">No cross-references found.</p>
               ) : (
                 <div className="space-y-3">
                   {entries.map(entry => (

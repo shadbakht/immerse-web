@@ -21,7 +21,7 @@ export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'communit
 
 function ComingSoon({ label }: { label: string }) {
   return (
-    <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
+    <div className="h-full flex items-center justify-center text-gray-400 dark:text-[#5C7A8E] text-sm">
       {label} — coming soon
     </div>
   );
@@ -122,17 +122,17 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
       ) : (
         <>
           {libraryCollapsed ? (
-            <div className="w-10 shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col items-center bg-white dark:bg-[#1b2128]">
+            <div className="w-10 shrink-0 border-r border-gray-200 dark:border-[#2D4050] flex flex-col items-center bg-white dark:bg-[#1B2A38]">
               <button
                 onClick={() => setLibraryCollapsed(false)}
-                className="mt-4 w-8 h-8 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#272e36] rounded-lg transition-colors text-lg font-medium"
+                className="mt-4 w-8 h-8 flex items-center justify-center text-gray-400 dark:text-[#5C7A8E] hover:text-gray-700 dark:hover:text-[#B8C7D6] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg transition-colors text-lg font-medium"
                 title="Expand Library"
               >
                 ›
               </button>
             </div>
           ) : (
-            <div className="w-[424px] shrink-0 border-r border-gray-200 dark:border-white/10 flex flex-col overflow-hidden bg-white dark:bg-[#1b2128]">
+            <div className="w-[424px] shrink-0 border-r border-gray-200 dark:border-[#2D4050] flex flex-col overflow-hidden bg-white dark:bg-[#1B2A38]">
               <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} onCollapse={() => setLibraryCollapsed(true)} />
             </div>
           )}

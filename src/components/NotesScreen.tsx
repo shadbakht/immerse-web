@@ -58,28 +58,28 @@ function NoteItem({
   ];
 
   return (
-    <div className="flex items-start gap-2 px-5 py-3 border-t border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors cursor-pointer select-none"
+    <div className="flex items-start gap-2 px-5 py-3 border-t border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors cursor-pointer select-none"
       onClick={() => setExpanded(v => !v)}>
       <div className="flex-1 min-w-0">
         {note.snapshotText && (
-          <p className="font-serif text-gray-500 dark:text-gray-400 leading-relaxed mb-1 line-clamp-2" style={{ fontSize: 'var(--quote-font-size)' }}>
+          <p className="font-serif text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-1 line-clamp-2" style={{ fontSize: 'var(--quote-font-size)' }}>
             "<Highlight text={note.snapshotText} q={searchQuery} />"
           </p>
         )}
         {note.citation && (
-          <p className="text-xs text-[#1B6B7B] font-medium truncate mb-1.5">
+          <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium truncate mb-1.5">
             <Highlight text={note.citation} q={searchQuery} />
           </p>
         )}
-        <p className={`text-sm text-gray-800 dark:text-gray-200 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+        <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
           <Highlight text={note.content} q={searchQuery} />
         </p>
         <div className="flex items-center justify-between mt-1.5">
-          <p className="text-xs text-gray-300 dark:text-gray-600">{formatDate(note.updatedAt)}</p>
+          <p className="text-xs text-gray-300 dark:text-[#4A6478]">{formatDate(note.updatedAt)}</p>
           {note.bookId && (
             <button
               onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
-              className="text-xs text-[#1B6B7B] font-medium hover:underline"
+              className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
               Open in reader →
             </button>
@@ -266,40 +266,40 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       {editingId && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center"
           onClick={() => { setEditingId(null); setEditContent(''); }}>
-          <div className="bg-white dark:bg-[#1b2128] rounded-2xl shadow-xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto"
+          <div className="bg-white dark:bg-[#1B2A38] rounded-2xl shadow-xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Edit Note</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-4">Edit Note</h2>
             <textarea
               autoFocus
               value={editContent}
               onChange={e => setEditContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4 min-h-32 resize-none"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-[#2D4050] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 mb-4 min-h-32 resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button onClick={() => { setEditingId(null); setEditContent(''); }}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#272e36] rounded-lg">Cancel</button>
+                className="px-4 py-2 text-sm text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg">Cancel</button>
               <button onClick={() => handleSaveEdit(editingId)}
-                className="px-4 py-2 text-sm bg-[#1B6B7B] text-white rounded-lg hover:bg-[#1B6B7B]/90">Save</button>
+                className="px-4 py-2 text-sm bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90">Save</button>
             </div>
           </div>
         </div>
       )}
 
       {/* Header + search */}
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-white/10 shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Notes</h1>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">Notes</h1>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search notes…"
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50 dark:bg-[#20262d]"
+            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]">Clear</button>
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
           )}
         </div>
       </div>
@@ -308,10 +308,10 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : hierarchy.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-16 px-4">
+          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">
             {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
           </p>
         ) : (
@@ -323,12 +323,12 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                 <div key={trad.catId}>
                   {/* Tradition header */}
                   <button
-                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left select-none border-b border-gray-100 dark:border-white/10"
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none border-b border-gray-100 dark:border-[#2D4050]"
                     onClick={() => toggleTradition(trad)}
                   >
-                    <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{trad.name}</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{totalNotes}</span>
-                    <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{trad.name}</span>
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{totalNotes}</span>
+                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {tradOpen && trad.books.map(book => {
@@ -337,12 +337,12 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                       <div key={book.bookKey}>
                         {/* Book sub-header */}
                         <button
-                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left select-none border-b border-gray-100 dark:border-white/10"
+                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none border-b border-gray-100 dark:border-[#2D4050]"
                           onClick={() => toggleBook(book.bookKey)}
                         >
-                          <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">{book.title}</span>
-                          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{book.notes.length}</span>
-                          <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
+                          <span className="flex-1 text-sm text-gray-700 dark:text-[#B8C7D6] truncate">{book.title}</span>
+                          <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{book.notes.length}</span>
+                          <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
                         </button>
 
                         {/* Note items */}

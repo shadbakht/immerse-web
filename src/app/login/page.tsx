@@ -117,21 +117,21 @@ function LoginPageInner() {
             <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Immerse</h1>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Sacred texts from all traditions</p>
+          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">Sacred texts from all traditions</p>
         </div>
 
         {success ? (
           <div className="text-center space-y-4">
             <div className="text-4xl">📬</div>
             <p className="text-white font-semibold text-lg">Check your email</p>
-            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed">{success}</p>
-            <button onClick={() => { setSuccess(''); setIsSignUp(false); setForgotMode(false); }} className="text-[#1B6B7B] text-sm hover:underline">
+            <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed">{success}</p>
+            <button onClick={() => { setSuccess(''); setIsSignUp(false); setForgotMode(false); }} className="text-[#1B6B7B] dark:text-[#2D9DB3] text-sm hover:underline">
               Back to Sign In
             </button>
           </div>
         ) : forgotMode ? (
           <div className="space-y-3">
-            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed text-center mb-1">
+            <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed text-center mb-1">
               Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
             <input
@@ -141,7 +141,7 @@ function LoginPageInner() {
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleForgot(); }}
               autoFocus
-              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
             />
 
             {error && <p className="text-red-400 text-sm">{error}</p>}
@@ -149,14 +149,14 @@ function LoginPageInner() {
             <button
               onClick={handleForgot}
               disabled={loading}
-              className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
+              className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition disabled:opacity-50"
             >
               {loading ? 'Please wait…' : 'Send Reset Link'}
             </button>
 
             <button
               onClick={() => { setForgotMode(false); setError(''); }}
-              className="w-full text-center text-gray-400 dark:text-gray-500 text-sm py-2 hover:text-white transition"
+              className="w-full text-center text-gray-400 dark:text-[#5C7A8E] text-sm py-2 hover:text-white transition"
             >
               Back to Sign In
             </button>
@@ -174,7 +174,7 @@ function LoginPageInner() {
                     onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     autoCapitalize="none"
                     autoCorrect="off"
-                    className={`w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] ${
+                    className={`w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3] ${
                       usernameStatus === 'taken'     ? 'ring-2 ring-red-500'   :
                       usernameStatus === 'available' ? 'ring-2 ring-green-500' : ''
                     }`}
@@ -183,7 +183,7 @@ function LoginPageInner() {
                     <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
                       usernameStatus === 'available' ? 'text-green-400' :
                       usernameStatus === 'taken'     ? 'text-red-400'   :
-                      usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400 dark:text-gray-500'
+                      usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400 dark:text-[#5C7A8E]'
                     }`}>
                       {usernameStatus === 'checking'  ? '…'            :
                        usernameStatus === 'available' ? '✓ Available'  :
@@ -196,7 +196,7 @@ function LoginPageInner() {
                   placeholder="Full Name"
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
-                  className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+                  className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
                 />
               </>
             )}
@@ -206,7 +206,7 @@ function LoginPageInner() {
               placeholder="Email *"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+              className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
             />
             <div className="relative">
               <input
@@ -215,12 +215,12 @@ function LoginPageInner() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-                className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 pr-11 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]"
+                className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 pr-11 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-300 dark:hover:text-gray-600 transition"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-[#8FA4B8] hover:text-gray-300 dark:hover:text-[#4A6478] transition"
                 tabIndex={-1}
               >
                 {showPassword ? (
@@ -243,7 +243,7 @@ function LoginPageInner() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition disabled:opacity-50"
+              className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition disabled:opacity-50"
             >
               {loading ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
             </button>
@@ -251,7 +251,7 @@ function LoginPageInner() {
             {!isSignUp && (
               <button
                 onClick={() => { setForgotMode(true); setError(''); }}
-                className="w-full text-center text-[#1B6B7B] text-sm py-1 hover:underline"
+                className="w-full text-center text-[#1B6B7B] dark:text-[#2D9DB3] text-sm py-1 hover:underline"
               >
                 Forgot password?
               </button>
@@ -263,14 +263,14 @@ function LoginPageInner() {
 
             <button
               onClick={switchMode}
-              className="w-full border border-[#1B6B7B] text-[#1B6B7B] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 transition"
+              className="w-full border border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 dark:hover:bg-[#2D9DB3]/10 transition"
             >
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>
 
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs text-gray-600 dark:text-gray-400">or</span>
+              <span className="text-xs text-gray-600 dark:text-[#8FA4B8]">or</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
 

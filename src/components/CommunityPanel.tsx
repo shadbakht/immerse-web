@@ -107,18 +107,18 @@ function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBo
   return (
     <div className="px-5 py-3">
       <p
-        className={`font-serif text-gray-700 dark:text-gray-300 leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
+        className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
         style={{ fontSize: 'var(--quote-font-size)' }}
         onClick={() => setExpanded(e => !e)}
       >
         &quot;{sel.snapshotText}&quot;
       </p>
-      {citation && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{citation}</p>}
+      {citation && <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-1">{citation}</p>}
       {expanded && onOpenBook && sel.bookId && (
         <button
           onClick={handleOpen}
           disabled={opening}
-          className="mt-2 text-xs text-[#1B6B7B] font-medium hover:underline disabled:opacity-60"
+          className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline disabled:opacity-60"
         >
           {opening ? 'Opening…' : 'Open in reader →'}
         </button>
@@ -176,11 +176,11 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
       className="flex items-center justify-center shrink-0 w-7 h-7 -ml-1"
     >
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
-        state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
-        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300 dark:border-white/15'
+        state === 'checked'       ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3]' :
+        state === 'indeterminate' ? 'border-[#1B6B7B] dark:border-[#2D9DB3]' : 'border-gray-300 dark:border-[#3A4D60]'
       }`}>
         {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
-        {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}
+        {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] rounded-full" />}
       </div>
     </button>
   );
@@ -201,12 +201,12 @@ function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenB
     <div>
       <div className="flex items-center gap-2 py-2 pr-4" style={{ paddingLeft: 16 + depth * 16 }}>
         <Checkbox state={nodeCheckState(payload, node.exportId, selectedIds)} onChange={() => onToggleSelect(node.exportId)} />
-        <button className="flex-1 min-w-0 text-left text-sm text-gray-700 dark:text-gray-300 truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
-        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{sels.length}</span>
-        <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
+        <button className="flex-1 min-w-0 text-left text-sm text-gray-700 dark:text-[#B8C7D6] truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
+        <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{sels.length}</span>
+        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
       </div>
       {open && (
-        <div className="divide-y divide-gray-50 dark:divide-white/5 border-t border-gray-50 dark:border-white/5">
+        <div className="divide-y divide-gray-50 dark:divide-[#2D4050]/60 border-t border-gray-50 dark:border-[#2D4050]/60">
           {sels.map((sel: any, i: number) => <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />)}
           {kids.map((c: any) => (
             <SubTagNode key={c.exportId} node={c} payload={payload} depth={depth + 1}
@@ -266,7 +266,7 @@ function TagCard({
   }
 
   return (
-    <div className="border-b border-gray-100 dark:border-white/10">
+    <div className="border-b border-gray-100 dark:border-[#2D4050]">
       <div className="flex items-center px-4 py-3.5 gap-2">
         {root && (
           <Checkbox
@@ -278,12 +278,12 @@ function TagCard({
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => setExpanded(e => !e)}
         >
-          <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{ct.name}</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+          <div className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{ct.name}</div>
+          <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5">
             {showAuthor && (
               <>
                 <button
-                  className="text-[#1B6B7B] hover:underline"
+                  className="text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
                   onClick={e => { e.stopPropagation(); onProfilePress(ct); }}
                 >
                   @{displayName}
@@ -301,7 +301,7 @@ function TagCard({
             <button
               disabled
               title={isOwn ? 'This is your own tag' : 'Already imported'}
-              className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-[#272e36] px-3 py-1 rounded-full cursor-not-allowed"
+              className="text-xs font-semibold text-gray-400 dark:text-[#5C7A8E] bg-gray-100 dark:bg-[#2D4050] px-3 py-1 rounded-full cursor-not-allowed"
             >
               {isOwn ? 'Import' : 'Imported'}
             </button>
@@ -309,16 +309,16 @@ function TagCard({
             <button
               onClick={handleImport}
               disabled={importing}
-              className="text-xs font-semibold text-white bg-[#1B6B7B] hover:bg-[#155a68] disabled:opacity-60 px-3 py-1 rounded-full transition-colors"
+              className="text-xs font-semibold text-white bg-[#1B6B7B] dark:bg-[#2D9DB3] hover:bg-[#155a68] dark:hover:bg-[#2589A0] disabled:opacity-60 px-3 py-1 rounded-full transition-colors"
             >
               {importing ? '…' : 'Import'}
             </button>
           )}
 
-          <span className="text-xs text-gray-400 dark:text-gray-500">{ct.selection_count}</span>
+          <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{ct.selection_count}</span>
 
           <span
-            className={`text-gray-400 dark:text-gray-500 text-sm transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
+            className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
             onClick={() => setExpanded(e => !e)}
           >
             ›
@@ -327,7 +327,7 @@ function TagCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-gray-50 dark:border-white/5 divide-y divide-gray-50 dark:divide-white/5">
+        <div className="border-t border-gray-50 dark:border-[#2D4050]/60 divide-y divide-gray-50 dark:divide-[#2D4050]/60">
           {rootSels.map((sel: any, i: number) => (
             <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />
           ))}
@@ -387,19 +387,19 @@ function FeedColumn({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-white/10 shrink-0">
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{title}</span>
+      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
+        <span className="text-xs font-semibold text-gray-500 dark:text-[#8FA4B8] uppercase tracking-wide">{title}</span>
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
             <p className="text-3xl mb-3">{searchQuery ? '🔍' : '🏷️'}</p>
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{searchQuery ? 'No results' : 'No shared tags yet'}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">{searchQuery ? 'Try a different search term.' : 'Be the first to share a tag.'}</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{searchQuery ? 'No results' : 'No shared tags yet'}</p>
+            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{searchQuery ? 'Try a different search term.' : 'Be the first to share a tag.'}</p>
           </div>
         ) : (
           <div>
@@ -499,30 +499,30 @@ function ProfileView({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 pt-5 pb-4 shrink-0 border-b border-gray-100 dark:border-white/10 flex items-center gap-3">
+      <div className="px-6 pt-5 pb-4 shrink-0 border-b border-gray-100 dark:border-[#2D4050] flex items-center gap-3">
         <button
           onClick={onBack}
-          className="text-2xl text-[#1B6B7B] leading-none w-8 shrink-0"
+          className="text-2xl text-[#1B6B7B] dark:text-[#2D9DB3] leading-none w-8 shrink-0"
           aria-label="Back"
         >
           ‹
         </button>
 
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-[#1B6B7B] flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-base">{initials}</span>
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">{profile.displayName}</div>
+            <div className="text-sm font-bold text-gray-900 dark:text-[#E2EAF2] truncate">{profile.displayName}</div>
             {profile.username && (
-              <div className="text-xs text-gray-400 dark:text-gray-500">@{profile.username}</div>
+              <div className="text-xs text-gray-400 dark:text-[#5C7A8E]">@{profile.username}</div>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           {profile.userId !== currentUserId && (
-            <span className="text-[10px] leading-tight text-gray-400 dark:text-gray-500 text-right max-w-[120px]">
+            <span className="text-[10px] leading-tight text-gray-400 dark:text-[#5C7A8E] text-right max-w-[120px]">
               Auto-imports user&apos;s public tags to your app
             </span>
           )}
@@ -531,10 +531,10 @@ function ProfileView({
             disabled={profile.userId === currentUserId || followLoading}
             className={`text-xs font-semibold px-4 py-1.5 rounded-full border-[1.5px] transition-colors disabled:opacity-60 ${
               profile.userId === currentUserId
-                ? 'border-gray-300 dark:border-white/15 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                ? 'border-gray-300 dark:border-[#3A4D60] text-gray-400 dark:text-[#5C7A8E] cursor-not-allowed'
                 : isFollowing
-                  ? 'bg-[#1B6B7B] border-[#1B6B7B] text-white'
-                  : 'border-[#1B6B7B] text-[#1B6B7B] hover:bg-[#1B6B7B]/5'
+                  ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3] text-white'
+                  : 'border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] hover:bg-[#1B6B7B]/5 dark:hover:bg-[#2D9DB3]/5'
             }`}
           >
             {profile.userId === currentUserId ? 'Follow' : followLoading ? '…' : isFollowing ? 'Unfollow' : 'Follow'}
@@ -546,13 +546,13 @@ function ProfileView({
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : tags.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-3xl mb-3">🏷️</p>
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">No public tags</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">This user hasn't shared any tags yet.</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">No public tags</p>
+            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">This user hasn't shared any tags yet.</p>
           </div>
         ) : (
           <div>
@@ -731,16 +731,16 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   return (
     <div className="h-full flex flex-col w-full relative">
       {/* Header + search */}
-      <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100 dark:border-white/10">
+      <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100 dark:border-[#2D4050]">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Discover</h1>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Discover</h1>
           {selectedCount > 0 && (
             <div className="flex items-center gap-2">
               <div className="relative" ref={exportMenuRef}>
                 <button
                   onClick={() => setShowExportMenu(v => !v)}
                   disabled={exporting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 disabled:opacity-60 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
                   title="Export selected tags"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
@@ -751,12 +751,12 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
                   {exporting ? 'Exporting…' : `Export (${selectedCount})`}
                 </button>
                 {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1b2128] rounded-xl shadow-lg border border-gray-200 dark:border-white/10 z-20 min-w-[160px] py-1">
+                  <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px] py-1">
                     {([{ label: 'PDF', format: 'pdf' }, { label: 'Word (.docx)', format: 'docx' }] as const).map(({ label, format }) => (
                       <button
                         key={format}
                         onClick={() => handleExport(format)}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
                       >
                         {label}
                       </button>
@@ -768,17 +768,17 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           )}
         </div>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={selectedCount > 0 ? 'Search selected tags…' : 'Search tags and users…'}
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50 dark:bg-[#20262d]"
+            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {(searchQuery || selectedCount > 0) && (
-            <button onClick={() => { setSearchQuery(''); clearSelection(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]">Clear</button>
+            <button onClick={() => { setSearchQuery(''); clearSelection(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
           )}
         </div>
       </div>
@@ -798,7 +798,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           onToggleSelect={toggleSelect}
           currentUserId={user?.id}
         />
-        <div className="w-px bg-gray-200 dark:bg-[#2f3740] shrink-0" />
+        <div className="w-px bg-gray-200 dark:bg-[#354759] shrink-0" />
         <FeedColumn
           title="Trending"
           tags={trendingTags}
@@ -817,15 +817,15 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       {/* Guest overlay */}
       {!user && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-8">
-          <div className="bg-white dark:bg-[#1b2128] rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
+          <div className="bg-white dark:bg-[#1B2A38] rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
             <div className="text-4xl mb-4">✦</div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Sign In to Access Discover</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">Sign In to Access Discover</h2>
+            <p className="text-sm text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-6">
               See what other readers are discovering across all traditions.
             </p>
             <a
               href="/login"
-              className="block w-full bg-[#1B6B7B] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] transition-colors text-sm"
+              className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
             >
               Sign In or Create Account
             </a>

@@ -130,7 +130,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-lg mx-auto px-8 py-10">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-8">Settings</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">Settings</h1>
 
         {justUpgraded && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-800 text-sm rounded-2xl px-5 py-4 flex items-center gap-3">
@@ -141,22 +141,22 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <div className="space-y-6">
 
             {/* Account */}
-            <section className="bg-white dark:bg-[#1b2128] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-gray-500">Account</span>
+            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">Account</span>
               </div>
 
               {!isGuest && (
                 <>
                   {/* Full Name */}
-                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-white/5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">Full Name</span>
+                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">Full Name</span>
                     {editingName ? (
                       <div className="flex items-center gap-2 flex-1">
                         <input
@@ -164,41 +164,41 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                           value={nameInput}
                           onChange={e => setNameInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setNameInput(fullName); } }}
-                          className="flex-1 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+                          className="flex-1 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3]"
                         />
-                        <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] font-semibold hover:underline disabled:opacity-50">
+                        <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold hover:underline disabled:opacity-50">
                           {nameSaving ? 'Saving…' : 'Save'}
                         </button>
-                        <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">Cancel</button>
+                        <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8]">Cancel</button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-3 flex-1 justify-end">
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{fullName || '—'}</span>
-                        <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] hover:underline">Edit</button>
+                        <span className="text-sm text-gray-700 dark:text-[#B8C7D6]">{fullName || '—'}</span>
+                        <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">Edit</button>
                       </div>
                     )}
                   </div>
 
                   {/* Username */}
-                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-white/5">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">Username</span>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">@{username || '—'}</span>
+                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">Username</span>
+                    <span className="text-sm text-gray-700 dark:text-[#B8C7D6]">@{username || '—'}</span>
                   </div>
                 </>
               )}
 
               {/* Plan */}
               <div className="px-5 py-4 flex items-center justify-between">
-                <span className="text-xs text-gray-400 dark:text-gray-500 w-24 shrink-0">Plan</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">Plan</span>
                 <div className="flex items-center gap-3">
-                  <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B]' : 'text-gray-500 dark:text-gray-400'}`}>
+                  <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B] dark:text-[#2D9DB3]' : 'text-gray-500 dark:text-[#8FA4B8]'}`}>
                     {isGuest ? 'Guest' : isTrial ? 'Pro Trial' : isPro ? 'Pro' : 'Standard'}
                   </span>
                   {!isGuest && (isPro && !isTrial ? (
                     <button
                       onClick={handleManageSubscription}
                       disabled={stripeLoading}
-                      className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 hover:underline disabled:opacity-50"
+                      className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8] hover:underline disabled:opacity-50"
                     >
                       {stripeLoading ? 'Loading…' : 'Manage'}
                     </button>
@@ -206,7 +206,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     <button
                       onClick={handleUpgrade}
                       disabled={stripeLoading}
-                      className="text-xs font-semibold bg-[#1B6B7B] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] transition-colors disabled:opacity-50"
+                      className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-50"
                     >
                       {stripeLoading ? 'Loading…' : 'Upgrade — $0.99/mo'}
                     </button>
@@ -214,7 +214,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                   {isGuest && (
                     <a
                       href="/login"
-                      className="text-xs font-semibold bg-[#1B6B7B] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] transition-colors"
+                      className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
                     >
                       Sign In or Create Account
                     </a>
@@ -224,9 +224,9 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
             </section>
 
             {/* Font size */}
-            <section className="bg-white dark:bg-[#1b2128] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-gray-500">Font Size</span>
+            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">Font Size</span>
               </div>
               <div className="px-5 py-4">
                 <div className="flex gap-2 mb-4">
@@ -236,8 +236,8 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                       onClick={() => handleFontChange(key)}
                       className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border transition-colors ${
                         fontSize === key
-                          ? 'border-[#1B6B7B] bg-[#1B6B7B]/8 text-[#1B6B7B]'
-                          : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/15'
+                          ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
+                          : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
                       }`}
                     >
                       <span className="font-semibold" style={{ fontSize: Math.min(size, 20) }}>A</span>
@@ -245,16 +245,16 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     </button>
                   ))}
                 </div>
-                <p className="text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-white/10 pt-3" style={{ fontSize: previewSize, lineHeight: 1.7 }}>
+                <p className="text-gray-500 dark:text-[#8FA4B8] border-t border-gray-100 dark:border-[#2D4050] pt-3" style={{ fontSize: previewSize, lineHeight: 1.7 }}>
                   Preview text at {fontSize} size.
                 </p>
               </div>
             </section>
 
             {/* Appearance */}
-            <section className="bg-white dark:bg-[#1b2128] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-gray-500">Appearance</span>
+            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">Appearance</span>
               </div>
               <div className="px-5 py-4 flex gap-2">
                 {(['light', 'dark', 'system'] as ColorMode[]).map(mode => (
@@ -263,8 +263,8 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     onClick={() => handleColorModeChange(mode)}
                     className={`flex-1 py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
                       colorMode === mode
-                        ? 'border-[#1B6B7B] bg-[#1B6B7B]/8 text-[#1B6B7B]'
-                        : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-white/15'
+                        ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
+                        : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
                     }`}
                   >
                     {mode}
@@ -274,31 +274,31 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
             </section>
 
             {/* About */}
-            <section className="bg-white dark:bg-[#1b2128] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-white/10">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-gray-500">About</span>
+            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">About</span>
               </div>
-              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-white/5">
-                <span className="text-xs text-gray-400 dark:text-gray-500">Version</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">{APP_VERSION}</span>
+              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Version</span>
+                <span className="text-sm text-gray-500 dark:text-[#8FA4B8]">{APP_VERSION}</span>
               </div>
-              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-white/5">
-                <span className="text-xs text-gray-400 dark:text-gray-500">Privacy Policy</span>
+              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Privacy Policy</span>
                 <a
                   href="/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-[#1B6B7B] hover:underline"
+                  className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
                 >
                   View →
                 </a>
               </div>
               <button
                 onClick={() => setShowIntro(true)}
-                className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
+                className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
               >
-                <span className="text-xs text-gray-400 dark:text-gray-500">Intro Tour</span>
-                <span className="text-sm text-[#1B6B7B] hover:underline">Replay Intro →</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Intro Tour</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">Replay Intro →</span>
               </button>
             </section>
 

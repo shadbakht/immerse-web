@@ -40,13 +40,13 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
       title="Add Note"
       footer={
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2D4050] text-sm text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !content.trim()}
-            className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] text-white text-sm font-semibold hover:bg-[#155a68] transition-colors disabled:opacity-40"
+            className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-40"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -55,9 +55,9 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
     >
       {/* Selection preview — pinned (sticky) so it stays visible when focusing
           the textarea brings up the on-screen keyboard and the body auto-scrolls. */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-[#1b2128] px-5 pt-4 pb-2">
-        <div className="px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
-          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{selectionText}"</p>
+      <div className="sticky top-0 z-10 bg-white dark:bg-[#1B2A38] px-5 pt-4 pb-2">
+        <div className="px-3 py-2.5 bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050]">
+          <p className="text-xs text-gray-500 dark:text-[#8FA4B8] line-clamp-2">"{selectionText}"</p>
         </div>
       </div>
 
@@ -69,7 +69,7 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
           onChange={e => setContent(e.target.value)}
           placeholder="Write your note…"
           rows={5}
-          className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
+          className="w-full border border-gray-200 dark:border-[#2D4050] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-[#E2EAF2] outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] resize-none leading-relaxed"
         />
       </div>
     </PanelSheet>

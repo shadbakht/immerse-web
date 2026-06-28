@@ -68,7 +68,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
       {/* Open button */}
       <button
         onClick={openStore}
-        className="shrink-0 bg-[#1B6B7B] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#155a68] transition-colors"
+        className="shrink-0 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
       >
         {platform === 'android' ? 'Install' : 'Get'}
       </button>
