@@ -12,7 +12,7 @@ function Section({ title }: { title: string }) {
 
 export default function SupportPage() {
   return (
-    <div className="min-h-screen bg-[#F8F7F4]">
+    <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Back */}
         <Link href="/" className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline mb-8 inline-block">← Back to Immerse</Link>

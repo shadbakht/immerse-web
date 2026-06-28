@@ -47,18 +47,36 @@ export async function loadSlugMaps(supabase: ReturnType<typeof import('@/lib/sup
   uuidToSlug: Map<string, string>;
 }> {
   if (!_slugToUuid) {
-    const { data, error } = await supabase.from('book_slug_map').select('local_id, book_id');
-    // Only cache a fully-populated map. If the fetch errors or returns nothing
-    // (a transient failure, egress hiccup, etc.), DON'T poison the module cache
-    // with an empty map — otherwise every book would open by its slug for the
-    // rest of the session and fail the uuid passages query. Fall back to a
-    // temporary empty map this call and retry on the next one.
-    if (error || !data || data.length === 0) {
-      if (error) console.error('[catalog] loadSlugMaps failed:', error);
-      return { slugToUuid: new Map(), uuidToSlug: new Map() };
+    // PRIMARY: the static asset in /public (mirrors book_slug_map, served as a
+    // plain file). This loads reliably regardless of auth/session/egress state,
+    // so book opening never depends on a live Supabase query — the source of a
+    // class of "books won't open" bugs where a cold/failed map left every book
+    // opening by its slug against the uuid passages column. Regenerate it when
+    // the corpus gains books (scripts write public/slug-map.json from the table).
+    try {
+      const res = await fetch('/slug-map.json', { cache: 'force-cache' });
+      if (res.ok) {
+        const map = (await res.json()) as Record<string, string>;
+        const entries = Object.entries(map);
+        if (entries.length > 0) {
+          _slugToUuid = new Map(entries);
+          _uuidToSlug = new Map(entries.map(([s, u]) => [u, s]));
+        }
+      }
+    } catch { /* fall through to the table */ }
+
+    // FALLBACK: the live table, for any book not yet in the static asset. Only
+    // cache a fully-populated result so a transient failure never poisons the
+    // module cache with an empty map.
+    if (!_slugToUuid) {
+      const { data, error } = await supabase.from('book_slug_map').select('local_id, book_id');
+      if (error || !data || data.length === 0) {
+        if (error) console.error('[catalog] loadSlugMaps failed:', error);
+        return { slugToUuid: new Map(), uuidToSlug: new Map() };
+      }
+      _slugToUuid = new Map(data.map((r: any) => [r.local_id as string, r.book_id as string]));
+      _uuidToSlug = new Map(data.map((r: any) => [r.book_id as string, r.local_id as string]));
     }
-    _slugToUuid = new Map(data.map((r: any) => [r.local_id as string, r.book_id as string]));
-    _uuidToSlug = new Map(data.map((r: any) => [r.book_id as string, r.local_id as string]));
   }
   return { slugToUuid: _slugToUuid!, uuidToSlug: _uuidToSlug! };
 }

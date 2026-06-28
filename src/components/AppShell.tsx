@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { syncSubscribedTags, syncFollowedUsers } from '@/lib/communitySync';
 import { initFontSize } from '@/lib/fontSize';
 import { initColorMode } from '@/lib/colorMode';
+import { loadSlugMaps } from '@/lib/catalog';
 import type { User } from '@supabase/supabase-js';
 import Sidebar from './Sidebar';
 import LibraryPanel from './LibraryPanel';
@@ -18,6 +19,18 @@ import TagsScreen from './TagsScreen';
 import XRefsScreen from './XRefsScreen';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Resolve a corpus slug to its Supabase uuid so everything downstream (the
+// reader query, reading_progress writes, prayer-style checks) only ever sees a
+// uuid. Returns uuids / imported:* ids untouched.
+async function resolveBookId(bookId: string): Promise<string> {
+  if (UUID_RE.test(bookId) || bookId.startsWith('imported:')) return bookId;
+  try {
+    const { slugToUuid } = await loadSlugMaps(createClient());
+    return slugToUuid.get(bookId) ?? bookId;
+  } catch { return bookId; }
+}
 
 function ComingSoon({ label }: { label: string }) {
   return (
@@ -63,6 +76,18 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   // Apply the saved light/dark/system color mode on load.
   useEffect(() => { initColorMode(); }, []);
 
+  // If the page was opened at /read/<slug> (slug, not uuid), resolve it to a
+  // uuid so the reader and reading_progress writes don't choke on the slug.
+  useEffect(() => {
+    if (!initialBookId || UUID_RE.test(initialBookId) || initialBookId.startsWith('imported:')) return;
+    resolveBookId(initialBookId).then(id => {
+      if (id !== initialBookId) {
+        setReaderTarget(t => (t && t.bookId === initialBookId ? { ...t, bookId: id } : t));
+        history.replaceState(null, '', `/read/${id}`);
+      }
+    });
+  }, [initialBookId]);
+
   // Silently sync subscribed and followed community tags on every page load
   useEffect(() => {
     if (!userId) return;
@@ -70,11 +95,12 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     syncFollowedUsers(userId).catch(e => console.warn('[AppShell] syncFollowed error:', e));
   }, [userId]);
 
-  function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false) {
-    setReaderTarget({ bookId, passageId, highlightQuery });
+  async function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false) {
+    const id = await resolveBookId(bookId);
+    setReaderTarget({ bookId: id, passageId, highlightQuery });
     setActiveTab('library');
     setLibraryCollapsed(collapseLibrary);
-    history.replaceState(null, '', `/read/${bookId}`);
+    history.replaceState(null, '', `/read/${id}`);
   }
 
   function openBookFromHome(bookId: string, passageId?: string, highlightQuery?: string) {
@@ -104,7 +130,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8F7F4]">
+    <div className="flex h-screen overflow-hidden bg-[#F8F7F4] dark:bg-[#0F1923]">
       <Sidebar activeTab={activeTab} onTabChange={handleTabChange} user={user} />
 
       {isFullWidth ? (

@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${geist.className} h-full bg-[#F8F7F4] antialiased`}>
+      <body className={`${geist.className} h-full bg-[#F8F7F4] dark:bg-[#0F1923] antialiased`}>
         <AppBanner playStoreId={PLAY_STORE_ID} appStoreId={APP_STORE_ID} />
         {children}
       </body>
