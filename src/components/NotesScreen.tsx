@@ -58,11 +58,11 @@ function NoteItem({
   ];
 
   return (
-    <div className="flex items-start gap-2 px-5 py-3 border-t border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+    <div className="flex items-start gap-2 px-5 py-3 border-t border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors cursor-pointer select-none"
       onClick={() => setExpanded(v => !v)}>
       <div className="flex-1 min-w-0">
         {note.snapshotText && (
-          <p className="font-serif text-gray-500 leading-relaxed mb-1 line-clamp-2" style={{ fontSize: 'var(--quote-font-size)' }}>
+          <p className="font-serif text-gray-500 dark:text-gray-400 leading-relaxed mb-1 line-clamp-2" style={{ fontSize: 'var(--quote-font-size)' }}>
             "<Highlight text={note.snapshotText} q={searchQuery} />"
           </p>
         )}
@@ -71,11 +71,11 @@ function NoteItem({
             <Highlight text={note.citation} q={searchQuery} />
           </p>
         )}
-        <p className={`text-sm text-gray-800 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+        <p className={`text-sm text-gray-800 dark:text-gray-200 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
           <Highlight text={note.content} q={searchQuery} />
         </p>
         <div className="flex items-center justify-between mt-1.5">
-          <p className="text-xs text-gray-300">{formatDate(note.updatedAt)}</p>
+          <p className="text-xs text-gray-300 dark:text-gray-600">{formatDate(note.updatedAt)}</p>
           {note.bookId && (
             <button
               onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
@@ -244,8 +244,18 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       }));
   }, [filtered]);
 
-  const toggleTradition = (catId: string) =>
-    setOpenTraditions(prev => { const next = new Set(prev); next.has(catId) ? next.delete(catId) : next.add(catId); return next; });
+  // A "small" tradition expands all the way (books + their notes) on a single
+  // tap, so the user doesn't have to tap the tradition then each book. Applies
+  // when it has ≤5 books and no book has >5 notes; larger ones keep the
+  // tap-tradition-then-tap-book behavior.
+  const SMALL_MAX = 5;
+  const toggleTradition = (trad: { catId: string; books: { bookKey: string; notes: NoteRow[] }[] }) => {
+    const isOpen = openTraditions.has(trad.catId);
+    setOpenTraditions(prev => { const next = new Set(prev); isOpen ? next.delete(trad.catId) : next.add(trad.catId); return next; });
+    if (!isOpen && trad.books.length <= SMALL_MAX && trad.books.every(b => b.notes.length <= SMALL_MAX)) {
+      setOpenBooks(prev => { const next = new Set(prev); trad.books.forEach(b => next.add(b.bookKey)); return next; });
+    }
+  };
 
   const toggleBook = (bookKey: string) =>
     setOpenBooks(prev => { const next = new Set(prev); next.has(bookKey) ? next.delete(bookKey) : next.add(bookKey); return next; });
@@ -256,18 +266,18 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       {editingId && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center"
           onClick={() => { setEditingId(null); setEditContent(''); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto"
+          <div className="bg-white dark:bg-[#1b2128] rounded-2xl shadow-xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit Note</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Edit Note</h2>
             <textarea
               autoFocus
               value={editContent}
               onChange={e => setEditContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4 min-h-32 resize-none"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4 min-h-32 resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button onClick={() => { setEditingId(null); setEditContent(''); }}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#272e36] rounded-lg">Cancel</button>
               <button onClick={() => handleSaveEdit(editingId)}
                 className="px-4 py-2 text-sm bg-[#1B6B7B] text-white rounded-lg hover:bg-[#1B6B7B]/90">Save</button>
             </div>
@@ -276,17 +286,17 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       )}
 
       {/* Header + search */}
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 mb-3">Notes</h1>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-white/10 shrink-0">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Notes</h1>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search notes…"
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
+            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50 dark:bg-[#20262d]"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]">Clear</button>
@@ -301,7 +311,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : hierarchy.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-16 px-4">
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-16 px-4">
             {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
           </p>
         ) : (
@@ -313,12 +323,12 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                 <div key={trad.catId}>
                   {/* Tradition header */}
                   <button
-                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
-                    onClick={() => toggleTradition(trad.catId)}
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left select-none border-b border-gray-100 dark:border-white/10"
+                    onClick={() => toggleTradition(trad)}
                   >
-                    <span className="flex-1 text-sm font-medium text-gray-800 truncate">{trad.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0">{totalNotes}</span>
-                    <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{trad.name}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{totalNotes}</span>
+                    <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {tradOpen && trad.books.map(book => {
@@ -327,12 +337,12 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                       <div key={book.bookKey}>
                         {/* Book sub-header */}
                         <button
-                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
+                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left select-none border-b border-gray-100 dark:border-white/10"
                           onClick={() => toggleBook(book.bookKey)}
                         >
-                          <span className="flex-1 text-sm text-gray-700 truncate">{book.title}</span>
-                          <span className="text-xs text-gray-400 shrink-0">{book.notes.length}</span>
-                          <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
+                          <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">{book.title}</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{book.notes.length}</span>
+                          <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
                         </button>
 
                         {/* Note items */}

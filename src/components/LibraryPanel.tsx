@@ -228,7 +228,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           return (
             <div
               key={book.id}
-              className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors"
+              className="flex items-center border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
               style={{ paddingLeft: bookPadLeft }}
             >
               <Checkbox
@@ -240,7 +240,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 onClick={() => onOpenBook(uuid)}
                 className="flex-1 text-left pr-4 py-2.5 min-w-0"
               >
-                <div className="text-sm text-gray-800 truncate">{book.title}</div>
+                <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{book.title}</div>
               </button>
             </div>
           );
@@ -255,7 +255,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           return (
             <div key={child.id}>
               <div
-                className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                className="flex items-center border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
                 style={{ paddingLeft: catPadLeft }}
               >
                 <Checkbox
@@ -267,12 +267,12 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   onClick={() => toggleNode(child.id)}
                   className="flex-1 flex items-center justify-between pr-4 py-3 text-left min-w-0"
                 >
-                  <span className={`truncate ${level === 0 ? 'text-sm font-medium text-gray-800' : 'text-sm text-gray-700'}`}>
+                  <span className={`truncate ${level === 0 ? 'text-sm font-medium text-gray-800 dark:text-gray-200' : 'text-sm text-gray-700 dark:text-gray-300'}`}>
                     {child.name}
                   </span>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span className="text-xs text-gray-400">{childImmediate}</span>
-                    <span className={`text-gray-400 text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{childImmediate}</span>
+                    <span className={`text-gray-400 dark:text-gray-500 text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
               </div>
@@ -503,7 +503,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   if (activeTab !== 'library') {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+      <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
         {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} — coming soon
       </div>
     );
@@ -528,9 +528,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       />
 
       {/* Header + search */}
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-white/10">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-900">Library</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Library</h2>
           <div className="flex items-center gap-1.5">
             {userId && (
               <button
@@ -567,14 +567,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         )}
 
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={selectedSlugs.size > 0 ? `Search ${selectedSlugs.size} selected book${selectedSlugs.size !== 1 ? 's' : ''}…` : 'Search all books…'}
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
+            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50 dark:bg-[#20262d]"
           />
           {(searchQuery || selectedSlugs.size > 0 || checkedResultIds.size > 0) && (
             <button
@@ -598,17 +598,17 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               <div className="w-5 h-5 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : searchResults.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-10">No results for "{searchQuery}"</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-10">No results for "{searchQuery}"</p>
           ) : (
             <div>
-              <p className="text-xs text-gray-400 px-4 py-2">{searchResults.length} results</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 px-4 py-2">{searchResults.length} results</p>
               {searchResults.map(result => {
                 const isExpanded = expandedResults.has(result.passageId);
                 const isChecked  = checkedResultIds.has(result.passageId);
                 const snippet    = getSnippet(result.content, searchQuery);
                 const location   = result.chapterLabel || result.sectionTitle;
                 return (
-                  <div key={result.passageId} className={`border-b border-gray-100 ${isChecked ? 'bg-[#1B6B7B]/5' : ''}`}>
+                  <div key={result.passageId} className={`border-b border-gray-100 dark:border-white/10 ${isChecked ? 'bg-[#1B6B7B]/5' : ''}`}>
                     <div className="flex items-start">
                       <Checkbox
                         state={isChecked ? 'checked' : 'unchecked'}
@@ -616,13 +616,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         className="pl-3 pr-1 pt-3.5 shrink-0"
                       />
                       <div
-                        className="flex-1 text-left pr-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                        className="flex-1 text-left pr-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
                         onClick={() => setExpandedResults(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
                       >
                         <p className="text-xs text-[#1B6B7B] font-medium mb-1 truncate">
                           {result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
-                        <p className="font-serif text-gray-700 leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
+                        <p className="font-serif text-gray-700 dark:text-gray-300 leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
                           {isExpanded ? highlightQuery(result.content, searchQuery) : highlightQuery(snippet, searchQuery)}
                         </p>
                         {isExpanded && (
@@ -652,16 +652,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
             return (
               <div key={root.id}>
-                <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors">
                   <Checkbox state={state} onChange={() => toggleSlugs(rootSlugs)} className="pl-3 pr-1 py-3.5 shrink-0" />
                   <button
                     onClick={() => toggleNode(root.id)}
                     className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
                   >
-                    <span className="text-sm font-medium text-gray-800 truncate">{root.name}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{root.name}</span>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className="text-xs text-gray-400">{immediateCount}</span>
-                      <span className={`text-gray-400 text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{immediateCount}</span>
+                      <span className={`text-gray-400 dark:text-gray-500 text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>
                 </div>
@@ -672,8 +672,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
           {/* ── My Books ── */}
           {(importedBooks.length > 0 || (userId && isPro)) && (
-            <div className="border-t border-gray-200 mt-1">
-              <div className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <div className="border-t border-gray-200 dark:border-white/10 mt-1">
+              <div className="flex items-center border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors">
                 <Checkbox
                   state={checkState(importedBooks.map(b => b.id))}
                   onChange={() => toggleSlugs(importedBooks.map(b => b.id))}
@@ -683,19 +683,19 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   onClick={() => setMyBooksOpen(v => !v)}
                   className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
                 >
-                  <span className="text-sm font-medium text-gray-800 truncate">My Books</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">My Books</span>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {importedBooks.length > 0 && (
-                      <span className="text-xs text-gray-400">{importedBooks.length}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{importedBooks.length}</span>
                     )}
-                    <span className={`text-gray-400 text-sm transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 dark:text-gray-500 text-sm transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
               </div>
               {myBooksOpen && (
                 <div className="bg-gray-50/30">
                   {importedBooks.length === 0 ? (
-                    <p className="text-xs text-gray-400 pl-9 pr-4 py-3">
+                    <p className="text-xs text-gray-400 dark:text-gray-500 pl-9 pr-4 py-3">
                       No imported books yet. Use the button near the search bar to import a book.
                     </p>
                   ) : (
@@ -717,8 +717,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
       {/* Tag action bar */}
       {checkedResultIds.size > 0 && (
-        <div className="border-t border-gray-200 px-4 py-3 bg-white flex items-center justify-between gap-3 shrink-0">
-          <button onClick={() => setCheckedResultIds(new Set())} className="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
+        <div className="border-t border-gray-200 dark:border-white/10 px-4 py-3 bg-white dark:bg-[#1b2128] flex items-center justify-between gap-3 shrink-0">
+          <button onClick={() => setCheckedResultIds(new Set())} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Cancel</button>
           <button
             onClick={() => setTagPanelVisible(true)}
             className="flex-1 bg-[#1B6B7B] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-[#155a68] transition-colors"
@@ -765,8 +765,8 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
 
   if (confirmDelete) {
     return (
-      <div className="flex items-center border-b border-gray-100 px-4 py-2.5 bg-red-50/60">
-        <span className="text-xs text-gray-600 flex-1 truncate pr-2">Delete &quot;{book.title}&quot;?</span>
+      <div className="flex items-center border-b border-gray-100 dark:border-white/10 px-4 py-2.5 bg-red-50/60">
+        <span className="text-xs text-gray-600 dark:text-gray-400 flex-1 truncate pr-2">Delete &quot;{book.title}&quot;?</span>
         <button
           onClick={() => { setConfirmDelete(false); onDelete(); }}
           className="text-xs text-red-600 font-medium hover:text-red-700 mr-3 shrink-0"
@@ -775,7 +775,7 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
         </button>
         <button
           onClick={() => setConfirmDelete(false)}
-          className="text-xs text-gray-500 hover:text-gray-700 shrink-0"
+          className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 shrink-0"
         >
           Cancel
         </button>
@@ -785,16 +785,16 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
 
   return (
     <div
-      className="flex items-center border-b border-gray-100 hover:bg-gray-50 transition-colors group"
+      className="flex items-center border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors group"
       style={{ paddingLeft: 36 }}
     >
       <button onClick={onOpen} className="flex-1 text-left py-2.5 min-w-0 pr-2">
-        <div className="text-sm text-gray-800 truncate">{book.title}</div>
+        <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{book.title}</div>
       </button>
       <button
         onClick={() => setConfirmDelete(true)}
         title="Delete"
-        className="opacity-0 group-hover:opacity-100 shrink-0 p-1.5 text-gray-400 hover:text-red-500 transition-all mr-1"
+        className="opacity-0 group-hover:opacity-100 shrink-0 p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-all mr-1"
       >
         <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M9 3h2a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1zm4 2V4a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3v1H4a1 1 0 0 0 0 2h.1l.9 10.1A2 2 0 0 0 7 19h6a2 2 0 0 0 2-1.9L15.9 7H16a1 1 0 0 0 0-2h-3z" clipRule="evenodd" />
@@ -815,7 +815,7 @@ function Checkbox({ state, onChange, className }: {
     <button onClick={e => { e.stopPropagation(); onChange(); }} className={`flex items-center justify-center ${className}`}>
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
         state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
-        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300'
+        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300 dark:border-white/15'
       }`}>
         {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
         {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}

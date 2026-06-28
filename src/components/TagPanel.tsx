@@ -123,7 +123,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
     return (
       <div key={tag.id}>
         <div
-          className="flex items-center gap-2 px-5 py-2.5 hover:bg-gray-50"
+          className="flex items-center gap-2 px-5 py-2.5 hover:bg-gray-50 dark:hover:bg-[#20262d]"
           style={{ paddingLeft: 20 + tag.depth * 20 }}
         >
           {/* Checkbox */}
@@ -134,19 +134,19 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
               setChecked(next);
             }}
             className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-              isChecked ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'
+              isChecked ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300 dark:border-white/15'
             }`}
           >
             {isChecked && <span className="text-white text-xs leading-none">✓</span>}
           </button>
 
           {/* Name */}
-          <span className="flex-1 text-sm text-gray-800">{tag.name}</span>
+          <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{tag.name}</span>
 
           {/* Add child button */}
           <button
             onClick={() => { setNewTagParentId(tag.id); setNewTagName(''); }}
-            className="text-gray-300 hover:text-[#1B6B7B] text-lg leading-none transition-colors px-1"
+            className="text-gray-300 dark:text-gray-600 hover:text-[#1B6B7B] text-lg leading-none transition-colors px-1"
             title="Add sub-tag"
           >
             +
@@ -154,7 +154,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
 
           {/* Chevron */}
           {children.length > 0 && (
-            <button onClick={() => toggleNode(tag.id)} className="text-gray-400 text-sm px-1">
+            <button onClick={() => toggleNode(tag.id)} className="text-gray-400 dark:text-gray-500 text-sm px-1">
               <span className={`inline-block transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
             </button>
           )}
@@ -179,7 +179,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
       title="Add Tag"
       footer={
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors">
             Cancel
           </button>
           <button
@@ -193,19 +193,19 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
       }
     >
       {/* Selection preview */}
-      <div className="mx-5 mt-4 mb-3 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-        <p className="text-xs text-gray-500 line-clamp-2">"{selectionText}"</p>
+      <div className="mx-5 mt-4 mb-3 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
+        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{selectionText}"</p>
       </div>
 
       {/* New tag input */}
       <div className="px-5 pb-3">
         {newTagParentId && (
           <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-xs text-gray-400">Sub-tag of</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Sub-tag of</span>
             <span className="text-xs font-medium text-[#1B6B7B]">
               {tags.find(t => t.id === newTagParentId)?.name}
             </span>
-            <button onClick={() => setNewTagParentId(null)} className="text-gray-300 hover:text-gray-500 text-xs ml-1">✕</button>
+            <button onClick={() => setNewTagParentId(null)} className="text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 text-xs ml-1">✕</button>
           </div>
         )}
         <div className="flex gap-2">
@@ -214,7 +214,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             onChange={e => setNewTagName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
             placeholder="New tag name…"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+            className="flex-1 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
           />
           <button
             onClick={handleCreateTag}
@@ -229,7 +229,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
       {/* Tag list */}
       <div className="pb-2">
         {rootTags.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No tags yet. Create your first one above.</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No tags yet. Create your first one above.</p>
         ) : (
           rootTags.map(tag => renderTag(tag, tags))
         )}

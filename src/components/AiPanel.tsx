@@ -59,7 +59,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
         {!isPro ? (
           <div className="text-center py-4">
             <div className="text-4xl mb-4">✨</div>
-            <p className="text-sm text-gray-600 leading-relaxed mb-5">
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-5">
               AI passage summaries are a Pro feature. Upgrade to get instant explanations of any passage.
             </p>
             <button className="w-full bg-[#1B6B7B] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] transition-colors">
@@ -69,7 +69,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
         ) : loading ? (
           <div className="flex flex-col items-center py-8 gap-3">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-400">Thinking…</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500">Thinking…</p>
           </div>
         ) : error ? (
           <div className="py-6 text-center">
@@ -84,18 +84,18 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
         ) : result ? (
           <div>
             {/* Selection preview */}
-            <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100 mb-5">
-              <p className="text-xs text-gray-500 line-clamp-2">"{selectionText}"</p>
+            <div className="bg-gray-50 dark:bg-[#20262d] rounded-xl px-3 py-2.5 border border-gray-100 dark:border-white/10 mb-5">
+              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{selectionText}"</p>
             </div>
 
             {/* AI result */}
             <h3 className="text-base font-bold text-[#1B6B7B] mb-2">{result.title}</h3>
-            <p className="text-sm text-gray-700 leading-relaxed">{result.explanation}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{result.explanation}</p>
 
             {/* Copy button */}
             <button
               onClick={handleCopy}
-              className="mt-5 w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              className="mt-5 w-full py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
             >
               {copied ? '✓ Copied' : 'Copy'}
             </button>

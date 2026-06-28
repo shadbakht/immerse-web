@@ -23,7 +23,7 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
     >
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
         state === 'checked'       ? 'bg-[#1B6B7B] border-[#1B6B7B]' :
-        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300'
+        state === 'indeterminate' ? 'border-[#1B6B7B]' : 'border-gray-300 dark:border-white/15'
       }`}>
         {state === 'checked'       && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
         {state === 'indeterminate' && <div className="w-2 h-0.5 bg-[#1B6B7B] rounded-full" />}
@@ -51,10 +51,10 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   ];
 
   return (
-    <div className="pl-9 pr-4 py-3 border-t border-gray-100 flex items-start gap-2">
+    <div className="pl-9 pr-4 py-3 border-t border-gray-100 dark:border-white/10 flex items-start gap-2">
       <div className="flex-1 min-w-0">
         <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-          <p className={`font-serif text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
+          <p className={`font-serif text-gray-700 dark:text-gray-300 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
             "<Highlight text={sel.snapshot_text} q={searchQuery} />"
           </p>
         </div>
@@ -122,16 +122,16 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
   const rowPaddingLeft = 12 + (depth ?? 0) * 14;
 
   return (
-    <div className="border-b border-gray-100">
+    <div className="border-b border-gray-100 dark:border-white/10">
       {renaming && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center" onClick={() => setRenaming(false)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Rename Tag</h2>
+          <div className="bg-white dark:bg-[#1b2128] rounded-2xl shadow-xl max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Rename Tag</h2>
             <input
               autoFocus
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 mb-4"
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   onRename(tag.id, newName);
@@ -143,23 +143,23 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
               }}
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => { setRenaming(false); setNewName(tag.name); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={() => { setRenaming(false); setNewName(tag.name); }} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#272e36] rounded-lg">Cancel</button>
               <button onClick={() => { onRename(tag.id, newName); setRenaming(false); }} className="px-4 py-2 text-sm bg-[#1B6B7B] text-white rounded-lg hover:bg-[#1B6B7B]/90">Save</button>
             </div>
           </div>
         </div>
       )}
       <div
-        className="flex items-center py-3.5 pr-4 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        className="flex items-center py-3.5 pr-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
         style={{ paddingLeft: rowPaddingLeft }}
         onClick={() => onToggleOpen?.()}
       >
         <Checkbox state={selectState} onChange={onToggleSelect} />
-        <span className="flex-1 text-sm font-medium text-gray-800 truncate ml-1 min-w-0">
+        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate ml-1 min-w-0">
           <Highlight text={tag.name} q={searchQuery} />
         </span>
-        <span className="text-xs text-gray-400 shrink-0 mx-2">{tag.selections.length}</span>
-        <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 mx-2">{tag.selections.length}</span>
+        <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
         <div onClick={e => e.stopPropagation()} className="ml-2">
           <ContextMenu options={menuOptions} />
         </div>
@@ -167,7 +167,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
       {open && (
         <div>
           {tag.selections.length === 0
-            ? <p className="pl-9 pr-4 py-3 text-xs text-gray-400 border-t border-gray-100">No passages tagged.</p>
+            ? <p className="pl-9 pr-4 py-3 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-white/10">No passages tagged.</p>
             : tag.selections.map(sel => (
                 <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} />
               ))}
@@ -445,9 +445,9 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
 
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-white/10 shrink-0">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-semibold text-gray-900">Tags</h1>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tags</h1>
           {selectedTagIds.size > 0 && (
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -464,9 +464,9 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                 {exporting ? 'Exporting…' : `Export (${selectedTagIds.size})`}
               </button>
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-20 min-w-[200px]">
-                  <div className="px-4 pt-3 pb-2 border-b border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest mb-2">Include</p>
+                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1b2128] rounded-xl shadow-lg border border-gray-200 dark:border-white/10 z-20 min-w-[200px]">
+                  <div className="px-4 pt-3 pb-2 border-b border-gray-100 dark:border-white/10">
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-widest mb-2">Include</p>
                     {([
                       { label: 'Notes',            checked: includeNotes, set: () => setIncludeNotes(v => !v), enabled: hasNotesForSelectedTags },
                       { label: 'Cross-references', checked: includeXrefs, set: () => setIncludeXrefs(v => !v), enabled: hasXrefsForSelectedTags },
@@ -477,10 +477,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                         onClick={e => { if (!enabled) return; e.stopPropagation(); set(); }}
                         title={enabled ? undefined : `None of the selected tags have ${label.toLowerCase()}`}
                       >
-                        <div className={`w-[15px] h-[15px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${checked && enabled ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300'}`}>
+                        <div className={`w-[15px] h-[15px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${checked && enabled ? 'bg-[#1B6B7B] border-[#1B6B7B]' : 'border-gray-300 dark:border-white/15'}`}>
                           {checked && enabled && <span className="text-white text-[9px] leading-none font-bold">✓</span>}
                         </div>
-                        <span className="text-sm text-gray-700">{label}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
                       </div>
                     ))}
                   </div>
@@ -492,7 +492,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                       <button
                         key={format}
                         onClick={() => handleExport(format)}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
                       >
                         {label}
                       </button>
@@ -504,8 +504,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           )}
         </div>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tags and passages…" className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50" />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tags and passages…" className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50 dark:bg-[#20262d]" />
           {(searchQuery || selectedTagIds.size > 0) && (
             <button onClick={() => { setSearchQuery(''); setSelectedTagIds(new Set()); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]">Clear</button>
           )}
@@ -515,7 +515,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         {loading ? (
           <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" /></div>
         ) : filtered.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-16 px-4">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-16 px-4">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
         ) : (
           <div>
             {filtered.map(tag => (

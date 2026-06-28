@@ -184,20 +184,20 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
     <div>
       <button
         onClick={toggle}
-        className="w-full flex items-center gap-2 py-2.5 pr-4 hover:bg-gray-50 transition-colors text-left"
+        className="w-full flex items-center gap-2 py-2.5 pr-4 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left"
         style={{ paddingLeft: 20 + depth * 18 }}
       >
         <TagIcon size={16} />
-        <span className="flex-1 text-sm font-medium text-gray-800 truncate">{tag.name}</span>
-        <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{tag.name}</span>
+        <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
       </button>
       {open && (
         <div>
           <div style={{ paddingLeft: 20 + depth * 18 + 24 }} className="pr-4">
             {quotes === null ? (
-              <p className="py-1.5 text-xs text-gray-400">Loading…</p>
+              <p className="py-1.5 text-xs text-gray-400 dark:text-gray-500">Loading…</p>
             ) : quotes.length === 0 ? (
-              <p className="py-1.5 text-xs text-gray-400">No quotes filed here.</p>
+              <p className="py-1.5 text-xs text-gray-400 dark:text-gray-500">No quotes filed here.</p>
             ) : (
               <div className="space-y-1.5 pb-1.5">
                 {quotes.map(q => <TagQuoteRow key={q.id} quote={q} onOpenBook={onOpenBook} />)}
@@ -216,9 +216,9 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
 function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (bookId: string, passageId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+    <div className="px-3 py-2 bg-gray-50 dark:bg-[#20262d] rounded-lg border border-gray-100 dark:border-white/10">
       <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-        <p className={`font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+        <p className={`font-serif text-sm text-gray-700 dark:text-gray-300 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
           "{quote.text}"
         </p>
       </div>
@@ -247,15 +247,15 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
   const [expanded, setExpanded] = useState(false);
   const menuOptions: MenuOption[] = [{ label: 'Delete', icon: '🗑️', color: 'danger', onClick: onDelete }];
   return (
-    <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+    <div className="bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10 overflow-hidden">
       <div className="px-4 py-3 flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-xs text-[#1B6B7B] font-medium mb-1.5 truncate">{entry.otherCitation}</p>
           <div className="cursor-pointer select-none flex items-start gap-2" onClick={() => setExpanded(v => !v)}>
-            <p className={`flex-1 font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+            <p className={`flex-1 font-serif text-sm text-gray-700 dark:text-gray-300 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
               "{entry.otherSnapshotText}"
             </p>
-            <span className={`text-gray-400 text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
+            <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
           </div>
           {expanded && entry.otherBookId && onOpenBook && (
             <button
@@ -1334,7 +1334,7 @@ async function handleCopy() {
 
   if (!target) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-300">
+      <div className="h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
         <div className="text-center">
           <div className="text-5xl mb-3">✦</div>
           <p className="text-sm">Select a book to begin reading</p>
@@ -1401,16 +1401,16 @@ async function handleCopy() {
       {toc.length > 0 && (
         <button
           onClick={() => setTocOpen(o => !o)}
-          className="absolute top-4 right-4 z-20 p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          className="absolute top-4 right-4 z-20 p-2 bg-white dark:bg-[#1b2128] border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors shadow-sm"
           title="Table of Contents"
         >
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
-            <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600" />
-            <line x1="6" y1="4"  x2="20" y2="4"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600" />
-            <circle cx="3" cy="9"  r="1.5" fill="currentColor" className="text-gray-600" />
-            <line x1="6" y1="9"  x2="20" y2="9"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600" />
-            <circle cx="3" cy="14" r="1.5" fill="currentColor" className="text-gray-600" />
-            <line x1="6" y1="14" x2="20" y2="14" stroke="currentColor" strokeWidth="1.2" className="text-gray-600" />
+            <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-gray-400" />
+            <line x1="6" y1="4"  x2="20" y2="4"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-gray-400" />
+            <circle cx="3" cy="9"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-gray-400" />
+            <line x1="6" y1="9"  x2="20" y2="9"  stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-gray-400" />
+            <circle cx="3" cy="14" r="1.5" fill="currentColor" className="text-gray-600 dark:text-gray-400" />
+            <line x1="6" y1="14" x2="20" y2="14" stroke="currentColor" strokeWidth="1.2" className="text-gray-600 dark:text-gray-400" />
           </svg>
         </button>
       )}
@@ -1419,16 +1419,16 @@ async function handleCopy() {
       {tocOpen && (
         <>
           <div className="absolute inset-0 z-10" onClick={() => setTocOpen(false)} />
-          <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-700">
+          <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white dark:bg-[#1b2128] rounded-xl shadow-xl border border-gray-200 dark:border-white/10">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10 font-semibold text-sm text-gray-700 dark:text-gray-300">
               Table of Contents
             </div>
             {tocDisplay.map(({ entry, i, key, hasChildren }) => (
-              <div key={i} className="flex items-stretch border-b border-gray-50 last:border-0">
+              <div key={i} className="flex items-stretch border-b border-gray-50 dark:border-white/5 last:border-0">
                 <button
                   onClick={() => scrollToPassage(entry.passageId)}
-                  className={`flex-1 text-left py-2.5 text-sm hover:bg-gray-50 transition-colors ${
-                    entry.depth ? 'pl-10 pr-2 text-gray-500' : 'px-4 text-gray-700 font-medium'
+                  className={`flex-1 text-left py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors ${
+                    entry.depth ? 'pl-10 pr-2 text-gray-500 dark:text-gray-400' : 'px-4 text-gray-700 dark:text-gray-300 font-medium'
                   }`}
                 >
                   {entry.label}
@@ -1436,7 +1436,7 @@ async function handleCopy() {
                 {hasChildren && (
                   <button
                     onClick={() => toggleTocSection(key)}
-                    className="w-10 shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-10 shrink-0 flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
                     title={collapsedToc.has(key) ? 'Expand' : 'Collapse'}
                     aria-label={collapsedToc.has(key) ? 'Expand section' : 'Collapse section'}
                   >
@@ -1490,7 +1490,7 @@ async function handleCopy() {
           </p>
           <button
             onClick={cancelEditSelection}
-            className="shrink-0 text-sm text-gray-500 hover:text-gray-700 font-medium"
+            className="shrink-0 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium"
           >
             Cancel
           </button>
@@ -1509,7 +1509,7 @@ async function handleCopy() {
             ) : (
               <>
                 <p className="text-sm font-semibold text-[#1B6B7B]">Select text or click a passage to link</p>
-                <p className="text-xs text-gray-500 truncate mt-0.5">
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                   "{xrefPickFrom.text.length > 80 ? xrefPickFrom.text.slice(0, 80) + '…' : xrefPickFrom.text}"
                 </p>
               </>
@@ -1518,7 +1518,7 @@ async function handleCopy() {
           {!pickSaving && (
             <button
               onClick={onXrefPickDone}
-              className="shrink-0 text-xs text-gray-500 hover:text-gray-700 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              className="shrink-0 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#272e36] transition-colors"
             >
               Cancel
             </button>
@@ -1530,8 +1530,8 @@ async function handleCopy() {
       {pdfUrl && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {book && (
-            <div className="px-6 py-3 border-b border-gray-100 shrink-0">
-              <h1 className="text-base font-semibold text-gray-900 truncate">{book.title}</h1>
+            <div className="px-6 py-3 border-b border-gray-100 dark:border-white/10 shrink-0">
+              <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{book.title}</h1>
             </div>
           )}
           <embed src={pdfUrl} type="application/pdf" className="flex-1 w-full" />
@@ -1543,8 +1543,8 @@ async function handleCopy() {
         <div className="max-w-[70ch] mx-auto px-8 py-12">
           {book && (
             <div className="mb-12 text-center">
-              <h1 className="text-2xl font-semibold text-gray-900 leading-snug">{book.title}</h1>
-              {book.authorName && <p className="text-sm text-gray-400 mt-2">{book.authorName}</p>}
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 leading-snug">{book.title}</h1>
+              {book.authorName && <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">{book.authorName}</p>}
             </div>
           )}
 
@@ -1590,12 +1590,12 @@ async function handleCopy() {
                       </div>
                     )}
                     {showChapter && prayerTitle && (
-                      <h2 className="text-center text-xl font-semibold text-gray-900 mt-3 mb-1">
+                      <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-1">
                         {prayerTitle}
                       </h2>
                     )}
                     {showSection && (
-                      <h3 className="text-center text-xs font-normal text-gray-400 uppercase tracking-wide mb-5">
+                      <h3 className="text-center text-xs font-normal text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-5">
                         {passage.section_title}
                       </h3>
                     )}
@@ -1610,7 +1610,7 @@ async function handleCopy() {
                       </div>
                     )}
                     {showSection && (
-                      <h2 className="text-center text-xl font-semibold text-gray-900 mt-3 mb-4">
+                      <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-4">
                         {passage.section_title}
                       </h2>
                     )}
@@ -1625,7 +1625,7 @@ async function handleCopy() {
                       </div>
                     )}
                     {showSection && (
-                      <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wide text-center mt-8 mb-3">
+                      <h3 className="text-sm font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide text-center mt-8 mb-3">
                         {passage.section_title}
                       </h3>
                     )}
@@ -1667,13 +1667,13 @@ async function handleCopy() {
                     </div>
                   )}
                   {passage.paragraph_number != null && !isLetterDate && (
-                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 select-none w-7 text-right leading-relaxed tabular-nums">
+                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 dark:text-gray-500 select-none w-7 text-right leading-relaxed tabular-nums">
                       {passage.paragraph_number}
                     </span>
                   )}
                   <p
                     data-pid={passage.id}
-                    className={`font-serif text-gray-800 leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
+                    className={`font-serif text-gray-800 dark:text-gray-200 leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
                     style={{ fontSize: 'var(--quote-font-size)' }}
                   >
                     <PassageContent
@@ -1684,7 +1684,7 @@ async function handleCopy() {
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                     />
                     {attribution && (
-                      <span className="block text-right italic text-gray-500 mt-2">{attribution}</span>
+                      <span className="block text-right italic text-gray-500 dark:text-gray-400 mt-2">{attribution}</span>
                     )}
                   </p>
                 </div>
@@ -1698,19 +1698,19 @@ async function handleCopy() {
       {activeFootnote && (
         <>
           <div className="absolute inset-0 z-30" onClick={() => setActiveFootnote(null)} />
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
+          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#1b2128] border-t border-gray-200 dark:border-white/10 shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-bold text-[#1B6B7B] uppercase tracking-widest mb-2 block">
                   Footnote {activeFootnote.num}
                 </span>
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  {activeFootnote.text || <span className="text-gray-400">Footnote text not available in the web version.</span>}
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {activeFootnote.text || <span className="text-gray-400 dark:text-gray-500">Footnote text not available in the web version.</span>}
                 </p>
               </div>
               <button
                 onClick={() => setActiveFootnote(null)}
-                className="text-gray-400 hover:text-gray-600 text-lg shrink-0 mt-0.5"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 text-lg shrink-0 mt-0.5"
               >
                 ✕
               </button>
@@ -1723,7 +1723,7 @@ async function handleCopy() {
       <PanelSheet visible={activePanel === 'signin'} onClose={closePanel} title="Sign In Required">
         <div className="px-5 py-8 text-center">
           <div className="text-4xl mb-4">✦</div>
-          <p className="text-sm text-gray-600 leading-relaxed mb-6">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-6">
             Sign in to tag, annotate, and save passages across all your devices.
           </p>
           <a
@@ -1769,8 +1769,8 @@ async function handleCopy() {
           >
             {data && (
               <div className="pt-4 pb-4">
-                <div className="mx-5 mb-1 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="font-serif text-xs text-gray-500 line-clamp-2">"{data.snapshotText}"</p>
+                <div className="mx-5 mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
+                  <p className="font-serif text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{data.snapshotText}"</p>
                 </div>
                 <button
                   onClick={() => startEditSelection([data.selectionId], { type: 'tags', passageId: annotationPanel!.passageId })}
@@ -1779,7 +1779,7 @@ async function handleCopy() {
                   Edit text selection
                 </button>
                 {data.tags.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-4">No tags on this selection.</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No tags on this selection.</p>
                 ) : (
                   <div>
                     {data.tags.map(tag => (
@@ -1827,8 +1827,8 @@ async function handleCopy() {
           >
             {data && (
               <div className="px-5 pt-4 pb-2">
-                <div className="mb-1 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="font-serif text-xs text-gray-500 line-clamp-2">"{data.snapshotText}"</p>
+                <div className="mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
+                  <p className="font-serif text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{data.snapshotText}"</p>
                 </div>
                 <button
                   onClick={() => startEditSelection([data.selectionId], { type: 'note', passageId: annotationPanel!.passageId })}
@@ -1841,7 +1841,7 @@ async function handleCopy() {
                   value={editNoteContent}
                   onChange={e => setEditNoteContent(e.target.value)}
                   rows={5}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
+                  className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] resize-none leading-relaxed"
                 />
               </div>
             )}
@@ -1874,8 +1874,8 @@ async function handleCopy() {
           >
             <div className="px-5 pt-4 pb-4">
               {thisSnap && (
-                <div className="mb-1 px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-xs text-gray-500 line-clamp-2">"{thisSnap}"</p>
+                <div className="mb-1 px-3 py-2.5 bg-gray-50 dark:bg-[#20262d] rounded-xl border border-gray-100 dark:border-white/10">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">"{thisSnap}"</p>
                 </div>
               )}
               {editSelIds.length > 0 && (
@@ -1887,7 +1887,7 @@ async function handleCopy() {
                 </button>
               )}
               {entries.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">No cross-references found.</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No cross-references found.</p>
               ) : (
                 <div className="space-y-3">
                   {entries.map(entry => (

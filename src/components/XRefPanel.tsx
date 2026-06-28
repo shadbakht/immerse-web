@@ -90,7 +90,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
       footer={
         step === 2 ? (
           <div className="flex gap-3">
-            <button onClick={() => setStep(1)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <button onClick={() => setStep(1)} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors">
               Back
             </button>
             <button
@@ -108,66 +108,66 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
         <div className="px-5 py-4 space-y-4">
           {/* Current selection */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Your selection</p>
-            <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
-              <p className="text-sm text-gray-700 line-clamp-3">"{selectionText}"</p>
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Your selection</p>
+            <div className="bg-gray-50 dark:bg-[#20262d] rounded-xl px-3 py-2.5 border border-gray-100 dark:border-white/10">
+              <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">"{selectionText}"</p>
             </div>
           </div>
 
           {/* Search */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Find a passage to link</p>
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Find a passage to link</p>
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search any passage…"
               autoFocus
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
+              className="w-full border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B]"
             />
           </div>
 
           {/* Results */}
-          {searching && <p className="text-sm text-gray-400 text-center py-4">Searching…</p>}
+          {searching && <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">Searching…</p>}
           {!searching && results.length > 0 && (
             <div className="space-y-2">
               {results.map(p => (
                 <button
                   key={p.id}
                   onClick={() => { setSelected(p); setStep(2); }}
-                  className="w-full text-left bg-gray-50 hover:bg-[#1B6B7B]/5 border border-gray-100 hover:border-[#1B6B7B]/30 rounded-xl px-3 py-2.5 transition-colors"
+                  className="w-full text-left bg-gray-50 dark:bg-[#20262d] hover:bg-[#1B6B7B]/5 border border-gray-100 dark:border-white/10 hover:border-[#1B6B7B]/30 rounded-xl px-3 py-2.5 transition-colors"
                 >
-                  <p className="text-sm text-gray-800 line-clamp-2">"{p.content.slice(0, 120)}…"</p>
-                  <p className="text-xs text-gray-400 mt-1">{citationFor(p)}</p>
+                  <p className="text-sm text-gray-800 dark:text-gray-200 line-clamp-2">"{p.content.slice(0, 120)}…"</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{citationFor(p)}</p>
                 </button>
               ))}
             </div>
           )}
           {!searching && searchQuery.length >= 3 && results.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-4">No results found.</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No results found.</p>
           )}
         </div>
       ) : (
         <div className="px-5 py-4 space-y-4">
           {/* From */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">From</p>
-            <div className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
-              <p className="text-sm text-gray-700">"{selectionText}"</p>
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">From</p>
+            <div className="bg-gray-50 dark:bg-[#20262d] rounded-xl px-3 py-2.5 border border-gray-100 dark:border-white/10">
+              <p className="text-sm text-gray-700 dark:text-gray-300">"{selectionText}"</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400">links to</span>
-            <div className="flex-1 h-px bg-gray-200" />
+            <div className="flex-1 h-px bg-gray-200 dark:bg-[#2f3740]" />
+            <span className="text-xs text-gray-400 dark:text-gray-500">links to</span>
+            <div className="flex-1 h-px bg-gray-200 dark:bg-[#2f3740]" />
           </div>
 
           {/* To */}
           {selected && (
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">To</p>
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">To</p>
               <div className="bg-[#1B6B7B]/5 rounded-xl px-3 py-2.5 border border-[#1B6B7B]/20">
-                <p className="text-sm text-gray-700 line-clamp-4">"{selected.content}"</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-4">"{selected.content}"</p>
                 <p className="text-xs text-[#1B6B7B] mt-1.5 font-medium">{citationFor(selected)}</p>
               </div>
             </div>

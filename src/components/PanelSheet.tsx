@@ -36,16 +36,16 @@ export default function PanelSheet({ visible, onClose, title, children, footer, 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="relative bg-white rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-white dark:bg-[#1b2128] rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
         style={{ maxHeight, minHeight: '40vh' }}
       >
         {/* Handle + Header */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 shrink-0">
-          <div className="w-8 h-1 rounded-full bg-gray-200 absolute top-2 left-1/2 -translate-x-1/2" />
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 dark:border-white/10 shrink-0">
+          <div className="w-8 h-1 rounded-full bg-gray-200 dark:bg-[#2f3740] absolute top-2 left-1/2 -translate-x-1/2" />
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors text-xl leading-none"
           >
             ✕
           </button>
@@ -58,7 +58,7 @@ export default function PanelSheet({ visible, onClose, title, children, footer, 
 
         {/* Footer */}
         {footer && (
-          <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+          <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10 shrink-0">
             {footer}
           </div>
         )}

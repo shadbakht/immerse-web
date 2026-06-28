@@ -50,7 +50,7 @@ export default function AppConfirmPage() {
 
         {mobile ? (
           <>
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
+            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed mb-8">
               Your account is ready. Opening the Immerse app and signing you in…
             </p>
             <a
@@ -61,14 +61,14 @@ export default function AppConfirmPage() {
             </a>
             <Link
               href="/login"
-              className="block w-full text-gray-400 text-sm py-3 mt-1 hover:text-white transition-colors"
+              className="block w-full text-gray-400 dark:text-gray-500 text-sm py-3 mt-1 hover:text-white transition-colors"
             >
               Continue on the web instead
             </Link>
           </>
         ) : (
           <>
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
+            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed mb-8">
               Your account is ready. Open the Immerse app on your phone to sign in,
               or continue on the web below.
             </p>

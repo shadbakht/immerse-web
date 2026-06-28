@@ -75,9 +75,9 @@ function XRefCard({
   ];
 
   return (
-    <div className="border-t border-gray-100">
+    <div className="border-t border-gray-100 dark:border-white/10">
       {/* Label row */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-white/10">
         {editing ? (
           <input
             ref={inputRef}
@@ -86,18 +86,18 @@ function XRefCard({
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit(); } if (e.key === 'Escape') { setEditing(false); } }}
             placeholder="Add label…"
-            className="flex-1 text-sm font-semibold text-[#1B6B7B] outline-none bg-transparent border-b border-[#1B6B7B]/40 pb-0.5 placeholder:text-gray-400 placeholder:font-normal"
+            className="flex-1 text-sm font-semibold text-[#1B6B7B] outline-none bg-transparent border-b border-[#1B6B7B]/40 pb-0.5 placeholder:text-gray-400 dark:text-gray-500 placeholder:font-normal"
           />
         ) : row.label ? (
           <button onClick={startEdit} className="flex-1 text-sm font-semibold text-[#1B6B7B] text-left hover:opacity-70 transition-opacity truncate">
             {row.label}
           </button>
         ) : (
-          <button onClick={startEdit} className="flex-1 text-sm text-gray-400 text-left hover:text-gray-500 transition-colors">
+          <button onClick={startEdit} className="flex-1 text-sm text-gray-400 dark:text-gray-500 text-left hover:text-gray-500 dark:hover:text-gray-400 transition-colors">
             Add label…
           </button>
         )}
-        <p className="text-xs text-gray-300 shrink-0">{formatDate(row.createdAt)}</p>
+        <p className="text-xs text-gray-300 dark:text-gray-600 shrink-0">{formatDate(row.createdAt)}</p>
         <div onClick={e => e.stopPropagation()}>
           <ContextMenu options={menuOptions} />
         </div>
@@ -105,12 +105,12 @@ function XRefCard({
 
       {/* Two quotes side by side */}
       <div
-        className="grid grid-cols-2 divide-x divide-gray-100 cursor-pointer select-none hover:bg-gray-50 transition-colors"
+        className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-white/10 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors"
         onClick={() => setExpanded(v => !v)}
       >
         {sides.map(side => (
           <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
-            <p className={`font-serif text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
+            <p className={`font-serif text-gray-700 dark:text-gray-300 leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
             <p className="text-xs text-[#1B6B7B] font-medium leading-snug">
@@ -278,17 +278,17 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       {/* Header + search */}
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 mb-3">Cross-References</h1>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-white/10 shrink-0">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Cross-References</h1>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search passages or labels…"
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50"
+            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 focus:border-[#1B6B7B] bg-gray-50 dark:bg-[#20262d]"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] hover:text-[#0f4a56]">Clear</button>
@@ -303,7 +303,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
             <div className="w-6 h-6 border-2 border-[#1B6B7B] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : hierarchy.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-16 px-6">
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-16 px-6">
             {searchQuery ? 'No cross-references match your search.' : 'No cross-references yet. Select passages in the reader to link them.'}
           </p>
         ) : (
@@ -314,12 +314,12 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                 <div key={pair.pairKey}>
                   {/* Pair header */}
                   <button
-                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left select-none border-b border-gray-100"
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#20262d] transition-colors text-left select-none border-b border-gray-100 dark:border-white/10"
                     onClick={() => togglePair(pair.pairKey)}
                   >
-                    <span className="flex-1 text-sm font-medium text-gray-800">{pair.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0">{pair.xrefs.length}</span>
-                    <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200">{pair.name}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{pair.xrefs.length}</span>
+                    <span className={`text-gray-400 dark:text-gray-500 text-sm shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {isOpen && (

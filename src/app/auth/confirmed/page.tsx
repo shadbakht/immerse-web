@@ -10,7 +10,7 @@ export default function ConfirmedPage() {
         </div>
         <div className="text-5xl mb-4">✅</div>
         <h1 className="text-2xl font-bold text-white mb-3">Email Confirmed</h1>
-        <p className="text-gray-400 text-sm leading-relaxed mb-8">
+        <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed mb-8">
           Your account is ready. Sign in with your email and password to get started.
         </p>
         <Link

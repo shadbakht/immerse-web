@@ -117,21 +117,21 @@ function LoginPageInner() {
             <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Immerse</h1>
-          <p className="text-sm text-gray-400 mt-2">Sacred texts from all traditions</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Sacred texts from all traditions</p>
         </div>
 
         {success ? (
           <div className="text-center space-y-4">
             <div className="text-4xl">📬</div>
             <p className="text-white font-semibold text-lg">Check your email</p>
-            <p className="text-gray-400 text-sm leading-relaxed">{success}</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed">{success}</p>
             <button onClick={() => { setSuccess(''); setIsSignUp(false); setForgotMode(false); }} className="text-[#1B6B7B] text-sm hover:underline">
               Back to Sign In
             </button>
           </div>
         ) : forgotMode ? (
           <div className="space-y-3">
-            <p className="text-gray-400 text-sm leading-relaxed text-center mb-1">
+            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed text-center mb-1">
               Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
             <input
@@ -156,7 +156,7 @@ function LoginPageInner() {
 
             <button
               onClick={() => { setForgotMode(false); setError(''); }}
-              className="w-full text-center text-gray-400 text-sm py-2 hover:text-white transition"
+              className="w-full text-center text-gray-400 dark:text-gray-500 text-sm py-2 hover:text-white transition"
             >
               Back to Sign In
             </button>
@@ -183,7 +183,7 @@ function LoginPageInner() {
                     <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
                       usernameStatus === 'available' ? 'text-green-400' :
                       usernameStatus === 'taken'     ? 'text-red-400'   :
-                      usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400'
+                      usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400 dark:text-gray-500'
                     }`}>
                       {usernameStatus === 'checking'  ? '…'            :
                        usernameStatus === 'available' ? '✓ Available'  :
@@ -220,7 +220,7 @@ function LoginPageInner() {
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-300 dark:hover:text-gray-600 transition"
                 tabIndex={-1}
               >
                 {showPassword ? (
@@ -270,7 +270,7 @@ function LoginPageInner() {
 
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs text-gray-600">or</span>
+              <span className="text-xs text-gray-600 dark:text-gray-400">or</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
 

@@ -41,14 +41,14 @@ export default function ResetPasswordPage() {
             <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Reset Password</h1>
-          <p className="text-sm text-gray-400 mt-2">Choose a new password for your account</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Choose a new password for your account</p>
         </div>
 
         {done ? (
           <div className="text-center space-y-4">
             <div className="text-4xl">✅</div>
             <p className="text-white font-semibold text-lg">Password updated</p>
-            <p className="text-gray-400 text-sm leading-relaxed">You can now use your new password.</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm leading-relaxed">You can now use your new password.</p>
             <button
               onClick={() => { router.push('/'); router.refresh(); }}
               className="block w-full bg-[#1B6B7B] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] transition"

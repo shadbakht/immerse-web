@@ -1,10 +1,21 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: `dark:` utilities apply when a `.dark` ancestor exists.
+   The Settings panel toggles `.dark` on <html> (light / dark / system). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
   /* Reading/quote font size, controlled by Settings (default = Large). */
   --quote-font-size: 20px;
+}
+
+/* Dark theme — driven by the .dark class (not OS media), so the Settings
+   light/dark/system control is the single source of truth. */
+.dark {
+  --background: #14181b;
+  --foreground: #e8e8e8;
 }
 
 @theme inline {
@@ -13,13 +24,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: Georgia, "Times New Roman", serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -42,4 +46,12 @@ body {
 input:not([class*="text-white"]),
 textarea:not([class*="text-white"]) {
   color: #111827;
+}
+.dark input:not([class*="text-white"]),
+.dark textarea:not([class*="text-white"]) {
+  color: #e8e8e8;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6b7280;
 }
