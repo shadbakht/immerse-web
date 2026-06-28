@@ -272,7 +272,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   </span>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     <span className="text-xs text-gray-400">{childImmediate}</span>
-                    <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
               </div>
@@ -319,14 +319,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).join(' & ');
   }
 
-  /** Map catalog slugs → Supabase UUIDs, filtering out 'imported:*' local IDs. */
-  function selectedUUIDs(): string[] {
-    return [...selectedSlugs]
-      .filter(s => !s.startsWith('imported:'))
-      .map(s => slugMap.get(s))
-      .filter(Boolean) as string[];
-  }
-
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) { setSearchResults([]); return; }
@@ -338,7 +330,17 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     setSearchLoading(true);
     try {
       const importedSelected = [...selectedSlugs].filter(s => s.startsWith('imported:'));
-      const regularUUIDs     = selectedSlugs.size > 0 ? selectedUUIDs() : null;
+      const regularSlugs     = [...selectedSlugs].filter(s => !s.startsWith('imported:'));
+      // Resolve the scope against a freshly-loaded slug map rather than the
+      // `slugMap` React state. If the state map is cold/empty, selectedUUIDs()
+      // would resolve every selected book to nothing → scope=[] → runFtsSearch
+      // early-returns [] and the search silently shows "No results" even though
+      // matches exist. loadSlugMaps is module-cached, so this is cheap.
+      let regularUUIDs: string[] | null = null;
+      if (regularSlugs.length > 0) {
+        const { slugToUuid } = await loadSlugMaps(supabase);
+        regularUUIDs = regularSlugs.map(s => slugToUuid.get(s)).filter(Boolean) as string[];
+      }
 
       // Remote (Supabase) search: run when no filter, or when regular books are selected.
       // If only imported books are selected, skip remote to avoid empty-IN query.
@@ -659,7 +661,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     <span className="text-sm font-medium text-gray-800 truncate">{root.name}</span>
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <span className="text-xs text-gray-400">{immediateCount}</span>
-                      <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                      <span className={`text-gray-400 text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>
                 </div>
@@ -686,7 +688,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     {importedBooks.length > 0 && (
                       <span className="text-xs text-gray-400">{importedBooks.length}</span>
                     )}
-                    <span className={`text-gray-400 text-xs transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 text-sm transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
               </div>

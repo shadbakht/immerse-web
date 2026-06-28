@@ -13,6 +13,7 @@ import { ContextMenu, type MenuOption } from './ContextMenu';
 import { TagIcon, NoteIcon, XRefIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
+import { loadSlugMaps } from '@/lib/catalog';
 
 interface Passage {
   id: string;
@@ -188,7 +189,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
       >
         <TagIcon size={16} />
         <span className="flex-1 text-sm font-medium text-gray-800 truncate">{tag.name}</span>
-        <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
       </button>
       {open && (
         <div>
@@ -254,7 +255,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
             <p className={`flex-1 font-serif text-sm text-gray-700 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
               "{entry.otherSnapshotText}"
             </p>
-            <span className={`text-gray-400 text-xs shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
+            <span className={`text-gray-400 text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
           </div>
           {expanded && entry.otherBookId && onOpenBook && (
             <button
@@ -567,6 +568,31 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       return;
     }
     // ── End local book ────────────────────────────────────────────────────────
+    // Defense-in-depth: the cloud queries below key on passages.book_id / books.id,
+    // which are uuid columns. If a corpus SLUG reaches us (a stale URL, a callsite
+    // that fell back to the slug, etc.), resolve it to a uuid first — otherwise
+    // Postgres rejects it ("invalid input syntax for type uuid") and the book
+    // silently fails to open. uuids always contain a hyphen and only hex+dashes;
+    // anything with a non-hex char (every slug has letters g–z) is treated as a slug.
+    const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookId);
+    if (!looksLikeUuid) {
+      const { slugToUuid } = await loadSlugMaps(supabase);
+      let resolved = slugToUuid.get(bookId);
+      if (!resolved) {
+        // Map may be cold/unavailable this render — hit the table directly.
+        const { data: row } = await supabase
+          .from('book_slug_map').select('book_id').eq('local_id', bookId).maybeSingle();
+        resolved = (row as any)?.book_id ?? undefined;
+      }
+      if (resolved) {
+        bookId = resolved;
+      } else {
+        console.error('[ReaderPanel] could not resolve book slug to uuid:', bookId);
+        setBook({ title: 'Could not load book', authorName: '', citationFormat: 'author_book_paragraph' });
+        setLoading(false);
+        return;
+      }
+    }
     try {
       // Fetch book metadata and all passages in parallel.
       // Passages are fetched in batches of 1000 to bypass the PostgREST server-side
@@ -1458,7 +1484,7 @@ async function handleCopy() {
 
       {/* Edit-text-selection banner */}
       {editingSel && (
-        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 px-5 py-3 flex items-center justify-between gap-3 z-10">
+        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
           <p className="flex-1 min-w-0 text-sm text-[#1B6B7B]">
             Highlight the new text for this annotation, then choose <span className="font-semibold">Update selection</span>.
           </p>
@@ -1473,7 +1499,7 @@ async function handleCopy() {
 
       {/* Xref pick-mode banner */}
       {xrefPickFrom && (
-        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 px-5 py-3 flex items-center justify-between gap-3 z-10">
+        <div className="shrink-0 bg-[#1B6B7B]/10 border-b border-[#1B6B7B]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">
             {pickSaving ? (
               <div className="flex items-center gap-2">
@@ -1641,7 +1667,7 @@ async function handleCopy() {
                     </div>
                   )}
                   {passage.paragraph_number != null && !isLetterDate && (
-                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-300 select-none w-7 text-right leading-relaxed tabular-nums">
+                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 select-none w-7 text-right leading-relaxed tabular-nums">
                       {passage.paragraph_number}
                     </span>
                   )}

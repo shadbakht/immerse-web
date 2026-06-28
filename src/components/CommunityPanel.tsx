@@ -203,7 +203,7 @@ function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenB
         <Checkbox state={nodeCheckState(payload, node.exportId, selectedIds)} onChange={() => onToggleSelect(node.exportId)} />
         <button className="flex-1 min-w-0 text-left text-sm text-gray-700 truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
         <span className="text-xs text-gray-400 shrink-0">{sels.length}</span>
-        <span className={`text-gray-400 text-xs shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
+        <span className={`text-gray-400 text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
       </div>
       {open && (
         <div className="divide-y divide-gray-50 border-t border-gray-50">
@@ -318,7 +318,7 @@ function TagCard({
           <span className="text-xs text-gray-400">{ct.selection_count}</span>
 
           <span
-            className={`text-gray-400 text-xs transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
+            className={`text-gray-400 text-sm transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
             onClick={() => setExpanded(e => !e)}
           >
             ›

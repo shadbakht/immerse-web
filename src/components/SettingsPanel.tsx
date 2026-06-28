@@ -14,9 +14,9 @@ type ColorMode = 'light' | 'dark' | 'system';
 
 const FONT_OPTIONS: { key: FontSize; size: number }[] = [
   { key: 'Small',  size: 14 },
-  { key: 'Medium', size: 16 },
-  { key: 'Large',  size: 18 },
-  { key: 'XL',     size: 21 },
+  { key: 'Medium', size: 17 },
+  { key: 'Large',  size: 20 },
+  { key: 'XL',     size: 24 },
 ];
 
 interface SettingsPanelProps {
@@ -135,7 +135,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     localStorage.setItem('immerse_color_mode', mode);
   }
 
-  const previewSize = FONT_OPTIONS.find(f => f.key === fontSize)?.size ?? 18;
+  const previewSize = FONT_OPTIONS.find(f => f.key === fontSize)?.size ?? 20;
 
   return (
     <div className="h-full overflow-y-auto">

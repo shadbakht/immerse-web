@@ -318,7 +318,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                   >
                     <span className="flex-1 text-sm font-medium text-gray-800 truncate">{trad.name}</span>
                     <span className="text-xs text-gray-400 shrink-0">{totalNotes}</span>
-                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {tradOpen && trad.books.map(book => {
@@ -332,7 +332,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                         >
                           <span className="flex-1 text-sm text-gray-700 truncate">{book.title}</span>
                           <span className="text-xs text-gray-400 shrink-0">{book.notes.length}</span>
-                          <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
+                          <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
                         </button>
 
                         {/* Note items */}

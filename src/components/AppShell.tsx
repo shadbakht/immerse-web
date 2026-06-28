@@ -128,7 +128,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
               </button>
             </div>
           ) : (
-            <div className="w-[368px] shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white">
+            <div className="w-[424px] shrink-0 border-r border-gray-200 flex flex-col overflow-hidden bg-white">
               <LibraryPanel activeTab={activeTab} userId={userId} onOpenBook={openBook} onCollapse={() => setLibraryCollapsed(true)} />
             </div>
           )}

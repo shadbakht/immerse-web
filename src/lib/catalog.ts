@@ -47,9 +47,18 @@ export async function loadSlugMaps(supabase: ReturnType<typeof import('@/lib/sup
   uuidToSlug: Map<string, string>;
 }> {
   if (!_slugToUuid) {
-    const { data } = await supabase.from('book_slug_map').select('local_id, book_id');
-    _slugToUuid = new Map((data ?? []).map((r: any) => [r.local_id as string, r.book_id as string]));
-    _uuidToSlug = new Map((data ?? []).map((r: any) => [r.book_id as string, r.local_id as string]));
+    const { data, error } = await supabase.from('book_slug_map').select('local_id, book_id');
+    // Only cache a fully-populated map. If the fetch errors or returns nothing
+    // (a transient failure, egress hiccup, etc.), DON'T poison the module cache
+    // with an empty map — otherwise every book would open by its slug for the
+    // rest of the session and fail the uuid passages query. Fall back to a
+    // temporary empty map this call and retry on the next one.
+    if (error || !data || data.length === 0) {
+      if (error) console.error('[catalog] loadSlugMaps failed:', error);
+      return { slugToUuid: new Map(), uuidToSlug: new Map() };
+    }
+    _slugToUuid = new Map(data.map((r: any) => [r.local_id as string, r.book_id as string]));
+    _uuidToSlug = new Map(data.map((r: any) => [r.book_id as string, r.local_id as string]));
   }
   return { slugToUuid: _slugToUuid!, uuidToSlug: _uuidToSlug! };
 }

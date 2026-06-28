@@ -159,7 +159,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
           <Highlight text={tag.name} q={searchQuery} />
         </span>
         <span className="text-xs text-gray-400 shrink-0 mx-2">{tag.selections.length}</span>
-        <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
         <div onClick={e => e.stopPropagation()} className="ml-2">
           <ContextMenu options={menuOptions} />
         </div>

@@ -319,7 +319,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                   >
                     <span className="flex-1 text-sm font-medium text-gray-800">{pair.name}</span>
                     <span className="text-xs text-gray-400 shrink-0">{pair.xrefs.length}</span>
-                    <span className={`text-gray-400 text-xs shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 text-sm shrink-0 transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {isOpen && (

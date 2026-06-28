@@ -154,7 +154,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
 
           {/* Chevron */}
           {children.length > 0 && (
-            <button onClick={() => toggleNode(tag.id)} className="text-gray-400 text-xs px-1">
+            <button onClick={() => toggleNode(tag.id)} className="text-gray-400 text-sm px-1">
               <span className={`inline-block transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
             </button>
           )}

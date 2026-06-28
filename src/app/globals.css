@@ -4,7 +4,7 @@
   --background: #ffffff;
   --foreground: #171717;
   /* Reading/quote font size, controlled by Settings (default = Large). */
-  --quote-font-size: 18px;
+  --quote-font-size: 20px;
 }
 
 @theme inline {
