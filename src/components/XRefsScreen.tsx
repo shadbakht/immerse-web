@@ -314,13 +314,15 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           </p>
         ) : (
           <div>
-            {hierarchy.map(pair => {
+            {hierarchy.map((pair, pi) => {
               const isOpen = openPairKeys.has(pair.pairKey);
               return (
                 <div key={pair.pairKey}>
+                  {/* Full-width divider between top-level pairs */}
+                  {pi > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
                   {/* Pair header */}
                   <button
-                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none border-b border-gray-100 dark:border-[#2D4050]"
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
                     onClick={() => togglePair(pair.pairKey)}
                   >
                     <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8]">{pair.name}</span>

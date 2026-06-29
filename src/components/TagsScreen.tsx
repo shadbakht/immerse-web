@@ -34,7 +34,7 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   );
 }
 
-function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void }) {
+function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void; depth: number }) {
   const [expanded, setExpanded] = useState(false);
 
   const menuOptions: MenuOption[] = [
@@ -47,7 +47,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   ];
 
   return (
-    <div className="pl-9 pr-3 py-1.5">
+    <div className="pr-3 py-1.5" style={{ paddingLeft: 36 + depth * 14 }}>
       <AnnotationCard
         variant="tag"
         quote={sel.snapshot_text}
@@ -114,7 +114,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
   const rowPaddingLeft = 12 + (depth ?? 0) * 14;
 
   return (
-    <div className="border-b border-gray-100 dark:border-[#2D4050]">
+    <div>
       {renaming && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center" onClick={() => setRenaming(false)}>
           <div className="bg-white dark:bg-[#1B2A38] rounded-2xl shadow-xl max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
@@ -161,7 +161,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
           {tag.selections.length === 0
             ? <p className="pl-9 pr-4 py-3 text-xs text-gray-400 dark:text-[#5C7A8E] border-t border-gray-100 dark:border-[#2D4050]">No passages tagged.</p>
             : tag.selections.map(sel => (
-                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} />
+                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} />
               ))}
         </div>
       )}
@@ -510,24 +510,35 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
         ) : (
           <div>
-            {filtered.map(tag => (
-              <TagCard
-                key={tag.id}
-                tag={tag}
-                depth={tag.depth ?? 0}
-                hasChildren={hasChildrenSet.has(tag.id)}
-                isOpen={openTagIds.has(tag.id)}
-                onToggleOpen={() => toggleOpenTag(tag.id)}
-                selectState={tagCheckState(tag.id)}
-                onToggleSelect={() => toggleSelectTag(tag.id)}
-                searchQuery={searchQuery}
-                onOpenBook={onOpenBook}
-                onDelete={handleDeleteTag}
-                onRename={handleRenameTag}
-                onToggleVisibility={handleToggleVisibility}
-                onRemovePassage={handleRemovePassage}
-              />
-            ))}
+            {filtered.map((tag, i) => {
+              const next = filtered[i + 1];
+              // Divider after this tag's subtree: full-width before a top-level
+              // tag, inset before a sub-tag, none at the end.
+              const nextDepth = next ? (next.depth ?? 0) : null;
+              const inset = nextDepth === null ? null : nextDepth === 0 ? 0 : 12 + nextDepth * 14;
+              return (
+                <div key={tag.id}>
+                  <TagCard
+                    tag={tag}
+                    depth={tag.depth ?? 0}
+                    hasChildren={hasChildrenSet.has(tag.id)}
+                    isOpen={openTagIds.has(tag.id)}
+                    onToggleOpen={() => toggleOpenTag(tag.id)}
+                    selectState={tagCheckState(tag.id)}
+                    onToggleSelect={() => toggleSelectTag(tag.id)}
+                    searchQuery={searchQuery}
+                    onOpenBook={onOpenBook}
+                    onDelete={handleDeleteTag}
+                    onRename={handleRenameTag}
+                    onToggleVisibility={handleToggleVisibility}
+                    onRemovePassage={handleRemovePassage}
+                  />
+                  {inset !== null && (
+                    <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: inset }} />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

@@ -54,7 +54,7 @@ function NoteItem({
   ];
 
   return (
-    <div className="px-4 py-1.5">
+    <div className="pl-12 pr-4 py-1.5">
       <AnnotationCard
         variant="note"
         quote={note.snapshotText}
@@ -303,14 +303,16 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           </p>
         ) : (
           <div>
-            {hierarchy.map(trad => {
+            {hierarchy.map((trad, ti) => {
               const tradOpen   = openTraditions.has(trad.catId);
               const totalNotes = trad.books.reduce((s, b) => s + b.notes.length, 0);
               return (
                 <div key={trad.catId}>
+                  {/* Full-width divider between top-level traditions */}
+                  {ti > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
                   {/* Tradition header */}
                   <button
-                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none border-b border-gray-100 dark:border-[#2D4050]"
+                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
                     onClick={() => toggleTradition(trad)}
                   >
                     <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{trad.name}</span>
@@ -322,9 +324,11 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                     const bookOpen = openBooks.has(book.bookKey);
                     return (
                       <div key={book.bookKey}>
+                        {/* Inset divider above each book (sub-level) */}
+                        <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 32 }} />
                         {/* Book sub-header */}
                         <button
-                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none border-b border-gray-100 dark:border-[#2D4050]"
+                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
                           onClick={() => toggleBook(book.bookKey)}
                         >
                           <span className="flex-1 text-sm text-gray-700 dark:text-[#B8C7D6] truncate">{book.title}</span>
