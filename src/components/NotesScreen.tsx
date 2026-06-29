@@ -6,6 +6,8 @@ import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushNote, deleteRemote } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
+import { Highlight } from './Highlight';
+import { AnnotationCard } from './AnnotationCard';
 
 interface NoteRow {
   noteId:       string;
@@ -25,12 +27,6 @@ interface NoteRow {
 interface NotesScreenProps {
   userId: string;
   onOpenBook: (bookId: string, passageId?: string) => void;
-}
-
-function Highlight({ text, q }: { text: string; q: string }) {
-  if (!q.trim()) return <>{text}</>;
-  const pat = new RegExp(`(${q.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-  return <>{text.split(pat).map((p, i) => pat.test(p) ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark> : <span key={i}>{p}</span>)}</>;
 }
 
 function formatDate(iso: string) {
@@ -58,37 +54,28 @@ function NoteItem({
   ];
 
   return (
-    <div className="flex items-start gap-2 px-5 py-3 border-t border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors cursor-pointer select-none"
-      onClick={() => setExpanded(v => !v)}>
-      <div className="flex-1 min-w-0">
-        {note.snapshotText && (
-          <p className="font-serif text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-1 line-clamp-2" style={{ fontSize: 'var(--quote-font-size)' }}>
-            "<Highlight text={note.snapshotText} q={searchQuery} />"
-          </p>
-        )}
-        {note.citation && (
-          <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium truncate mb-1.5">
-            <Highlight text={note.citation} q={searchQuery} />
-          </p>
-        )}
-        <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+    <div className="px-4 py-1.5">
+      <AnnotationCard
+        variant="note"
+        quote={note.snapshotText}
+        citation={note.citation}
+        date={formatDate(note.updatedAt)}
+        query={searchQuery}
+        onClick={() => setExpanded(v => !v)}
+        action={<ContextMenu options={menuOptions} />}
+        footer={note.bookId ? (
+          <button
+            onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
+            className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
+          >
+            Open in reader →
+          </button>
+        ) : undefined}
+      >
+        <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed mt-1.5 ${expanded ? '' : 'line-clamp-2'}`}>
           <Highlight text={note.content} q={searchQuery} />
         </p>
-        <div className="flex items-center justify-between mt-1.5">
-          <p className="text-xs text-gray-300 dark:text-[#4A6478]">{formatDate(note.updatedAt)}</p>
-          {note.bookId && (
-            <button
-              onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
-              className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
-            >
-              Open in reader →
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="shrink-0" onClick={e => e.stopPropagation()}>
-        <ContextMenu options={menuOptions} />
-      </div>
+      </AnnotationCard>
     </div>
   );
 }

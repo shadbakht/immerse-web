@@ -7,6 +7,8 @@ import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { publishTag, unpublishTag } from '@/lib/communitySync';
 import { exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
+import { Highlight } from './Highlight';
+import { AnnotationCard } from './AnnotationCard';
 
 interface TagsScreenProps {
   userId: string;
@@ -32,12 +34,6 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   );
 }
 
-function Highlight({ text, q }: { text: string; q: string }) {
-  if (!q.trim()) return <>{text}</>;
-  const pat = new RegExp(`(${q.trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-  return <>{text.split(pat).map((p, i) => pat.test(p) ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark> : <span key={i}>{p}</span>)}</>;
-}
-
 function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -51,28 +47,24 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove }: { sel: SelRow; s
   ];
 
   return (
-    <div className="pl-9 pr-4 py-3 border-t border-gray-100 dark:border-[#2D4050] flex items-start gap-2">
-      <div className="flex-1 min-w-0">
-        <div className="cursor-pointer select-none" onClick={() => setExpanded(v => !v)}>
-          <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
-            "<Highlight text={sel.snapshot_text} q={searchQuery} />"
-          </p>
-        </div>
-        <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mt-1">
-          <Highlight text={sel.citation} q={searchQuery} />
-        </p>
-        {expanded && sel.book_id && (
+    <div className="pl-9 pr-3 py-1.5">
+      <AnnotationCard
+        variant="tag"
+        quote={sel.snapshot_text}
+        citation={sel.citation}
+        query={searchQuery}
+        clampQuote={!expanded}
+        onClick={() => setExpanded(v => !v)}
+        action={<ContextMenu options={menuOptions} />}
+        footer={expanded && sel.book_id ? (
           <button
-            onClick={() => onOpenBook(sel.book_id, sel.passage_id)}
+            onClick={e => { e.stopPropagation(); onOpenBook(sel.book_id, sel.passage_id); }}
             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
           >
             Open in reader →
           </button>
-        )}
-      </div>
-      <div className="shrink-0" onClick={e => e.stopPropagation()}>
-        <ContextMenu options={menuOptions} />
-      </div>
+        ) : undefined}
+      />
     </div>
   );
 }
