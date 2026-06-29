@@ -3,14 +3,16 @@
 import React from 'react';
 import { Highlight } from './Highlight';
 
-export type AnnotationVariant = 'tag' | 'note' | 'xref';
+export type AnnotationVariant = 'tag' | 'note' | 'xref' | 'discover';
 
 // Accent rail + marker color/shape per variant, mirroring the in-reader markers
-// and the mobile DARK_COLORS / LIGHT_COLORS annotation palette.
+// and the mobile DARK_COLORS / LIGHT_COLORS annotation palette. Discover uses the
+// teal brand accent (it isn't an in-reader annotation type, so it gets a dot).
 const ACCENT: Record<AnnotationVariant, { rail: string; marker: string; symbol: string }> = {
-  tag:  { rail: 'bg-[#5B8EC4] dark:bg-[#7BAFD8]', marker: 'text-[#5B8EC4] dark:text-[#7BAFD8]', symbol: '●' },
-  note: { rail: 'bg-[#D4BC6A] dark:bg-[#E8CC78]', marker: 'text-[#D4BC6A] dark:text-[#E8CC78]', symbol: '■' },
-  xref: { rail: 'bg-[#5A9460] dark:bg-[#6BB073]', marker: 'text-[#5A9460] dark:text-[#6BB073]', symbol: '⬢' },
+  tag:      { rail: 'bg-[#5B8EC4] dark:bg-[#7BAFD8]', marker: 'text-[#5B8EC4] dark:text-[#7BAFD8]', symbol: '●' },
+  note:     { rail: 'bg-[#D4BC6A] dark:bg-[#E8CC78]', marker: 'text-[#D4BC6A] dark:text-[#E8CC78]', symbol: '■' },
+  xref:     { rail: 'bg-[#5A9460] dark:bg-[#6BB073]', marker: 'text-[#5A9460] dark:text-[#6BB073]', symbol: '⬢' },
+  discover: { rail: 'bg-[#1B6B7B] dark:bg-[#2D9DB3]', marker: 'text-[#1B6B7B] dark:text-[#2D9DB3]', symbol: '●' },
 };
 
 export interface AnnotationCardProps {

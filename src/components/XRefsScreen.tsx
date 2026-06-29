@@ -75,9 +75,13 @@ function XRefCard({
   ];
 
   return (
-    <div className="border-t border-gray-100 dark:border-[#2D4050]">
+    <div className="px-4 py-1.5">
+    <div className="flex rounded-xl border border-gray-200 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] overflow-hidden">
+      <div className="w-1 shrink-0 bg-[#5A9460] dark:bg-[#6BB073]" aria-hidden />
+      <div className="flex-1 min-w-0">
       {/* Label row */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-[#2D4050]">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100 dark:border-[#2D4050]">
+        <span className="text-[9px] leading-none text-[#5A9460] dark:text-[#6BB073]" aria-hidden>⬢</span>
         {editing ? (
           <input
             ref={inputRef}
@@ -113,7 +117,7 @@ function XRefCard({
             <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
-            <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium leading-snug">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] leading-snug">
               <Highlight text={side.citation} q={searchQuery} />
             </p>
             {expanded && side.bookId && (
@@ -127,6 +131,8 @@ function XRefCard({
           </div>
         ))}
       </div>
+      </div>
+    </div>
     </div>
   );
 }

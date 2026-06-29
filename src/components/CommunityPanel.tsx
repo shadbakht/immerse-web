@@ -11,6 +11,7 @@ import {
   type CommunityTagRow,
 } from '@/lib/communitySync';
 import { exportAsDocx, exportAsPdf, type TagRow } from '@/lib/tagExport';
+import { AnnotationCard } from './AnnotationCard';
 
 const EMPTY_SET: Set<string> = new Set();
 
@@ -105,24 +106,23 @@ function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBo
   }
 
   return (
-    <div className="px-5 py-3">
-      <p
-        className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed cursor-pointer select-none ${expanded ? '' : 'line-clamp-3'}`}
-        style={{ fontSize: 'var(--quote-font-size)' }}
+    <div className="px-4 py-1.5">
+      <AnnotationCard
+        variant="discover"
+        quote={sel.snapshotText}
+        citation={citation}
+        clampQuote={!expanded}
         onClick={() => setExpanded(e => !e)}
-      >
-        &quot;{sel.snapshotText}&quot;
-      </p>
-      {citation && <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-1">{citation}</p>}
-      {expanded && onOpenBook && sel.bookId && (
-        <button
-          onClick={handleOpen}
-          disabled={opening}
-          className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline disabled:opacity-60"
-        >
-          {opening ? 'Opening…' : 'Open in reader →'}
-        </button>
-      )}
+        footer={expanded && onOpenBook && sel.bookId ? (
+          <button
+            onClick={e => { e.stopPropagation(); handleOpen(); }}
+            disabled={opening}
+            className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline disabled:opacity-60"
+          >
+            {opening ? 'Opening…' : 'Open in reader →'}
+          </button>
+        ) : undefined}
+      />
     </div>
   );
 }
