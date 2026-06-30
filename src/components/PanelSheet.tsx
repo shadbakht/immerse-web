@@ -29,14 +29,18 @@ export default function PanelSheet({ visible, onClose, title, children, footer, 
   if (!visible) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col justify-end">
-      {/* Backdrop */}
+    // pointer-events-none so wheel/touch scrolling over the dimmed area (and the
+    // space above the sheet) passes through to the reader behind — the book text
+    // stays scrollable while a panel is open. Tap-away still closes via the
+    // document mousedown listener above. The sheet re-enables pointer events.
+    <div className="absolute inset-0 z-50 flex flex-col justify-end pointer-events-none">
+      {/* Backdrop (dim only — non-interactive) */}
       <div className="absolute inset-0 bg-black/30" />
 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="relative bg-white dark:bg-[#1B2A38] rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative pointer-events-auto bg-white dark:bg-[#1B2A38] rounded-t-2xl shadow-2xl flex flex-col overflow-hidden"
         style={{ maxHeight, minHeight: '40vh' }}
       >
         {/* Handle + Header */}
