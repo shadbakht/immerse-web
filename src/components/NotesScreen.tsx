@@ -53,19 +53,30 @@ const GROUP_MODE_KEY = 'notes_group_mode';
 type GroupMode = 'book' | 'date';
 
 function NoteItem({
-  note, searchQuery, onOpenBook, onDelete, onEdit, dateIso,
+  note, searchQuery, onOpenBook, onDelete, onSave, dateIso,
 }: {
   note: NoteRow;
   searchQuery: string;
   onOpenBook: (b: string, p?: string) => void;
   onDelete: (id: string) => void;
-  onEdit:   (id: string) => void;
+  onSave:   (id: string, content: string) => void;
   dateIso?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing]   = useState(false);
+  const [draft, setDraft]       = useState(note.content);
+
+  const startEdit  = () => { setDraft(note.content); setEditing(true); };
+  const cancelEdit = () => { setEditing(false); setDraft(note.content); };
+  const saveEdit   = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) return;
+    onSave(note.noteId, trimmed);
+    setEditing(false);
+  };
 
   const menuOptions: MenuOption[] = [
-    { label: 'Edit', icon: '✏️', onClick: () => onEdit(note.noteId) },
+    { label: 'Edit', icon: '✏️', onClick: startEdit },
     { label: 'Delete', icon: '🗑️', color: 'danger', onClick: () => { if (confirm('Delete this note?')) onDelete(note.noteId); } },
   ];
 
@@ -79,7 +90,7 @@ function NoteItem({
         query={searchQuery}
         quoteLines={1}
         citationFirst
-        onClick={() => setExpanded(v => !v)}
+        onClick={editing ? undefined : () => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
         belowQuote={note.bookId ? (
           <button
@@ -90,9 +101,30 @@ function NoteItem({
           </button>
         ) : undefined}
       >
-        <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed mt-1.5 ${expanded ? '' : 'line-clamp-3'}`}>
-          <Highlight text={note.content} q={searchQuery} />
-        </p>
+        {editing ? (
+          <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') cancelEdit();
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit();
+              }}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-[#2D4050] rounded-lg text-sm text-gray-900 dark:text-[#E2EAF2] bg-white/80 dark:bg-[#243040]/80 focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 min-h-24 resize-y"
+            />
+            <div className="flex gap-2 justify-end mt-2">
+              <button onClick={cancelEdit}
+                className="px-3 py-1.5 text-xs text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg">Cancel</button>
+              <button onClick={saveEdit}
+                className="px-3 py-1.5 text-xs bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90">Save</button>
+            </div>
+          </div>
+        ) : (
+          <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed mt-1.5 ${expanded ? '' : 'line-clamp-3'}`}>
+            <Highlight text={note.content} q={searchQuery} />
+          </p>
+        )}
       </AnnotationCard>
     </div>
   );
@@ -105,8 +137,6 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [searchQuery, setSearchQuery]   = useState('');
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
   const [openBooks, setOpenBooks]           = useState<Set<string>>(new Set());
-  const [editingId, setEditingId]   = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
   const [groupMode, setGroupMode]   = useState<GroupMode>('book');
 
   // Restore the saved By Book / By Date preference once on mount
@@ -193,24 +223,18 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     setNotes(prev => prev.filter(n => n.noteId !== id));
   }
 
-  async function handleEditNote(id: string) {
-    const note = notes.find(n => n.noteId === id);
-    if (note) { setEditingId(id); setEditContent(note.content); }
-  }
-
-  async function handleSaveEdit(id: string) {
-    if (!editContent.trim()) return;
+  async function handleSaveEdit(id: string, content: string) {
+    const trimmed = content.trim();
+    if (!trimmed) return;
     const note = notes.find(n => n.noteId === id);
     if (note) {
       await pushNote({
         id: note.noteId, user_id: userId,
-        selection_id: '', content: editContent.trim(),
+        selection_id: '', content: trimmed,
         updated_at: new Date().toISOString(),
       }).catch(() => {});
-      setNotes(prev => prev.map(n => n.noteId === id ? { ...n, content: editContent.trim() } : n));
+      setNotes(prev => prev.map(n => n.noteId === id ? { ...n, content: trimmed } : n));
     }
-    setEditingId(null);
-    setEditContent('');
   }
 
   // Filter notes by search
@@ -296,29 +320,6 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
 
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
-      {/* Edit modal */}
-      {editingId && (
-        <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center"
-          onClick={() => { setEditingId(null); setEditContent(''); }}>
-          <div className="glass rounded-2xl max-w-4xl mx-4 p-6 max-h-[80vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-4">Edit Note</h2>
-            <textarea
-              autoFocus
-              value={editContent}
-              onChange={e => setEditContent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-[#2D4050] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 mb-4 min-h-32 resize-none"
-            />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => { setEditingId(null); setEditContent(''); }}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg">Cancel</button>
-              <button onClick={() => handleSaveEdit(editingId)}
-                className="px-4 py-2 text-sm bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">Notes</h1>
@@ -386,7 +387,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                     searchQuery={searchQuery}
                     onOpenBook={onOpenBook}
                     onDelete={handleDeleteNote}
-                    onEdit={handleEditNote}
+                    onSave={handleSaveEdit}
                   />
                 ))}
               </div>
@@ -435,7 +436,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                             searchQuery={searchQuery}
                             onOpenBook={onOpenBook}
                             onDelete={handleDeleteNote}
-                            onEdit={handleEditNote}
+                            onSave={handleSaveEdit}
                           />
                         ))}
                       </div>
