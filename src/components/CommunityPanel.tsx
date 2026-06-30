@@ -93,7 +93,7 @@ async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
 
 // ── One expandable quote (feed + profile) ────────────────────────────────────
 
-function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBookFn }) {
+function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBook?: OpenBookFn; depth?: number }) {
   const [expanded, setExpanded] = useState(false);
   const [opening, setOpening]   = useState(false);
   const citation = sel.citation ?? sel.bookTitle;
@@ -106,7 +106,7 @@ function CommunitySelection({ sel, onOpenBook }: { sel: any; onOpenBook?: OpenBo
   }
 
   return (
-    <div className="px-4 py-1.5">
+    <div className="pr-4 py-1.5" style={{ paddingLeft: 32 + depth * 16 }}>
       <AnnotationCard
         variant="discover"
         quote={sel.snapshotText}
@@ -199,6 +199,8 @@ function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenB
   const sels = node.selections ?? [];
   return (
     <div>
+      {/* Sub-level divider: hairline inset to this sub-tag's indentation */}
+      <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 16 + depth * 16 }} />
       <div className="flex items-center gap-2 py-2 pr-4" style={{ paddingLeft: 16 + depth * 16 }}>
         <Checkbox state={nodeCheckState(payload, node.exportId, selectedIds)} onChange={() => onToggleSelect(node.exportId)} />
         <button className="flex-1 min-w-0 text-left text-sm text-gray-700 dark:text-[#B8C7D6] truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
@@ -206,8 +208,8 @@ function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenB
         <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
       </div>
       {open && (
-        <div className="divide-y divide-gray-50 dark:divide-[#2D4050]/60 border-t border-gray-50 dark:border-[#2D4050]/60">
-          {sels.map((sel: any, i: number) => <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />)}
+        <div>
+          {sels.map((sel: any, i: number) => <CommunitySelection key={i} sel={sel} depth={depth} onOpenBook={onOpenBook} />)}
           {kids.map((c: any) => (
             <SubTagNode key={c.exportId} node={c} payload={payload} depth={depth + 1}
               selectedIds={selectedIds} onToggleSelect={onToggleSelect} onOpenBook={onOpenBook} />
@@ -327,9 +329,9 @@ function TagCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-gray-50 dark:border-[#2D4050]/60 divide-y divide-gray-50 dark:divide-[#2D4050]/60">
+        <div>
           {rootSels.map((sel: any, i: number) => (
-            <CommunitySelection key={i} sel={sel} onOpenBook={onOpenBook} />
+            <CommunitySelection key={i} sel={sel} depth={0} onOpenBook={onOpenBook} />
           ))}
           {childTags.map((c: any) => (
             <SubTagNode
