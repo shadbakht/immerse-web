@@ -89,7 +89,7 @@ function NoteItem({
           </button>
         ) : undefined}
       >
-        <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed mt-1.5 ${expanded ? '' : 'line-clamp-2'}`}>
+        <p className={`text-sm text-gray-800 dark:text-[#D2DCE8] leading-relaxed mt-1.5 ${expanded ? '' : 'line-clamp-3'}`}>
           <Highlight text={note.content} q={searchQuery} />
         </p>
       </AnnotationCard>
