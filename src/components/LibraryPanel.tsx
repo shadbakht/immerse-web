@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
@@ -226,9 +226,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           const isChecked = selectedSlugs.has(book.id);
           const uuid = slugMap.get(book.id) ?? book.id;
           return (
+            <Fragment key={book.id}>
             <div
-              key={book.id}
-              className="flex items-center border-b border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+              className="flex items-center hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
               style={{ paddingLeft: bookPadLeft }}
             >
               <Checkbox
@@ -243,6 +243,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
               </button>
             </div>
+            <Divider id={book.id} />
+            </Fragment>
           );
         })}
 
@@ -255,7 +257,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           return (
             <div key={child.id}>
               <div
-                className="flex items-center border-b border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                className="flex items-center hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
                 style={{ paddingLeft: catPadLeft }}
               >
                 <Checkbox
@@ -276,6 +278,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   </div>
                 </button>
               </div>
+              <Divider id={child.id} />
               {isOpen && (
                 <div className={level === 0 ? 'bg-gray-50/30' : ''}>
                   {renderChildren(child.id, level + 1)}
@@ -516,6 +519,37 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     .filter(c => c.parentId === null && c.kind !== 'imported')
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
+  // Depth-aware dividers (match the Tags/mobile-Library treatment): a full-width
+  // line only BETWEEN top-level categories; sub-levels get a line inset to the
+  // next row's indentation; none after the last visible row. Built by flattening
+  // the currently-expanded tree so the lookahead crosses subtree boundaries.
+  const dividerInset = useMemo(() => {
+    const rows: { id: string; level: number }[] = [];
+    const walk = (parentId: string, level: number) => {
+      for (const b of booksInCategory(parentId)) rows.push({ id: b.id, level });
+      for (const c of childrenOf(parentId)) {
+        rows.push({ id: c.id, level });
+        if (openNodes.has(c.id)) walk(c.id, level + 1);
+      }
+    };
+    for (const root of roots) {
+      rows.push({ id: root.id, level: 0 });
+      if (openNodes.has(root.id)) walk(root.id, 1);
+    }
+    const map = new Map<string, number | null>();
+    for (let i = 0; i < rows.length; i++) {
+      const next = rows[i + 1];
+      map.set(rows[i].id, !next ? null : next.level === 0 ? 0 : 12 + next.level * 14);
+    }
+    return map;
+  }, [roots, openNodes, childrenOf, booksInCategory]);
+
+  const Divider = ({ id }: { id: string }) => {
+    const inset = dividerInset.get(id);
+    if (inset == null) return null;
+    return <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={inset > 0 ? { marginLeft: inset } : undefined} />;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Hidden file input */}
@@ -652,7 +686,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
             return (
               <div key={root.id}>
-                <div className="flex items-center border-b border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors">
+                <div className="flex items-center hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors">
                   <Checkbox state={state} onChange={() => toggleSlugs(rootSlugs)} className="pl-3 pr-1 py-3.5 shrink-0" />
                   <button
                     onClick={() => toggleNode(root.id)}
@@ -665,6 +699,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     </div>
                   </button>
                 </div>
+                <Divider id={root.id} />
                 {isOpen && renderChildren(root.id, 1)}
               </div>
             );
