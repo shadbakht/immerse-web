@@ -299,7 +299,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       {editingId && (
         <div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center"
           onClick={() => { setEditingId(null); setEditContent(''); }}>
-          <div className="bg-white dark:bg-[#1B2A38] rounded-2xl shadow-xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto"
+          <div className="glass rounded-2xl max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-4">Edit Note</h2>
             <textarea

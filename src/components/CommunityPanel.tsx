@@ -819,7 +819,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       {/* Guest overlay */}
       {!user && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-8">
-          <div className="bg-white dark:bg-[#1B2A38] rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
+          <div className="glass rounded-2xl p-8 max-w-sm w-full text-center">
             <div className="text-4xl mb-4">✦</div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">Sign In to Access Discover</h2>
             <p className="text-sm text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-6">
