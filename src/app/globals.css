@@ -10,7 +10,7 @@
   /* Reading/quote font size, controlled by Settings (default = Large). */
   --quote-font-size: 20px;
   /* Liquid-glass material tokens (light) — mirrors the mobile GLASS_LIGHT. */
-  --glass-bg:     rgba(248, 249, 250, 0.66);
+  --glass-bg:     rgba(248, 249, 250, 0.40);
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-shadow: 0 12px 40px rgba(28, 43, 53, 0.20);
 }
@@ -22,7 +22,7 @@
   --background: #0F1923;   /* mobile background */
   --foreground: #E2EAF2;   /* mobile textPrimary */
   /* Liquid-glass material tokens (dark) — mirrors the mobile GLASS_DARK. */
-  --glass-bg:     rgba(15, 25, 35, 0.64);
+  --glass-bg:     rgba(15, 25, 35, 0.40);
   --glass-border: rgba(255, 255, 255, 0.18);
   --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
 }
