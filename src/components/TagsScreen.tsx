@@ -34,7 +34,7 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   );
 }
 
-function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void; depth: number }) {
+function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth, isPublic }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void; depth: number; isPublic: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
   const menuOptions: MenuOption[] = [
@@ -53,6 +53,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: Se
         quote={sel.snapshot_text}
         citation={sel.citation}
         query={searchQuery}
+        hideMarker={!isPublic}
         clampQuote={!expanded}
         onClick={() => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
@@ -161,7 +162,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
           {tag.selections.length === 0
             ? <p className="pl-9 pr-4 py-3 text-xs text-gray-400 dark:text-[#5C7A8E] border-t border-gray-100 dark:border-[#2D4050]">No passages tagged.</p>
             : tag.selections.map(sel => (
-                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} />
+                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} isPublic={tag.visibility === 'published'} />
               ))}
         </div>
       )}

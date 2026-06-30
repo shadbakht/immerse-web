@@ -30,6 +30,8 @@ export interface AnnotationCardProps {
   clampQuote?: boolean;
   /** Clamp the quote to an exact number of lines (1–3). Overrides clampQuote. */
   quoteLines?: 1 | 2 | 3;
+  /** Hide the variant marker dot (e.g. private tags on the Tags screen). */
+  hideMarker?: boolean;
   /** Top-right action (e.g. a context menu). */
   action?:    React.ReactNode;
   onClick?:   () => void;
@@ -47,7 +49,7 @@ export interface AnnotationCardProps {
 // pull-quote + small-caps citation + flexible content slots.
 export function AnnotationCard({
   variant, quote, citation, kicker, date, query = '',
-  clampQuote, quoteLines, action, onClick, belowQuote, children, footer, className = '',
+  clampQuote, quoteLines, hideMarker, action, onClick, belowQuote, children, footer, className = '',
 }: AnnotationCardProps) {
   const a = ACCENT[variant];
   // Tailwind needs literal class names — map explicitly.
@@ -62,10 +64,12 @@ export function AnnotationCard({
       <div className="flex-1 min-w-0 px-3.5 py-3">
         <div className="flex items-start gap-2">
           <div className={`flex-1 min-w-0 ${onClick ? 'cursor-pointer select-none' : ''}`} onClick={onClick}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className={`text-[9px] leading-none ${a.marker}`} aria-hidden>{a.symbol}</span>
-              {kicker && <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E] truncate">{kicker}</span>}
-            </div>
+            {(!hideMarker || kicker) && (
+              <div className="flex items-center gap-1.5 mb-1.5">
+                {!hideMarker && <span className={`text-[9px] leading-none ${a.marker}`} aria-hidden>{a.symbol}</span>}
+                {kicker && <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E] truncate">{kicker}</span>}
+              </div>
+            )}
             <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${quoteClamp}`} style={{ fontSize: 'var(--quote-font-size)' }}>
               &quot;<Highlight text={quote} q={query} />&quot;
             </p>
