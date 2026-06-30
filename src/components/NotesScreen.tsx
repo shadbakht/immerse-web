@@ -13,6 +13,7 @@ interface NoteRow {
   noteId:       string;
   content:      string;
   updatedAt:    string;
+  createdAt:    string;
   snapshotText: string;
   citation:     string;
   passageId:    string;
@@ -37,14 +38,29 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// "June 2026" — section header for the by-date journal view
+function formatMonthLabel(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+// Stable year-month grouping key (e.g. "2026-05")
+function monthKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+}
+
+const GROUP_MODE_KEY = 'notes_group_mode';
+type GroupMode = 'book' | 'date';
+
 function NoteItem({
-  note, searchQuery, onOpenBook, onDelete, onEdit,
+  note, searchQuery, onOpenBook, onDelete, onEdit, dateIso,
 }: {
   note: NoteRow;
   searchQuery: string;
   onOpenBook: (b: string, p?: string) => void;
   onDelete: (id: string) => void;
   onEdit:   (id: string) => void;
+  dateIso?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -59,7 +75,7 @@ function NoteItem({
         variant="note"
         quote={note.snapshotText}
         citation={note.citation}
-        date={formatDate(note.updatedAt)}
+        date={formatDate(dateIso ?? note.updatedAt)}
         query={searchQuery}
         onClick={() => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
@@ -89,6 +105,18 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [openBooks, setOpenBooks]           = useState<Set<string>>(new Set());
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [groupMode, setGroupMode]   = useState<GroupMode>('book');
+
+  // Restore the saved By Book / By Date preference once on mount
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(GROUP_MODE_KEY) : null;
+    if (saved === 'date' || saved === 'book') setGroupMode(saved);
+  }, []);
+
+  function changeGroupMode(mode: GroupMode) {
+    setGroupMode(mode);
+    try { window.localStorage.setItem(GROUP_MODE_KEY, mode); } catch { /* ignore */ }
+  }
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -111,7 +139,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     setLoading(true);
     try {
       const [{ data: noteData }, selMap, catalog, { uuidToSlug }] = await Promise.all([
-        supabase.from('notes').select('id, content, updated_at, selection_id').eq('user_id', userId).order('updated_at', { ascending: false }),
+        supabase.from('notes').select('id, content, updated_at, created_at, selection_id').eq('user_id', userId).order('updated_at', { ascending: false }),
         fetchSelectionsByUser(userId),
         loadCatalog(),
         loadSlugMaps(supabase),
@@ -140,6 +168,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           noteId:      n.id,
           content:     n.content,
           updatedAt:   n.updated_at,
+          createdAt:   n.created_at ?? n.updated_at,
           snapshotText: sel.snapshot_text,
           citation:    sel.citation,
           passageId:   sel.passage_id,
@@ -231,6 +260,22 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       }));
   }, [filtered]);
 
+  // By-date journal: notes newest-first, grouped under month-year headers.
+  const dateGroups = useMemo(() => {
+    const sorted = [...filtered].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const groups: { key: string; label: string; notes: NoteRow[] }[] = [];
+    let cur: { key: string; label: string; notes: NoteRow[] } | null = null;
+    for (const n of sorted) {
+      const k = monthKey(n.createdAt);
+      if (!cur || cur.key !== k) {
+        cur = { key: k, label: formatMonthLabel(n.createdAt), notes: [] };
+        groups.push(cur);
+      }
+      cur.notes.push(n);
+    }
+    return groups;
+  }, [filtered]);
+
   // A "small" tradition expands all the way (books + their notes) on a single
   // tap, so the user doesn't have to tap the tradition then each book. Applies
   // when it has ≤5 books and no book has >5 notes; larger ones keep the
@@ -289,6 +334,25 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
             <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
           )}
         </div>
+
+        {/* By Book / By Date segmented control */}
+        <div className="flex justify-center mt-3">
+          <div className="inline-flex bg-gray-100 dark:bg-[#243040] rounded-lg p-0.5">
+            {(['book', 'date'] as GroupMode[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => changeGroupMode(mode)}
+                className={`px-5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  groupMode === mode
+                    ? 'bg-white dark:bg-[#324252] text-gray-900 dark:text-[#E2EAF2] shadow-sm'
+                    : 'text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6]'
+                }`}
+              >
+                {mode === 'book' ? 'By Book' : 'By Date'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Hierarchy list */}
@@ -297,10 +361,35 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : hierarchy.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">
             {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
           </p>
+        ) : groupMode === 'date' ? (
+          <div>
+            {dateGroups.map((g, gi) => (
+              <div key={g.key}>
+                {/* Full-width divider between months */}
+                {gi > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
+                {/* Month header */}
+                <div className="flex items-center gap-2 px-4 py-3.5 select-none">
+                  <span className="flex-1 text-sm font-semibold tracking-wide text-gray-700 dark:text-[#B8C7D6] truncate">{g.label}</span>
+                  <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{g.notes.length}</span>
+                </div>
+                {g.notes.map(note => (
+                  <NoteItem
+                    key={note.noteId}
+                    note={note}
+                    dateIso={note.createdAt}
+                    searchQuery={searchQuery}
+                    onOpenBook={onOpenBook}
+                    onDelete={handleDeleteNote}
+                    onEdit={handleEditNote}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
         ) : (
           <div>
             {hierarchy.map((trad, ti) => {
