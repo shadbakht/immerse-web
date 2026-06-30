@@ -78,6 +78,7 @@ function NoteItem({
         date={formatDate(dateIso ?? note.updatedAt)}
         query={searchQuery}
         quoteLines={1}
+        citationFirst
         onClick={() => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
         belowQuote={note.bookId ? (

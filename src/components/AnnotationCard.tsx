@@ -32,6 +32,9 @@ export interface AnnotationCardProps {
   quoteLines?: 1 | 2 | 3;
   /** Hide the variant marker dot (e.g. private tags on the Tags screen). */
   hideMarker?: boolean;
+  /** Render the citation row immediately under the quote (above belowQuote/children)
+   *  instead of at the card's foot. Used by Notes so citation sits with the quote. */
+  citationFirst?: boolean;
   /** Top-right action (e.g. a context menu). */
   action?:    React.ReactNode;
   onClick?:   () => void;
@@ -49,7 +52,7 @@ export interface AnnotationCardProps {
 // pull-quote + small-caps citation + flexible content slots.
 export function AnnotationCard({
   variant, quote, citation, kicker, date, query = '',
-  clampQuote, quoteLines, hideMarker, action, onClick, belowQuote, children, footer, className = '',
+  clampQuote, quoteLines, hideMarker, citationFirst, action, onClick, belowQuote, children, footer, className = '',
 }: AnnotationCardProps) {
   const a = ACCENT[variant];
   // Tailwind needs literal class names — map explicitly.
@@ -58,6 +61,14 @@ export function AnnotationCard({
     quoteLines === 2 ? 'line-clamp-2' :
     quoteLines === 3 ? 'line-clamp-3' :
     clampQuote       ? 'line-clamp-3' : '';
+  const citeRow = (citation || date) ? (
+    <div className="flex items-center justify-between gap-2 mt-1.5">
+      {citation
+        ? <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] truncate"><Highlight text={citation} q={query} /></p>
+        : <span />}
+      {date && <p className="text-[10px] text-gray-400 dark:text-[#5C7A8E] shrink-0">{date}</p>}
+    </div>
+  ) : null;
   return (
     <div className={`flex rounded-xl border border-gray-200 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] overflow-hidden ${className}`}>
       <div className={`w-1 shrink-0 ${a.rail}`} aria-hidden />
@@ -73,16 +84,10 @@ export function AnnotationCard({
             <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${quoteClamp}`} style={{ fontSize: 'var(--quote-font-size)' }}>
               &quot;<Highlight text={quote} q={query} />&quot;
             </p>
+            {citationFirst && citeRow}
             {belowQuote}
             {children}
-            {(citation || date) && (
-              <div className="flex items-center justify-between gap-2 mt-1.5">
-                {citation
-                  ? <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] truncate"><Highlight text={citation} q={query} /></p>
-                  : <span />}
-                {date && <p className="text-[10px] text-gray-400 dark:text-[#5C7A8E] shrink-0">{date}</p>}
-              </div>
-            )}
+            {!citationFirst && citeRow}
             {footer}
           </div>
           {action && <div className="shrink-0" onClick={e => e.stopPropagation()}>{action}</div>}
