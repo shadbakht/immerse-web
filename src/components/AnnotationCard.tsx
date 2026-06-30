@@ -28,9 +28,13 @@ export interface AnnotationCardProps {
   query?:     string;
   /** Collapse the quote to 3 lines. */
   clampQuote?: boolean;
+  /** Clamp the quote to an exact number of lines (1–3). Overrides clampQuote. */
+  quoteLines?: 1 | 2 | 3;
   /** Top-right action (e.g. a context menu). */
   action?:    React.ReactNode;
   onClick?:   () => void;
+  /** Slot rendered directly below the quote, above the reflection (open-in-reader…). */
+  belowQuote?: React.ReactNode;
   /** Content slot rendered between the quote and the citation (note reflection…). */
   children?:  React.ReactNode;
   /** Slot rendered after the citation row (open-in-reader link…). */
@@ -43,9 +47,15 @@ export interface AnnotationCardProps {
 // pull-quote + small-caps citation + flexible content slots.
 export function AnnotationCard({
   variant, quote, citation, kicker, date, query = '',
-  clampQuote, action, onClick, children, footer, className = '',
+  clampQuote, quoteLines, action, onClick, belowQuote, children, footer, className = '',
 }: AnnotationCardProps) {
   const a = ACCENT[variant];
+  // Tailwind needs literal class names — map explicitly.
+  const quoteClamp =
+    quoteLines === 1 ? 'line-clamp-1' :
+    quoteLines === 2 ? 'line-clamp-2' :
+    quoteLines === 3 ? 'line-clamp-3' :
+    clampQuote       ? 'line-clamp-3' : '';
   return (
     <div className={`flex rounded-xl border border-gray-200 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] overflow-hidden ${className}`}>
       <div className={`w-1 shrink-0 ${a.rail}`} aria-hidden />
@@ -56,9 +66,10 @@ export function AnnotationCard({
               <span className={`text-[9px] leading-none ${a.marker}`} aria-hidden>{a.symbol}</span>
               {kicker && <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E] truncate">{kicker}</span>}
             </div>
-            <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${clampQuote ? 'line-clamp-3' : ''}`} style={{ fontSize: 'var(--quote-font-size)' }}>
+            <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${quoteClamp}`} style={{ fontSize: 'var(--quote-font-size)' }}>
               &quot;<Highlight text={quote} q={query} />&quot;
             </p>
+            {belowQuote}
             {children}
             {(citation || date) && (
               <div className="flex items-center justify-between gap-2 mt-1.5">

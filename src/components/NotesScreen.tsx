@@ -77,12 +77,13 @@ function NoteItem({
         citation={note.citation}
         date={formatDate(dateIso ?? note.updatedAt)}
         query={searchQuery}
+        quoteLines={1}
         onClick={() => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
-        footer={note.bookId ? (
+        belowQuote={note.bookId ? (
           <button
             onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
-            className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
+            className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
           >
             Open in reader →
           </button>
