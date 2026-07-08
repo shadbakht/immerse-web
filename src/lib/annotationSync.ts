@@ -7,18 +7,23 @@ import { createClient } from './supabase/client';
 
 const supabase = createClient();
 
-export async function pushTag(tag: { id: string; user_id: string; name: string; visibility?: string; updated_at?: string }) {
+export async function pushTag(tag: { id: string; user_id: string; name: string; visibility?: string; updated_at?: string; parent_id?: string | null; depth?: number; sort_order?: number }) {
   try {
     const updated_at = tag.updated_at || new Date().toISOString();
+    const row: Record<string, unknown> = {
+      id: tag.id,
+      user_id: tag.user_id,
+      name: tag.name,
+      visibility: tag.visibility ?? 'private',
+      updated_at,
+    };
+    // Only include hierarchy fields when provided (reorder/re-parent writes).
+    if (tag.parent_id !== undefined) row.parent_id = tag.parent_id;
+    if (tag.depth !== undefined) row.depth = tag.depth;
+    if (tag.sort_order !== undefined) row.sort_order = tag.sort_order;
     const { error } = await supabase
       .from('tags')
-      .upsert({
-        id: tag.id,
-        user_id: tag.user_id,
-        name: tag.name,
-        visibility: tag.visibility ?? 'private',
-        updated_at,
-      }, { onConflict: 'id' });
+      .upsert(row, { onConflict: 'id' });
 
     if (error) console.warn('pushTag error:', error);
     return !error;

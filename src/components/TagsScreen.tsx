@@ -9,6 +9,121 @@ import { exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagEx
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Re-parent a tag one level in/out, recomputing the subtree's depth, renumbering
+// affected sibling groups, and enforcing depth<5. Returns the updated list +
+// changed tags, or null if invalid (first child / already root / exceeds cap).
+function computeReparent(tags: TagRow[], tagId: string, dir: 'indent' | 'outdent'):
+  { next: TagRow[]; changed: TagRow[] } | null {
+  const byId = new Map(tags.map(t => [t.id, { ...t }]));
+  const tag = byId.get(tagId);
+  if (!tag) return null;
+  const sortSibs = (pid: string | null) =>
+    tags.filter(t => (t.parent_id ?? null) === pid)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
+  const descIds: string[] = [];
+  const stack = [tagId];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    for (const c of tags.filter(t => t.parent_id === cur)) { descIds.push(c.id); stack.push(c.id); }
+  }
+  const oldParentId = tag.parent_id ?? null;
+
+  let newParentId: string | null;
+  let delta: number;
+  if (dir === 'indent') {
+    const sibs = sortSibs(oldParentId);
+    const idx = sibs.findIndex(t => t.id === tagId);
+    if (idx <= 0) return null;
+    newParentId = sibs[idx - 1].id;
+    delta = 1;
+    const subtreeMax = Math.max(tag.depth, ...descIds.map(id => byId.get(id)!.depth));
+    if (subtreeMax + 1 >= 5) return null;
+  } else {
+    if (oldParentId == null) return null;
+    newParentId = byId.get(oldParentId)!.parent_id ?? null;
+    delta = -1;
+  }
+
+  tag.parent_id = newParentId;
+  tag.depth += delta;
+  for (const id of descIds) byId.get(id)!.depth += delta;
+
+  const kidsOf = (pid: string | null) =>
+    tags.filter(t => (t.parent_id ?? null) === pid && t.id !== tagId)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
+        .map(t => t.id);
+  const renumber = (ids: string[]) => ids.forEach((id, i) => { byId.get(id)!.sort_order = i; });
+
+  renumber(kidsOf(oldParentId));
+  if (dir === 'indent') {
+    renumber([...kidsOf(newParentId), tagId]);
+  } else {
+    const gpKids = kidsOf(newParentId);
+    const at = gpKids.indexOf(oldParentId!);
+    const insertAt = at >= 0 ? at + 1 : gpKids.length;
+    renumber([...gpKids.slice(0, insertAt), tagId, ...gpKids.slice(insertAt)]);
+  }
+
+  const next = tags.map(t => byId.get(t.id)!);
+  const changed = next.filter(t => {
+    const o = tags.find(x => x.id === t.id)!;
+    return o.parent_id !== t.parent_id || o.depth !== t.depth || (o.sort_order ?? 0) !== (t.sort_order ?? 0);
+  });
+  return { next, changed };
+}
+
+const DragGrip = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+);
+
+// A draggable tag heading in Organize mode (web). Drag the grip to reorder; tap
+// the name to expand its quotes (which are drag-reorderable below).
+function SortableTagRow({ tag, count, isOpen, hasQuotes, onToggleOpen, canIndent, canOutdent, onIndent, onOutdent }: {
+  tag: TagRow; count: number; isOpen: boolean; hasQuotes: boolean; onToggleOpen: () => void;
+  canIndent: boolean; canOutdent: boolean; onIndent: () => void; onOutdent: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tag.id });
+  const depth = tag.depth ?? 0;
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, paddingLeft: 12 + depth * 16 }}
+      className={`flex items-center gap-2 py-3 pr-3 border-b border-gray-100 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
+    >
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 dark:text-[#5C7A8E] touch-none" aria-label="Drag to reorder">
+        <DragGrip />
+      </button>
+      <button onClick={onToggleOpen} className="flex-1 flex items-center gap-2 min-w-0 text-left">
+        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#E2EAF2] truncate">{tag.name}</span>
+        <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{count}</span>
+        {hasQuotes && <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>}
+      </button>
+      <button onClick={onOutdent} disabled={!canOutdent} title="Outdent" className={`px-1.5 text-lg leading-none ${canOutdent ? 'text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70' : 'text-gray-200 dark:text-[#2D4050] cursor-default'}`}>⇤</button>
+      <button onClick={onIndent} disabled={!canIndent} title="Indent" className={`px-1.5 text-lg leading-none ${canIndent ? 'text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70' : 'text-gray-200 dark:text-[#2D4050] cursor-default'}`}>⇥</button>
+    </div>
+  );
+}
+
+// A draggable quote row under an expanded tag in Organize mode (web).
+function SortableQuoteRow({ sel, depth }: { sel: SelRow; depth: number }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sel.id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, paddingLeft: 20 + depth * 16 }}
+      className={`flex items-center gap-3 py-2 pr-4 border-b border-gray-50 dark:border-[#243543] bg-gray-50/40 dark:bg-[#16232F] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
+    >
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-[#3A4D60] touch-none" aria-label="Drag to reorder">
+        <DragGrip />
+      </button>
+      <span className="flex-1 text-xs text-gray-600 dark:text-[#8FA4B8] truncate italic">{sel.snapshot_text}</span>
+    </div>
+  );
+}
 
 interface TagsScreenProps {
   userId: string;
@@ -70,8 +185,9 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth, isPublic }:
   );
 }
 
-function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth, hasChildren, isOpen, onToggleOpen }: {
+function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, onDelete, onRename, onToggleVisibility, onRemovePassage, depth, hasChildren, isOpen, onToggleOpen, count }: {
   tag: TagRow;
+  count?: number;
   selectState: CheckState;
   onToggleSelect: () => void;
   searchQuery: string;
@@ -151,7 +267,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
         <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate ml-1 min-w-0">
           <Highlight text={tag.name} q={searchQuery} />
         </span>
-        <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0 mx-2">{tag.selections.length}</span>
+        <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0 mx-2">{count ?? tag.selections.length}</span>
         <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
         <div onClick={e => e.stopPropagation()} className="ml-2">
           <ContextMenu options={menuOptions} />
@@ -174,6 +290,95 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const supabase = createClient();
   const [tags, setTags] = useState<TagRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [organizing, setOrganizing] = useState(false); // drag-to-reorder mode
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  // On drop: reorder among siblings (parent unchanged — Slice 2), recompute
+  // sort_order per parent group, persist changed tags to Supabase.
+  const handleTagDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setTags(prev => {
+      const from = prev.findIndex(t => t.id === active.id);
+      const to = prev.findIndex(t => t.id === over.id);
+      if (from < 0 || to < 0) return prev;
+      const origById = new Map(prev.map(t => [t.id, t.sort_order ?? 0]));
+      const moved = arrayMove(prev, from, to);
+      const counter = new Map<string, number>();
+      const next = moved.map(t => {
+        const key = (t.parent_id ?? '__root__') as string;
+        const n = counter.get(key) ?? 0;
+        counter.set(key, n + 1);
+        return ((t.sort_order ?? 0) === n ? t : { ...t, sort_order: n });
+      });
+      const now = new Date().toISOString();
+      for (const t of next) {
+        if ((origById.get(t.id) ?? 0) !== (t.sort_order ?? 0)) {
+          pushTag({ id: t.id, user_id: userId, name: t.name, parent_id: t.parent_id, depth: t.depth, sort_order: t.sort_order, visibility: t.visibility, updated_at: now }).catch(() => {});
+        }
+      }
+      return next;
+    });
+  }, [userId]);
+
+  // Reorder quotes within a single tag; persist selection_tags.sort_order.
+  const handleQuoteDragEnd = useCallback((tagId: string, event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setTags(prev => prev.map(t => {
+      if (t.id !== tagId) return t;
+      const from = t.selections.findIndex(s => s.id === active.id);
+      const to = t.selections.findIndex(s => s.id === over.id);
+      if (from < 0 || to < 0) return t;
+      const sels = arrayMove(t.selections, from, to);
+      sels.forEach((s, i) => {
+        supabase.from('selection_tags').update({ sort_order: i })
+          .eq('tag_id', tagId).eq('selection_id', s.id).then(() => {}, () => {});
+      });
+      return { ...t, selections: sels };
+    }));
+  }, [supabase]);
+
+  // Indent / outdent a tag (re-parent one level). Persists the changed subtree.
+  const handleReparent = useCallback((tagId: string, dir: 'indent' | 'outdent') => {
+    setTags(prev => {
+      const result = computeReparent(prev, tagId, dir);
+      if (!result) return prev;
+      const now = new Date().toISOString();
+      for (const t of result.changed) {
+        pushTag({ id: t.id, user_id: userId, name: t.name, parent_id: t.parent_id, depth: t.depth, sort_order: t.sort_order, visibility: t.visibility, updated_at: now }).catch(() => {});
+      }
+      return result.next;
+    });
+  }, [userId]);
+
+  // Per-tag indent/outdent eligibility for disabling the buttons at boundaries.
+  const reparentFlags = useMemo(() => {
+    const key = (p: string | null) => p ?? '__root__';
+    const groups = new Map<string, TagRow[]>();
+    for (const t of tags) {
+      const k = key(t.parent_id ?? null);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(t);
+    }
+    for (const arr of groups.values()) arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
+    const subMax = new Map<string, number>();
+    const childrenOf = (id: string) => tags.filter(t => t.parent_id === id);
+    const computeMax = (t: TagRow): number => {
+      let m = t.depth;
+      for (const c of childrenOf(t.id)) m = Math.max(m, computeMax(c));
+      subMax.set(t.id, m);
+      return m;
+    };
+    for (const t of tags) if (!t.parent_id) computeMax(t);
+    const flags = new Map<string, { canIndent: boolean; canOutdent: boolean }>();
+    for (const t of tags) {
+      const sibs = groups.get(key(t.parent_id ?? null)) ?? [];
+      const idx = sibs.findIndex(s => s.id === t.id);
+      flags.set(t.id, { canOutdent: !!t.parent_id, canIndent: idx > 0 && (subMax.get(t.id) ?? t.depth) + 1 < 5 });
+    }
+    return flags;
+  }, [tags]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   const [openTagIds, setOpenTagIds] = useState<Set<string>>(new Set());
@@ -224,11 +429,12 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
       const tagIds = tagList.map((t: any) => t.id);
       const selIds = Object.keys(selMap);
       const { data: stData } = await supabase
-        .from('selection_tags').select('tag_id, selection_id')
+        .from('selection_tags').select('tag_id, selection_id, sort_order')
         .in('tag_id', tagIds).in('selection_id', selIds);
 
+      // Hand-ordered within each tag (sort_order), created order as tiebreaker.
       const selsByTag: Record<string, SelRow[]> = {};
-      for (const st of (stData ?? []) as any[]) {
+      for (const st of [...((stData ?? []) as any[])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))) {
         const s = selMap[st.selection_id];
         if (!s) continue;
         (selsByTag[st.tag_id] ??= []).push({ id: st.selection_id, ...s });
@@ -385,6 +591,22 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     return out;
   }, [childrenByParent]);
 
+  // Aggregate quote count per tag = distinct selections across its whole subtree
+  // (own + descendants), matching the count shown on the Discover screen. A parent
+  // with 0 direct quotes but populated sub-tags now shows the subtree total.
+  const aggregateCounts = useMemo(() => {
+    const selsById = new Map(tags.map(t => [t.id, t.selections]));
+    const m = new Map<string, number>();
+    for (const t of tags) {
+      const ids = new Set<string>();
+      for (const sub of subtreeIds(t.id)) {
+        for (const s of (selsById.get(sub) ?? [])) ids.add(s.id);
+      }
+      m.set(t.id, ids.size);
+    }
+    return m;
+  }, [tags, subtreeIds]);
+
   // Checkbox state for a tag, derived from its subtree (like the Library panel).
   const tagCheckState = useCallback((id: string): CheckState => {
     const ids = subtreeIds(id);
@@ -440,8 +662,18 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Tags</h1>
-          {selectedTagIds.size > 0 && (
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Tags</h1>
+            {tags.length > 0 && (
+              <button
+                onClick={() => setOrganizing(o => !o)}
+                className={`text-sm font-medium px-2.5 py-1 rounded-lg transition-colors ${organizing ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white' : 'text-[#1B6B7B] dark:text-[#2D9DB3] hover:bg-[#1B6B7B]/10'}`}
+              >
+                {organizing ? 'Done' : 'Organize'}
+              </button>
+            )}
+          </div>
+          {!organizing && selectedTagIds.size > 0 && (
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(v => !v)}
@@ -507,6 +739,36 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" /></div>
+        ) : organizing ? (
+          <div>
+            <p className="text-xs text-gray-400 dark:text-[#5C7A8E] text-center py-3 px-4">Drag the grip to reorder · ⇤ ⇥ to change nesting · click a tag to reorder its quotes.</p>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTagDragEnd}>
+              <SortableContext items={tags.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                {tags.map(tag => (
+                  <div key={tag.id}>
+                    <SortableTagRow
+                      tag={tag}
+                      count={aggregateCounts.get(tag.id) ?? tag.selections.length}
+                      isOpen={openTagIds.has(tag.id)}
+                      hasQuotes={tag.selections.length > 0}
+                      onToggleOpen={() => toggleOpenTag(tag.id)}
+                      canIndent={reparentFlags.get(tag.id)?.canIndent ?? false}
+                      canOutdent={reparentFlags.get(tag.id)?.canOutdent ?? false}
+                      onIndent={() => handleReparent(tag.id, 'indent')}
+                      onOutdent={() => handleReparent(tag.id, 'outdent')}
+                    />
+                    {openTagIds.has(tag.id) && tag.selections.length > 0 && (
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={e => handleQuoteDragEnd(tag.id, e)}>
+                        <SortableContext items={tag.selections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                          {tag.selections.map(sel => <SortableQuoteRow key={sel.id} sel={sel} depth={tag.depth ?? 0} />)}
+                        </SortableContext>
+                      </DndContext>
+                    )}
+                  </div>
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">{searchQuery ? 'No tags match your search.' : 'No tags yet. Select a passage in the reader to tag it.'}</p>
         ) : (
@@ -522,6 +784,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                   <TagCard
                     tag={tag}
                     depth={tag.depth ?? 0}
+                    count={aggregateCounts.get(tag.id) ?? tag.selections.length}
                     hasChildren={hasChildrenSet.has(tag.id)}
                     isOpen={openTagIds.has(tag.id)}
                     onToggleOpen={() => toggleOpenTag(tag.id)}
