@@ -9,6 +9,7 @@ import { resolveIsPro } from '@/lib/proStatus';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
+import { semanticSearch, reciprocalRankFusion, SEMANTIC_SEARCH_ENABLED } from '@/lib/semanticSearch';
 
 // Categories whose books have no canonical order and should display
 // alphabetically (mirrors the mobile LibraryScreen normalised sort).
@@ -37,6 +38,7 @@ interface SearchResult {
   chapterLabel: string | null;
   sectionTitle: string | null;
   content:      string;
+  semantic?:    boolean;  // meaning-based ("Related") hit
 }
 
 interface LibraryPanelProps {
@@ -73,6 +75,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   // Search
   const [searchQuery,       setSearchQuery]       = useState('');
   const [searchResults,     setSearchResults]     = useState<SearchResult[]>([]);
+  const [semanticOn,        setSemanticOn]        = useState(false); // opt-in "Related" (semantic) search
   const [searchLoading,     setSearchLoading]     = useState(false);
   const [expandedResults,   setExpandedResults]   = useState<Set<string>>(new Set());
   const [checkedResultIds,  setCheckedResultIds]  = useState<Set<string>>(new Set());
@@ -322,12 +325,26 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).join(' & ');
   }
 
+  // Remember the "Related" toggle across sessions.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage.getItem('search.semanticOn.v1') === '1') {
+      setSemanticOn(true);
+    }
+  }, []);
+  function toggleSemantic() {
+    setSemanticOn(prev => {
+      const next = !prev;
+      try { window.localStorage.setItem('search.semanticOn.v1', next ? '1' : '0'); } catch {}
+      return next;
+    });
+  }
+
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) { setSearchResults([]); return; }
     const timer = setTimeout(() => doSearch(q), 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedSlugs]);
+  }, [searchQuery, selectedSlugs, semanticOn]);
 
   async function doSearch(q: string) {
     setSearchLoading(true);
@@ -361,7 +378,26 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         : importedSelected;
       const localResults = await searchLocalBooks(q, localBookIds);
 
-      setSearchResults([...localResults, ...remoteResults]);
+      const keyword = [...localResults, ...remoteResults];
+      setSearchResults(keyword);
+      setSearchLoading(false);
+
+      // Semantic search is opt-in (the "Related" toggle) and whole-library only,
+      // so keyword search stays fast/local by default.
+      if (!SEMANTIC_SEARCH_ENABLED || !semanticOn || selectedSlugs.size > 0) return;
+      const hits = await semanticSearch(supabase, q, undefined, 40);
+      if (hits.length === 0) return;
+      const semItems: SearchResult[] = hits.map(h => ({
+        passageId:    h.passageId,
+        bookId:       h.bookId,
+        bookTitle:    h.bookTitle,
+        authorName:   '',
+        chapterLabel: null,
+        sectionTitle: null,
+        content:      h.snippet,
+        semantic:     true,
+      }));
+      setSearchResults(reciprocalRankFusion([keyword, semItems], r => r.passageId));
     } finally {
       setSearchLoading(false);
     }
@@ -617,6 +653,21 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             >Clear</button>
           )}
         </div>
+        {SEMANTIC_SEARCH_ENABLED && searchQuery.trim() && selectedSlugs.size === 0 && (
+          <button
+            onClick={toggleSemantic}
+            className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border transition-colors ${
+              semanticOn
+                ? 'border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/10'
+                : 'border-gray-200 dark:border-[#2D4050] text-gray-400 dark:text-[#5C7A8E]'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+            Related passages{semanticOn ? ' · on' : ''}
+          </button>
+        )}
       </div>
 
       {/* Body */}
@@ -654,7 +705,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         onClick={() => setExpandedResults(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
                       >
                         <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mb-1 truncate">
-                          {result.bookTitle}{location ? ` · ${location}` : ''}
+                          {result.semantic ? 'RELATED · ' : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
                           {isExpanded ? highlightQuery(result.content, searchQuery) : highlightQuery(snippet, searchQuery)}
