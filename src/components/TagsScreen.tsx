@@ -275,11 +275,9 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
       </div>
       {open && (
         <div>
-          {tag.selections.length === 0
-            ? <p className="pl-9 pr-4 py-3 text-xs text-gray-400 dark:text-[#5C7A8E] border-t border-gray-100 dark:border-[#2D4050]">No passages tagged.</p>
-            : tag.selections.map(sel => (
-                <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} isPublic={tag.visibility === 'published'} />
-              ))}
+          {tag.selections.map(sel => (
+            <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} isPublic={tag.visibility === 'published'} />
+          ))}
         </div>
       )}
     </div>

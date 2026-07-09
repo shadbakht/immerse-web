@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
+import { fetchSelectionsByUser, type SelInfo } from '@/lib/fetchAnnotationSelections';
 import PanelSheet from './PanelSheet';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 
@@ -31,9 +32,20 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
   const [openNodes, setOpenNodes] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Per-tag quote reveal (mobile parity): tagId → quotes (undefined = loading)
+  const [tagQuotes, setTagQuotes] = useState<Record<string, { text: string; citation: string }[]>>({});
+  const loadedTagIdsRef = useRef<Set<string>>(new Set());
+  const selMapPromiseRef = useRef<Promise<Record<string, SelInfo>> | null>(null);
 
   useEffect(() => {
-    if (visible && userId) loadTags();
+    if (visible && userId) {
+      loadTags();
+      // Fresh quote data each time the panel opens
+      setOpenNodes(new Set());
+      setTagQuotes({});
+      loadedTagIdsRef.current = new Set();
+      selMapPromiseRef.current = null;
+    }
   }, [visible, userId]);
 
   async function loadTags() {
@@ -100,12 +112,36 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
     }
   }
 
+  // Lazily load a tag's existing selections on first expand (mobile parity).
+  const loadTagQuotes = useCallback(async (tagId: string) => {
+    if (loadedTagIdsRef.current.has(tagId)) return;
+    loadedTagIdsRef.current.add(tagId);
+    try {
+      // One user-wide selections fetch per panel session, shared across tags
+      selMapPromiseRef.current ??= fetchSelectionsByUser(userId);
+      const [selMap, { data: stData }] = await Promise.all([
+        selMapPromiseRef.current,
+        supabase.from('selection_tags').select('selection_id, sort_order').eq('tag_id', tagId),
+      ]);
+      const quotes = [...((stData ?? []) as { selection_id: string; sort_order: number | null }[])]
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map(st => selMap[st.selection_id])
+        .filter((s): s is SelInfo => !!s?.snapshot_text)
+        .map(s => ({ text: s.snapshot_text, citation: s.citation }));
+      setTagQuotes(prev => ({ ...prev, [tagId]: quotes }));
+    } catch {
+      loadedTagIdsRef.current.delete(tagId);
+    }
+  }, [userId]);
+
   function toggleNode(id: string) {
+    const willOpen = !openNodes.has(id);
     setOpenNodes(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+    if (willOpen) loadTagQuotes(id);
   }
 
   function renderTag(tag: Tag, allTags: Tag[]) {
@@ -140,8 +176,16 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             {isChecked && <span className="text-white text-xs leading-none">✓</span>}
           </button>
 
-          {/* Name */}
-          <span className="flex-1 text-sm text-gray-800 dark:text-[#D2DCE8]">{tag.name}</span>
+          {/* Name + chevron — whole area toggles expand (mobile parity); the
+              chevron rotates but isn't a separate tap target. Every tag expands
+              to reveal its quotes + sub-tags. */}
+          <button
+            onClick={() => toggleNode(tag.id)}
+            className="flex-1 flex items-center gap-1.5 min-w-0 text-left cursor-pointer"
+          >
+            <span className="truncate text-sm text-gray-800 dark:text-[#D2DCE8]">{tag.name}</span>
+            <span className={`inline-block text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+          </button>
 
           {/* Add child button */}
           <button
@@ -152,18 +196,23 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             +
           </button>
 
-          {/* Chevron */}
-          {children.length > 0 && (
-            <button onClick={() => toggleNode(tag.id)} className="text-gray-400 dark:text-[#5C7A8E] text-sm px-1">
-              <span className={`inline-block transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
-            </button>
-          )}
-
           {/* Kebab menu */}
           <div onClick={e => e.stopPropagation()}>
             <ContextMenu options={deleteOption} />
           </div>
         </div>
+
+        {/* Inline quote reveal — this tag's existing selections (mobile parity).
+            Loaded-and-empty renders nothing at all. */}
+        {isOpen && tagQuotes[tag.id]?.length !== 0 && (
+          <div className="pr-5 pb-1" style={{ paddingLeft: 20 + tag.depth * 20 + 28 }}>
+            {tagQuotes[tag.id] === undefined ? (
+              <p className="text-xs text-gray-400 dark:text-[#5C7A8E] py-1">…</p>
+            ) : (
+              tagQuotes[tag.id].map((q, i) => <TagQuoteRow key={i} quote={q} isFirst={i === 0} />)
+            )}
+          </div>
+        )}
 
         {isOpen && children.map(child => renderTag(child, allTags))}
       </div>
@@ -235,5 +284,27 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
         )}
       </div>
     </PanelSheet>
+  );
+}
+
+// ─── TagQuoteRow ── 2-line clamped quote; click to expand full text + citation ──
+
+function TagQuoteRow({ quote, isFirst }: { quote: { text: string; citation: string }; isFirst: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <>
+      {!isFirst && <div className="border-t border-gray-100 dark:border-[#2D4050]" />}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="block w-full text-left py-1.5 cursor-pointer"
+      >
+        <p className={`text-xs text-gray-500 dark:text-[#8FA4B8] italic ${expanded ? '' : 'line-clamp-2'}`}>
+          "{quote.text}"
+        </p>
+        {expanded && quote.citation && (
+          <p className="text-[11px] text-gray-400 dark:text-[#5C7A8E] mt-1">{quote.citation}</p>
+        )}
+      </button>
+    </>
   );
 }

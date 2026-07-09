@@ -1640,7 +1640,7 @@ async function handleCopy() {
                       {taggedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}
-                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title="View tags"
                         >
                           <TagIcon size={20} />
@@ -1649,7 +1649,7 @@ async function handleCopy() {
                       {notedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleNoteIconClick(passage.id); }}
-                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title="View note"
                         >
                           <NoteIcon size={20} />
@@ -1658,7 +1658,7 @@ async function handleCopy() {
                       {xrefPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleXrefIconClick(passage.id); }}
-                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity"
+                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title="View cross-references"
                         >
                           <XRefIcon size={20} />
@@ -1736,23 +1736,27 @@ async function handleCopy() {
       </PanelSheet>
 
       {/* Annotation panels */}
+      {/* selectionText uses the captured pending ref — the live selectionBar state
+          gets nulled by the document mousedown listener on the first click inside
+          a panel, which blanked the quote preview (and the layout shift swallowed
+          that click). */}
       <TagPanel
         visible={activePanel === 'tag'}
         onClose={closePanel}
         userId={userId}
-        selectionText={selectionBar?.text ?? ''}
+        selectionText={(pendingSelectionRef.current ?? selectionBar)?.text ?? ''}
         onSave={handleTagSave}
       />
       <NotePanel
         visible={activePanel === 'note'}
         onClose={closePanel}
-        selectionText={selectionBar?.text ?? ''}
+        selectionText={(pendingSelectionRef.current ?? selectionBar)?.text ?? ''}
         onSave={handleNoteSave}
       />
       <AiPanel
         visible={activePanel === 'ai'}
         onClose={closePanel}
-        selectionText={selectionBar?.text ?? ''}
+        selectionText={(pendingSelectionRef.current ?? selectionBar)?.text ?? ''}
         bookTitle={book?.title ?? ''}
         authorName={book?.authorName ?? ''}
         isPro={isPro}
