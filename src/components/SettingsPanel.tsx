@@ -12,6 +12,11 @@ import pkg from '../../package.json';
 // Single source of truth for the displayed version: package.json.
 const APP_VERSION = pkg.version;
 
+// Full feature walkthrough on YouTube (About → "Watch Full Feature Video").
+// PLACEHOLDER until the video is published — swap in the real watch URL then.
+// Same constant exists in the mobile repo: src/screens/SettingsScreen.js.
+const FEATURE_VIDEO_URL = 'https://www.youtube.com';
+
 const FONT_OPTIONS: { key: FontSize; size: number }[] = [
   { key: 'Small',  size: 14 },
   { key: 'Medium', size: 17 },
@@ -295,11 +300,22 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
               <button
                 onClick={() => setShowIntro(true)}
-                className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                className="w-full px-5 py-4 flex items-center justify-between text-left border-b border-gray-50 dark:border-[#2D4050]/60 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
               >
                 <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Intro Tour</span>
-                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">Replay Intro →</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">Replay on-boarding screenshots →</span>
               </button>
+              <div className="px-5 py-4 flex items-center justify-between">
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Full Feature Video</span>
+                <a
+                  href={FEATURE_VIDEO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
+                >
+                  Watch Full Feature Video →
+                </a>
+              </div>
             </section>
 
           </div>
