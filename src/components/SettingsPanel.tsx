@@ -13,9 +13,8 @@ import pkg from '../../package.json';
 const APP_VERSION = pkg.version;
 
 // Full feature walkthrough on YouTube (About → "Watch Full Feature Video").
-// PLACEHOLDER until the video is published — swap in the real watch URL then.
 // Same constant exists in the mobile repo: src/screens/SettingsScreen.js.
-const FEATURE_VIDEO_URL = 'https://www.youtube.com';
+const FEATURE_VIDEO_URL = 'https://youtu.be/z4pgyDj5QFY';
 
 const FONT_OPTIONS: { key: FontSize; size: number }[] = [
   { key: 'Small',  size: 14 },
