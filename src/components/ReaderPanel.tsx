@@ -61,6 +61,30 @@ const PRAYER_LAYOUT_BOOKS = new Set<string>([
   'c40c3e99-32fc-418a-b12f-4df5b06951ca', // Riḍván 1992
 ]);
 
+// Books whose chapters hold several tablets/selections running together with no
+// heading between them — the reader draws a hairline divider where the tablet's
+// own paragraph numbering resets (leading digit in content) or an unnumbered
+// invocation line follows a numbered paragraph. Mirrors the mobile reader's
+// section dividers. Opt-in by UUID: the leading-digit heuristic is only safe
+// for books ingested with per-tablet "td" numbers baked into the content.
+const TABLET_DIVIDER_BOOKS = new Set<string>([
+  '10dbae1f-449a-4131-bd7c-ee2d2db0bf96', // Days of Remembrance
+]);
+
+// Leading per-tablet number baked into content, e.g. "12Within this Paradise…".
+const LEADING_TD_RE = /^(\d+)(?=\D)/;
+
+// Books whose content carries the per-tablet number GLUED to the text
+// ("1Proclaim unto the celestial…"). The mobile reader hides these inline
+// numbers and mirrors them into the margin; do the same here: strip from the
+// body, show as the margin number. Tight pattern (digit run followed directly
+// by a capital or opening quote) so legitimate leading numbers are untouched.
+const TD_NUMBER_BOOKS = new Set<string>([
+  '10dbae1f-449a-4131-bd7c-ee2d2db0bf96', // Days of Remembrance
+  '818d9db5-11e2-4037-ab7a-96197a01e3d6', // Gems of Divine Mysteries
+]);
+const GLUED_TD_RE = /^(\d{1,3})(?=[“‘"A-Z])/;
+
 // Trailing attribution at the end of a prayer paragraph, e.g. "\n—Bahá'u'lláh".
 const ATTRIBUTION_RE = /\n(—(?:Bahá’u’lláh|The Báb|‘Abdu’l-Bahá|Shoghi Effendi)[^\n]{0,4})\s*$/;
 
@@ -1372,7 +1396,10 @@ async function handleCopy() {
   let lastSection = '';
   const isPrayerStyle = !!target?.bookId && PRAYER_STYLE_BOOKS.has(target.bookId);
   const isLayoutStyle = !isPrayerStyle && !!target?.bookId && PRAYER_LAYOUT_BOOKS.has(target.bookId);
+  const hasTabletDividers = !!target?.bookId && TABLET_DIVIDER_BOOKS.has(target.bookId);
+  const hasTdNumbers = !!target?.bookId && TD_NUMBER_BOOKS.has(target.bookId);
   let lastPrayerSection = '';
+  let prevTdNum: number | null = null; // previous passage's leading tablet number (divider books)
 
   // Build collapsible TOC rows: each depth-1 entry is keyed to its parent section
   // (depth-0 passageId); hide children of collapsed sections.
@@ -1578,6 +1605,29 @@ async function handleCopy() {
             // Letter date-lines ("19 December 1922 …") render as bold sub-headings.
             const isLetterDate = /^\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/.test(passage.content);
 
+            // Tablet boundary inside a chapter (divider books only): the per-tablet
+            // numbering resets to 1, or an unnumbered invocation line follows a
+            // numbered paragraph. Chapter starts are already marked by the eyebrow.
+            let showTabletDivider = false;
+            if (hasTabletDividers) {
+              const tdMatch = passage.content.match(LEADING_TD_RE);
+              const tdNum = tdMatch ? parseInt(tdMatch[1], 10) : null;
+              showTabletDivider = !showChapter && prevTdNum !== null &&
+                ((tdNum === 1 && prevTdNum >= 1) || tdNum === null);
+              prevTdNum = tdNum;
+            }
+
+            // Glued per-tablet number → out of the body text, into the margin
+            // (mirrors mobile, which hides the inline number and shows it there).
+            let tdMargin: string | null = null;
+            if (hasTdNumbers) {
+              const glued = passage.content.match(GLUED_TD_RE);
+              if (glued) {
+                tdMargin = glued[1];
+                bodyText = bodyText.slice(glued[1].length);
+              }
+            }
+
             return (
               <div key={passage.id} id={`p-${passage.id}`} data-pid={passage.id}>
                 {isPrayerStyle ? (
@@ -1624,6 +1674,9 @@ async function handleCopy() {
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
+                    {showTabletDivider && (
+                      <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
+                    )}
                     {showSection && (
                       <h3 className="text-sm font-medium text-gray-400 dark:text-[#5C7A8E] uppercase tracking-wide text-center mt-8 mb-3">
                         {passage.section_title}
@@ -1666,9 +1719,9 @@ async function handleCopy() {
                       )}
                     </div>
                   )}
-                  {passage.paragraph_number != null && !isLetterDate && (
+                  {(tdMargin != null || passage.paragraph_number != null) && !isLetterDate && (
                     <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-right leading-relaxed tabular-nums">
-                      {passage.paragraph_number}
+                      {tdMargin ?? passage.paragraph_number}
                     </span>
                   )}
                   <p
