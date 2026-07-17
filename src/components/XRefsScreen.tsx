@@ -81,7 +81,6 @@ function XRefCard({
       <div className="flex-1 min-w-0">
       {/* Label row */}
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100 dark:border-[#2D4050]">
-        <span className="text-[9px] leading-none text-[#5A9460] dark:text-[#6BB073]" aria-hidden>⬢</span>
         {editing ? (
           <input
             ref={inputRef}

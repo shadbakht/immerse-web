@@ -149,7 +149,23 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   );
 }
 
-function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth, isPublic }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void; depth: number; isPublic: boolean }) {
+// Small globe marking a public (published) or community-imported tag on its row —
+// same vocabulary as the mobile Tags screen's visibility globe.
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor"
+      strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
+      className={`shrink-0 ${className ?? ''}`} aria-label="Public tag"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+      <path d="M2 12h20" />
+    </svg>
+  );
+}
+
+function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void; depth: number }) {
   const [expanded, setExpanded] = useState(false);
 
   const menuOptions: MenuOption[] = [
@@ -168,7 +184,6 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth, isPublic }:
         quote={sel.snapshot_text}
         citation={sel.citation}
         query={searchQuery}
-        hideMarker={!isPublic}
         clampQuote={!expanded}
         onClick={() => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
@@ -267,6 +282,11 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
         <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate ml-1 min-w-0">
           <Highlight text={tag.name} q={searchQuery} />
         </span>
+        {(tag.visibility === 'published' || tag.visibility === 'imported') && (
+          <GlobeIcon className={tag.visibility === 'published'
+            ? 'text-[#5B8EC4] dark:text-[#7BAFD8]'
+            : 'text-[#1B6B7B] dark:text-[#2D9DB3]'} />
+        )}
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0 mx-2">{count ?? tag.selections.length}</span>
         <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
         <div onClick={e => e.stopPropagation()} className="ml-2">
@@ -276,7 +296,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
       {open && (
         <div>
           {tag.selections.map(sel => (
-            <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} isPublic={tag.visibility === 'published'} />
+            <PassageRow key={sel.id} sel={sel} searchQuery={searchQuery} onOpenBook={onOpenBook} onRemove={() => onRemovePassage(tag.id, sel.id)} depth={depth ?? 0} />
           ))}
         </div>
       )}

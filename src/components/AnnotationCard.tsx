@@ -5,14 +5,14 @@ import { Highlight } from './Highlight';
 
 export type AnnotationVariant = 'tag' | 'note' | 'xref' | 'discover';
 
-// Accent rail + marker color/shape per variant, mirroring the in-reader markers
-// and the mobile DARK_COLORS / LIGHT_COLORS annotation palette. Discover uses the
-// teal brand accent (it isn't an in-reader annotation type, so it gets a dot).
-const ACCENT: Record<AnnotationVariant, { rail: string; marker: string; symbol: string }> = {
-  tag:      { rail: 'bg-[#5B8EC4] dark:bg-[#7BAFD8]', marker: 'text-[#5B8EC4] dark:text-[#7BAFD8]', symbol: '●' },
-  note:     { rail: 'bg-[#D4BC6A] dark:bg-[#E8CC78]', marker: 'text-[#D4BC6A] dark:text-[#E8CC78]', symbol: '■' },
-  xref:     { rail: 'bg-[#5A9460] dark:bg-[#6BB073]', marker: 'text-[#5A9460] dark:text-[#6BB073]', symbol: '⬢' },
-  discover: { rail: 'bg-[#1B6B7B] dark:bg-[#2D9DB3]', marker: 'text-[#1B6B7B] dark:text-[#2D9DB3]', symbol: '●' },
+// Accent rail color per variant, mirroring the in-reader markers and the
+// mobile DARK_COLORS / LIGHT_COLORS annotation palette. Discover uses the
+// teal brand accent (it isn't an in-reader annotation type).
+const ACCENT: Record<AnnotationVariant, { rail: string }> = {
+  tag:      { rail: 'bg-[#5B8EC4] dark:bg-[#7BAFD8]' },
+  note:     { rail: 'bg-[#D4BC6A] dark:bg-[#E8CC78]' },
+  xref:     { rail: 'bg-[#5A9460] dark:bg-[#6BB073]' },
+  discover: { rail: 'bg-[#1B6B7B] dark:bg-[#2D9DB3]' },
 };
 
 export interface AnnotationCardProps {
@@ -30,8 +30,6 @@ export interface AnnotationCardProps {
   clampQuote?: boolean;
   /** Clamp the quote to an exact number of lines (1–3). Overrides clampQuote. */
   quoteLines?: 1 | 2 | 3;
-  /** Hide the variant marker dot (e.g. private tags on the Tags screen). */
-  hideMarker?: boolean;
   /** Render the citation row immediately under the quote (above belowQuote/children)
    *  instead of at the card's foot. Used by Notes so citation sits with the quote. */
   citationFirst?: boolean;
@@ -48,11 +46,11 @@ export interface AnnotationCardProps {
 }
 
 // Shared "soft card" used across the annotation list screens (Tags, Notes, and
-// later XRefs + Discover). Skeleton = accent rail + marker shape + serif
-// pull-quote + small-caps citation + flexible content slots.
+// later XRefs + Discover). Skeleton = accent rail + serif pull-quote +
+// small-caps citation + flexible content slots.
 export function AnnotationCard({
   variant, quote, citation, kicker, date, query = '',
-  clampQuote, quoteLines, hideMarker, citationFirst, action, onClick, belowQuote, children, footer, className = '',
+  clampQuote, quoteLines, citationFirst, action, onClick, belowQuote, children, footer, className = '',
 }: AnnotationCardProps) {
   const a = ACCENT[variant];
   // Tailwind needs literal class names — map explicitly.
@@ -75,10 +73,9 @@ export function AnnotationCard({
       <div className="flex-1 min-w-0 px-3.5 py-3">
         <div className="flex items-start gap-2">
           <div className={`flex-1 min-w-0 ${onClick ? 'cursor-pointer select-none' : ''}`} onClick={onClick}>
-            {(!hideMarker || kicker) && (
-              <div className="flex items-center gap-1.5 mb-1.5">
-                {!hideMarker && <span className={`text-[9px] leading-none ${a.marker}`} aria-hidden>{a.symbol}</span>}
-                {kicker && <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E] truncate">{kicker}</span>}
+            {kicker && (
+              <div className="mb-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E] truncate block">{kicker}</span>
               </div>
             )}
             <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${quoteClamp}`} style={{ fontSize: 'var(--quote-font-size)' }}>
