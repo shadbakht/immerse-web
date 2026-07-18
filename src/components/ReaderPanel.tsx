@@ -116,6 +116,11 @@ const PARAGRAPH_BREAK_BOOKS = new Set<string>([
   'b7ac6051-d0f4-447f-af03-77d488d77246', // Turning Point for All Nations
   'bb317a9a-3394-4f11-bce0-bb6fcb4b3110', // Constitution of the UHJ
   'b34a0f91-1552-4d73-b177-6fabf64281c9', // Prosperity of Humankind
+  // Jul 2026 batch 2 — had annotations; selections re-anchored after re-sync
+  'ae11fd3c-45b8-4683-8c57-8c33f19fedfb', // Prayers and Meditations
+  '07f903ff-3dfe-452e-9a6e-93f33bba334b', // Tablets of Bahá'u'lláh (after the Kitáb-i-Aqdas)
+  '1489c42a-ee8b-4a9c-a527-11e7a8c2afff', // 'Abdu'l-Bahá in London
+  '54f5ee1f-594b-490e-ae9e-f3f899cc7092', // Arohanui
 ]);
 
 interface TocEntry {

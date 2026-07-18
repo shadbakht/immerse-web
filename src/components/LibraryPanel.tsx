@@ -438,13 +438,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     const expanded = expandSynonyms(q);
     const hasOps = /[|&!()"]/.test(expanded);
     const tsQuery = hasOps ? expanded : q.trim().split(/\s+/).filter(Boolean).map(t => `${t}:*`).join(' & ');
-    let query = supabase
-      .from('passages')
-      .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
-      .textSearch('fts', tsQuery, { type: 'websearch', config: 'english' })
-      .limit(40);
-    if (scope && scope.length > 0) query = query.in('book_id', scope);
-    const { data } = await query;
+    // Routed through the search_passages RPC rather than a direct
+    // .textSearch(...).limit(40): the LIMIT made the planner pick a Seq Scan
+    // over ~250k rows for rare terms (~7s → anon statement timeout). The RPC
+    // pins enable_seqscan=off so the GIN index is used (~0.2s). It applies the
+    // same websearch_to_tsquery + 40-row cap and the same visibility rule, so
+    // results are unchanged.
+    const { data } = await supabase
+      .rpc('search_passages', {
+        search_query: tsQuery,
+        book_scope: scope && scope.length > 0 ? scope : null,
+      })
+      .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
     return mapResults(data ?? []);
   }
 
