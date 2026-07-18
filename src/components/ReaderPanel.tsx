@@ -88,6 +88,36 @@ const GLUED_TD_RE = /^(\d{1,3})(?=[“‘"A-Z])/;
 // Trailing attribution at the end of a prayer paragraph, e.g. "\n—Bahá'u'lláh".
 const ATTRIBUTION_RE = /\n(—(?:Bahá’u’lláh|The Báb|‘Abdu’l-Bahá|Shoghi Effendi)[^\n]{0,4})\s*$/;
 
+// Books whose passage content carries \n paragraph breaks that should render as
+// spaced paragraphs (same treatment as prayers, without the prayer styling).
+// Content gets its newlines from syncCorpusParity's <br> → \n conversion; the
+// mobile reader inserts the same newline into its DOM, so offsets stay aligned.
+const PARAGRAPH_BREAK_BOOKS = new Set<string>([
+  '37336237-1959-4a2d-8e72-76270ac25c4c', // Bahíyyih Khánum
+  'd48c5bd5-ae8c-4f39-992b-1dbc6764f5d4', // Compilation of Compilations: Volume 1
+  '9c0a3162-dd2e-4db2-bcc8-80eab4135dfe', // Compilation of Compilations: Volume 2
+  '52384e3e-0ae7-4f17-b4a9-b2b5f60a6a3c', // Compilation of Compilations: Volume 3
+  '130e2248-e1fd-484c-bd45-aeb476214c01', // Messages to the Bahá'í World
+  '008c6efa-027a-47cb-bff9-7c6b79dac323', // Bahá'í World Faith ('Abdu'l-Bahá's section)
+  'd1aa7400-52f0-4e27-b610-35b918935507', // Directives from the Guardian
+  '321083c9-6a94-41ca-8a2c-5ec8ae7b968c', // Foundations of World Unity
+  'd5fa46a3-b623-4f35-abef-7bbe6a633eaf', // Messages to America
+  'dfa58bb7-d184-4482-a1b5-8ba4f606e260', // Proclamation of Bahá'u'lláh
+  '51f3331c-57f4-4d3c-bb64-72d6e4621fb4', // Dear Co-worker
+  '05ae913a-b19a-4c20-a90c-131d563e49c3', // Japan Will Turn Ablaze!
+  '211fb90b-a166-48b4-8259-db613cd8083e', // Light of Divine Guidance vol. 1
+  '5c9bde55-9e6e-48c3-947c-2a4ece6dabf3', // Light of Divine Guidance vol. 2
+  '4cc95413-f5f8-4c64-ada2-8225c0ac4e72', // Letters from the Guardian to Australia & NZ
+  '83b3c2fd-8a50-482a-83bf-20dd5db30306', // High Endeavours
+  '467562f7-7d4b-41ff-8a77-ce700a2ca9e5', // Dawn of a New Day
+  'ae2f91f3-24f2-4e62-97f3-321412c9347a', // Unfolding Destiny
+  '81309f9d-edc3-4796-85a6-bb7a1a364481', // Messages to Canada
+  '76043a9e-6723-45f7-bf59-1bf45b1603f0', // Divine Philosophy
+  'b7ac6051-d0f4-447f-af03-77d488d77246', // Turning Point for All Nations
+  'bb317a9a-3394-4f11-bce0-bb6fcb4b3110', // Constitution of the UHJ
+  'b34a0f91-1552-4d73-b177-6fabf64281c9', // Prosperity of Humankind
+]);
+
 interface TocEntry {
   label: string;
   passageId: string;
@@ -113,8 +143,27 @@ interface ReaderPanelProps {
   onXrefPickDone?: () => void;
 }
 
+// Prayer paragraph break: each newline in a prayer body is a source paragraph
+// boundary. Keep the newline character in the DOM (selection offsets follow
+// textContent) but collapse it inside a fixed-height block spacer so
+// consecutive paragraphs get real vertical space instead of a bare line break.
+function renderPrayerText(text: string, kp: string) {
+  const segs = text.split('\n');
+  if (segs.length === 1) return <span key={kp}>{text}</span>;
+  return (
+    <span key={kp}>
+      {segs.map((seg, i) => (
+        <span key={i}>
+          {i > 0 && <span className="block h-[1em] whitespace-normal">{'\n'}</span>}
+          {seg}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // Render a text fragment, turning [N] markers into tappable footnote sups.
-function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp: string) {
+function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp: string, prayerBreaks?: boolean) {
   return text.split(/(\[\d+\])/g).map((part, i) => {
     const m = part.match(/^\[(\d+)\]$/);
     if (m) {
@@ -129,11 +178,11 @@ function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp:
         </sup>
       );
     }
-    return <span key={kp + i}>{part}</span>;
+    return prayerBreaks ? renderPrayerText(part, kp + i) : <span key={kp + i}>{part}</span>;
   });
 }
 
-function PassageContent({ text, onFootnoteClick, highlight }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string }) {
+function PassageContent({ text, onFootnoteClick, highlight, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string; prayerBreaks?: boolean }) {
   const clean = text.replace(/\/\*[^*]*\*\//g, '');
   if (highlight) {
     const plain = clean.replace(/<\/?em>/g, '');
@@ -145,7 +194,7 @@ function PassageContent({ text, onFootnoteClick, highlight }: { text: string; on
         {parts.map((part, i) =>
           pattern.test(part)
             ? <mark key={i} className="search-highlight rounded px-0.5">{part}</mark>
-            : <span key={i}>{part}</span>
+            : prayerBreaks ? renderPrayerText(part, `h${i}`) : <span key={i}>{part}</span>
         )}
       </>
     );
@@ -155,8 +204,8 @@ function PassageContent({ text, onFootnoteClick, highlight }: { text: string; on
     <>
       {segs.map((seg, i) =>
         i % 2 === 1
-          ? <em key={`i${i}`}>{renderFootnotes(seg, onFootnoteClick, `i${i}-`)}</em>
-          : <span key={`n${i}`}>{renderFootnotes(seg, onFootnoteClick, `n${i}-`)}</span>
+          ? <em key={`i${i}`}>{renderFootnotes(seg, onFootnoteClick, `i${i}-`, prayerBreaks)}</em>
+          : <span key={`n${i}`}>{renderFootnotes(seg, onFootnoteClick, `n${i}-`, prayerBreaks)}</span>
       )}
     </>
   );
@@ -1356,6 +1405,16 @@ async function handleCopy() {
     setTocOpen(false);
   }
 
+  // Must run before the !target early return: hooks after a conditional return
+  // change the hook count between renders and crash React when a book is opened.
+  useEffect(() => {
+    if (!target?.bookId) return;
+    try {
+      const raw = localStorage.getItem(`immerse.toc.collapsed.${target.bookId}`);
+      setCollapsedToc(raw ? new Set(JSON.parse(raw)) : new Set());
+    } catch { setCollapsedToc(new Set()); }
+  }, [target?.bookId]);
+
   if (!target) {
     return (
       <div className="h-full flex items-center justify-center text-gray-300 dark:text-[#4A6478]">
@@ -1366,14 +1425,6 @@ async function handleCopy() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!target?.bookId) return;
-    try {
-      const raw = localStorage.getItem(`immerse.toc.collapsed.${target.bookId}`);
-      setCollapsedToc(raw ? new Set(JSON.parse(raw)) : new Set());
-    } catch { setCollapsedToc(new Set()); }
-  }, [target?.bookId]);
 
   function toggleTocSection(key: string) {
     setCollapsedToc(prev => {
@@ -1395,6 +1446,7 @@ async function handleCopy() {
   let lastChapter = '';
   let lastSection = '';
   const isPrayerStyle = !!target?.bookId && PRAYER_STYLE_BOOKS.has(target.bookId);
+  const hasParagraphBreaks = isPrayerStyle || (!!target?.bookId && PARAGRAPH_BREAK_BOOKS.has(target.bookId));
   const isLayoutStyle = !isPrayerStyle && !!target?.bookId && PRAYER_LAYOUT_BOOKS.has(target.bookId);
   const hasTabletDividers = !!target?.bookId && TABLET_DIVIDER_BOOKS.has(target.bookId);
   const hasTdNumbers = !!target?.bookId && TD_NUMBER_BOOKS.has(target.bookId);
@@ -1735,6 +1787,7 @@ async function handleCopy() {
                         setActiveFootnote({ num: n, text: footnoteMap[n] ?? '' });
                       }}
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
+                      prayerBreaks={hasParagraphBreaks}
                     />
                     {attribution && (
                       <span className="block text-right italic text-gray-500 dark:text-[#8FA4B8] mt-2">{attribution}</span>
