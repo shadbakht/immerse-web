@@ -450,7 +450,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         book_scope: scope && scope.length > 0 ? scope : null,
       })
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
-    return mapResults(data ?? []);
+    // supabase types .rpc().select() as object|array; the RPC returns rows and
+    // mapResults handles the array. Cast keeps `next build` type-checking (the
+    // union broke it since the search_passages rewiring).
+    return mapResults((data as any[]) ?? []);
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
