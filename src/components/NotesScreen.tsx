@@ -49,9 +49,6 @@ function monthKey(iso: string) {
   return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
 }
 
-const GROUP_MODE_KEY = 'notes_group_mode';
-type GroupMode = 'book' | 'date';
-
 function NoteItem({
   note, searchQuery, onOpenBook, onDelete, onSave, dateIso,
 }: {
@@ -137,18 +134,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const [searchQuery, setSearchQuery]   = useState('');
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
   const [openBooks, setOpenBooks]           = useState<Set<string>>(new Set());
-  const [groupMode, setGroupMode]   = useState<GroupMode>('book');
-
-  // Restore the saved By Book / By Date preference once on mount
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(GROUP_MODE_KEY) : null;
-    if (saved === 'date' || saved === 'book') setGroupMode(saved);
-  }, []);
-
-  function changeGroupMode(mode: GroupMode) {
-    setGroupMode(mode);
-    try { window.localStorage.setItem(GROUP_MODE_KEY, mode); } catch { /* ignore */ }
-  }
+  // No By Book / By Date toggle on web — both groupings are always on screen.
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -318,9 +304,119 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const toggleBook = (bookKey: string) =>
     setOpenBooks(prev => { const next = new Set(prev); next.has(bookKey) ? next.delete(bookKey) : next.add(bookKey); return next; });
 
+  // ── Column bodies ───────────────────────────────────────────────────────────
+  // Both groupings render side by side (Discover's two-column pattern), so each
+  // body is built once here and dropped into its own scrolling column below.
+
+  const dateBody = (
+    <div>
+      {dateGroups.map((g, gi) => (
+        <div key={g.key}>
+          {/* Full-width divider between months */}
+          {gi > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
+          {/* Month header */}
+          <div className="flex items-center gap-2 px-4 py-3.5 select-none">
+            <span className="flex-1 text-sm font-semibold tracking-wide text-gray-700 dark:text-[#B8C7D6] truncate">{g.label}</span>
+            <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{g.notes.length}</span>
+          </div>
+          {g.notes.map(note => (
+            <NoteItem
+              key={note.noteId}
+              note={note}
+              dateIso={note.createdAt}
+              searchQuery={searchQuery}
+              onOpenBook={onOpenBook}
+              onDelete={handleDeleteNote}
+              onSave={handleSaveEdit}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  const bookBody = (
+    <div>
+      {hierarchy.map((trad, ti) => {
+        const tradOpen   = openTraditions.has(trad.catId);
+        const totalNotes = trad.books.reduce((s, b) => s + b.notes.length, 0);
+        return (
+          <div key={trad.catId}>
+            {/* Full-width divider between top-level traditions */}
+            {ti > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
+            {/* Tradition header */}
+            <button
+              className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
+              onClick={() => toggleTradition(trad)}
+            >
+              <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{trad.name}</span>
+              <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{totalNotes}</span>
+              <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
+            </button>
+
+            {tradOpen && trad.books.map(book => {
+              const bookOpen = openBooks.has(book.bookKey);
+              return (
+                <div key={book.bookKey}>
+                  {/* Inset divider above each book (sub-level) */}
+                  <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 32 }} />
+                  {/* Book sub-header */}
+                  <button
+                    className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
+                    onClick={() => toggleBook(book.bookKey)}
+                  >
+                    <span className="flex-1 text-sm text-gray-700 dark:text-[#B8C7D6] truncate">{book.title}</span>
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{book.notes.length}</span>
+                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
+                  </button>
+
+                  {/* Note items */}
+                  {bookOpen && book.notes.map(note => (
+                    <NoteItem
+                      key={note.noteId}
+                      note={note}
+                      searchQuery={searchQuery}
+                      onOpenBook={onOpenBook}
+                      onDelete={handleDeleteNote}
+                      onSave={handleSaveEdit}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Plain function, called (not rendered as <Column/>): a nested component would
+  // be a fresh type on every render and remount the notes — losing edit drafts
+  // and scroll position on each keystroke in the search box.
+  function renderColumn(title: string, body: React.ReactNode) {
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
+          <span className="text-xs font-semibold text-gray-500 dark:text-[#8FA4B8] uppercase tracking-wide">{title}</span>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">
+              {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
+            </p>
+          ) : body}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
-      {/* Header + search */}
+    <div className="h-full flex flex-col w-full">
+      {/* Header + search — spans both columns */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">Notes</h1>
         <div className="relative">
@@ -337,116 +433,13 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
             <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
           )}
         </div>
-
-        {/* By Book / By Date segmented control */}
-        <div className="flex justify-center mt-3">
-          <div className="inline-flex bg-gray-100 dark:bg-[#243040] rounded-lg p-0.5">
-            {(['book', 'date'] as GroupMode[]).map(mode => (
-              <button
-                key={mode}
-                onClick={() => changeGroupMode(mode)}
-                className={`px-5 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  groupMode === mode
-                    ? 'bg-white dark:bg-[#324252] text-gray-900 dark:text-[#E2EAF2] shadow-sm'
-                    : 'text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6]'
-                }`}
-              >
-                {mode === 'book' ? 'By Book' : 'By Date'}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
-      {/* Hierarchy list */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">
-            {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
-          </p>
-        ) : groupMode === 'date' ? (
-          <div>
-            {dateGroups.map((g, gi) => (
-              <div key={g.key}>
-                {/* Full-width divider between months */}
-                {gi > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
-                {/* Month header */}
-                <div className="flex items-center gap-2 px-4 py-3.5 select-none">
-                  <span className="flex-1 text-sm font-semibold tracking-wide text-gray-700 dark:text-[#B8C7D6] truncate">{g.label}</span>
-                  <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{g.notes.length}</span>
-                </div>
-                {g.notes.map(note => (
-                  <NoteItem
-                    key={note.noteId}
-                    note={note}
-                    dateIso={note.createdAt}
-                    searchQuery={searchQuery}
-                    onOpenBook={onOpenBook}
-                    onDelete={handleDeleteNote}
-                    onSave={handleSaveEdit}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div>
-            {hierarchy.map((trad, ti) => {
-              const tradOpen   = openTraditions.has(trad.catId);
-              const totalNotes = trad.books.reduce((s, b) => s + b.notes.length, 0);
-              return (
-                <div key={trad.catId}>
-                  {/* Full-width divider between top-level traditions */}
-                  {ti > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
-                  {/* Tradition header */}
-                  <button
-                    className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
-                    onClick={() => toggleTradition(trad)}
-                  >
-                    <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{trad.name}</span>
-                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{totalNotes}</span>
-                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
-                  </button>
-
-                  {tradOpen && trad.books.map(book => {
-                    const bookOpen = openBooks.has(book.bookKey);
-                    return (
-                      <div key={book.bookKey}>
-                        {/* Inset divider above each book (sub-level) */}
-                        <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 32 }} />
-                        {/* Book sub-header */}
-                        <button
-                          className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
-                          onClick={() => toggleBook(book.bookKey)}
-                        >
-                          <span className="flex-1 text-sm text-gray-700 dark:text-[#B8C7D6] truncate">{book.title}</span>
-                          <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{book.notes.length}</span>
-                          <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
-                        </button>
-
-                        {/* Note items */}
-                        {bookOpen && book.notes.map(note => (
-                          <NoteItem
-                            key={note.noteId}
-                            note={note}
-                            searchQuery={searchQuery}
-                            onOpenBook={onOpenBook}
-                            onDelete={handleDeleteNote}
-                            onSave={handleSaveEdit}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        )}
+      {/* Two-column split: By Book | By Date */}
+      <div className="flex-1 flex overflow-hidden">
+        {renderColumn('By Book', bookBody)}
+        <div className="w-px bg-gray-200 dark:bg-[#354759] shrink-0" />
+        {renderColumn('By Date', dateBody)}
       </div>
     </div>
   );
