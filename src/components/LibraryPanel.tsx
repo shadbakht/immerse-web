@@ -650,29 +650,30 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050]">
         <div className="flex items-center justify-between mb-3">
-          {availableLanguages.length > 1 ? (
-            <label className="relative inline-flex items-center gap-1 cursor-pointer group">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Library</h2>
-              <svg className="w-4 h-4 text-gray-400 dark:text-[#5C7A8E] group-hover:text-[#1B6B7B] dark:group-hover:text-[#2D9DB3]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-              </svg>
-              {contentLang !== 'en' && (
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E] ml-1">{LANGUAGE_LABELS[contentLang] ?? contentLang}</span>
-              )}
-              <select
-                aria-label="Library language"
-                value={contentLang}
-                onChange={e => setContentLang(e.target.value)}
-                className="absolute inset-0 w-full opacity-0 cursor-pointer"
-              >
-                {availableLanguages.map(l => (
-                  <option key={l} value={l}>{LANGUAGE_LABELS[l] ?? l}</option>
-                ))}
-              </select>
-            </label>
-          ) : (
+          <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Library</h2>
-          )}
+            {/* The active language always reads out, and sits in its own pill:
+                a bare chevron on the heading looked like decoration, so nobody
+                found the switcher. */}
+            {availableLanguages.length > 1 && (
+              <label className="relative inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-gray-200 dark:border-[#2D4050] bg-gray-50 dark:bg-[#243040] text-xs font-medium text-gray-600 dark:text-[#8FA4B8] cursor-pointer hover:border-[#1B6B7B] hover:text-[#1B6B7B] dark:hover:border-[#2D9DB3] dark:hover:text-[#2D9DB3] transition-colors">
+                {LANGUAGE_LABELS[contentLang] ?? contentLang}
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                </svg>
+                <select
+                  aria-label="Library language"
+                  value={contentLang}
+                  onChange={e => setContentLang(e.target.value)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                >
+                  {availableLanguages.map(l => (
+                    <option key={l} value={l}>{LANGUAGE_LABELS[l] ?? l}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
           <div className="flex items-center gap-1.5">
             {userId && (
               <button
