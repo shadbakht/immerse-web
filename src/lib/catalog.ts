@@ -21,6 +21,7 @@ export interface CatalogBook {
   id: string;       // corpus slug
   categoryId: string;
   title: string;
+  language?: string;   // BCP-47; absent on legacy entries, treated as 'en'
 }
 
 export interface Catalog {

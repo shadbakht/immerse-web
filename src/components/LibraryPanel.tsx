@@ -15,6 +15,10 @@ import { semanticSearch, reciprocalRankFusion, SEMANTIC_SEARCH_ENABLED } from '@
 // alphabetically (mirrors the mobile LibraryScreen normalised sort).
 // Scripture categories (Bible, Tanakh, Qur'an, GGS, etc.) are left in their
 // catalog (canonical) order.
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English', es: 'Español', pt: 'Português', fr: 'Français',
+};
+
 const ALPHA_SORTED_CATEGORIES = new Set([
   'cat-bahai-bahullh',        // Bahá'u'lláh
   'cat-bahai-abdulbah',       // ‘Abdu'l-Bahá
@@ -63,6 +67,20 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   const [loading, setLoading]   = useState(true);
   const [openNodes, setOpenNodes] = useState<Set<string>>(new Set());
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+
+  // Which content language the library is scoped to. Mirrors the mobile scope
+  // switcher: books carry a language tag and the tree shows one language at a
+  // time. Persisted so a Spanish reader stays in Spanish across sessions.
+  const [contentLang, setContentLangState] = useState('en');
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('immerse:contentLang') : null;
+    if (saved) setContentLangState(saved);
+  }, []);
+  const setContentLang = useCallback((lang: string) => {
+    setContentLangState(lang);
+    try { localStorage.setItem('immerse:contentLang', lang); } catch { /* ignore */ }
+    setOpenNodes(new Set());   // collapse: the previous language's open nodes don't apply
+  }, []);
 
   // My Books
   const [isPro, setIsPro]                 = useState(false);
@@ -157,14 +175,38 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   // ── Tree helpers ─────────────────────────────────────────────────────────────
 
-  const childrenOf = useCallback((parentId: string): CatalogCategory[] => {
-    return (catalog?.categories ?? [])
-      .filter(c => c.parentId === parentId)
-      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  const bookLang = (b: CatalogBook) => b.language ?? 'en';
+
+  // Content languages present in the catalog, English first, then the rest by count.
+  const availableLanguages = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const b of catalog?.books ?? []) counts.set(bookLang(b), (counts.get(bookLang(b)) ?? 0) + 1);
+    return [...counts.keys()].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : a.localeCompare(b)));
   }, [catalog]);
 
+  // Categories that contain at least one book in the active language, at any
+  // depth. Categories are shared across languages, so without this the Spanish
+  // scope would still show every empty English branch.
+  const inScopeCats = useMemo(() => {
+    const withBooks = new Set<string>();
+    for (const b of catalog?.books ?? []) if (bookLang(b) === contentLang) withBooks.add(b.categoryId);
+    const parentOf = new Map((catalog?.categories ?? []).map(c => [c.id, c.parentId]));
+    // Walk each book-bearing category up to the root so ancestors stay visible.
+    for (const start of [...withBooks]) {
+      let cur: string | null | undefined = start;
+      while (cur) { withBooks.add(cur); cur = parentOf.get(cur); }
+    }
+    return withBooks;
+  }, [catalog, contentLang]);
+
+  const childrenOf = useCallback((parentId: string): CatalogCategory[] => {
+    return (catalog?.categories ?? [])
+      .filter(c => c.parentId === parentId && inScopeCats.has(c.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  }, [catalog, inScopeCats]);
+
   const booksInCategory = useCallback((catId: string): CatalogBook[] => {
-    const books = (catalog?.books ?? []).filter(b => b.categoryId === catId);
+    const books = (catalog?.books ?? []).filter(b => b.categoryId === catId && bookLang(b) === contentLang);
     if (ALPHA_SORTED_CATEGORIES.has(catId)) {
       return [...books].sort((a, b) => {
         const ak = titleSortKey(a.title), bk = titleSortKey(b.title);
@@ -172,7 +214,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       });
     }
     return books;
-  }, [catalog]);
+  }, [catalog, contentLang]);
 
   // Recursively collect all book slugs under a category at any depth
   const allSlugsUnder = useCallback((catId: string): string[] => {
@@ -558,9 +600,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Root traditions (parentId = null, not imported)
+  // Root traditions (parentId = null, not imported), scoped to the active language.
   const roots = (catalog?.categories ?? [])
-    .filter(c => c.parentId === null && c.kind !== 'imported')
+    .filter(c => c.parentId === null && c.kind !== 'imported' && inScopeCats.has(c.id))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
   // Depth-aware dividers (match the Tags/mobile-Library treatment): a full-width
@@ -608,7 +650,29 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050]">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Library</h2>
+          {availableLanguages.length > 1 ? (
+            <label className="relative inline-flex items-center gap-1 cursor-pointer group">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Library</h2>
+              <svg className="w-4 h-4 text-gray-400 dark:text-[#5C7A8E] group-hover:text-[#1B6B7B] dark:group-hover:text-[#2D9DB3]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+              </svg>
+              {contentLang !== 'en' && (
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E] ml-1">{LANGUAGE_LABELS[contentLang] ?? contentLang}</span>
+              )}
+              <select
+                aria-label="Library language"
+                value={contentLang}
+                onChange={e => setContentLang(e.target.value)}
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+              >
+                {availableLanguages.map(l => (
+                  <option key={l} value={l}>{LANGUAGE_LABELS[l] ?? l}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Library</h2>
+          )}
           <div className="flex items-center gap-1.5">
             {userId && (
               <button
