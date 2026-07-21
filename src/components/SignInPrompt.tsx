@@ -1,10 +1,13 @@
 'use client';
 
+import { useTranslation } from '@/contexts/LanguageProvider';
+
 interface SignInPromptProps {
   message: string;
 }
 
 export default function SignInPrompt({ message }: SignInPromptProps) {
+  const { t } = useTranslation();
   return (
     <div className="h-full flex items-center justify-center px-8">
       <div className="text-center max-w-sm">
@@ -14,7 +17,7 @@ export default function SignInPrompt({ message }: SignInPromptProps) {
           href="/login"
           className="inline-block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
         >
-          Sign In or Create Account
+          {t('common.signInCreate')}
         </a>
       </div>
     </div>

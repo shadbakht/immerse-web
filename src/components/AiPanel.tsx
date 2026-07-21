@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import PanelSheet from './PanelSheet';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface AiResult {
   title:       string;
@@ -20,6 +21,7 @@ interface AiPanelProps {
 
 export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, isPro }: AiPanelProps) {
   const supabase = createClient();
+  const { t } = useTranslation();
   const [result, setResult] = useState<AiResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +42,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
       if (error) throw error;
       setResult(data);
     } catch (e: any) {
-      setError(e.message ?? 'Failed to get AI summary.');
+      setError(e.message ?? t('ai.error'));
     } finally {
       setLoading(false);
     }
@@ -54,22 +56,22 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
   }
 
   return (
-    <PanelSheet visible={visible} onClose={onClose} title="AI Summary">
+    <PanelSheet visible={visible} onClose={onClose} title={t('ai.summary')}>
       <div className="px-5 py-5">
         {!isPro ? (
           <div className="text-center py-4">
             <div className="text-4xl mb-4">✨</div>
             <p className="text-sm text-gray-600 dark:text-[#8FA4B8] leading-relaxed mb-5">
-              AI passage summaries are a Pro feature. Upgrade to get instant explanations of any passage.
+              {t('ai.upgradeBlurb')}
             </p>
             <button className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors">
-              Upgrade to Pro — $0.99/mo
+              {t('ai.upgradeBtn')}
             </button>
           </div>
         ) : loading ? (
           <div className="flex flex-col items-center py-8 gap-3">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-400 dark:text-[#5C7A8E]">Thinking…</p>
+            <p className="text-sm text-gray-400 dark:text-[#5C7A8E]">{t('ai.thinking')}</p>
           </div>
         ) : error ? (
           <div className="py-6 text-center">
@@ -78,7 +80,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
               onClick={fetchSummary}
               className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
             >
-              Try again
+              {t('common.retry')}
             </button>
           </div>
         ) : result ? (
@@ -97,7 +99,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
               onClick={handleCopy}
               className="mt-5 w-full py-2.5 rounded-xl border border-gray-200 dark:border-[#2D4050] text-sm text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
             >
-              {copied ? '✓ Copied' : 'Copy'}
+              {copied ? t('ai.copied') : t('common.copy')}
             </button>
           </div>
         ) : null}

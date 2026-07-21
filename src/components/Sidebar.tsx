@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { ReactNode } from 'react';
 import type { NavTab } from './AppShell';
+import type { TranslationKey } from '@immerse/i18n';
+import { useTranslation } from '@/contexts/LanguageProvider';
 import {
   HomeIcon,
   LibraryIcon,
@@ -15,13 +17,16 @@ import {
   SettingsIcon,
 } from './Icons';
 
-const NAV_ITEMS: { tab: NavTab; label: string; icon: ReactNode }[] = [
-  { tab: 'home',      label: 'Home',      icon: <HomeIcon      size={20} /> },
-  { tab: 'library',   label: 'Library',   icon: <LibraryIcon   size={20} /> },
-  { tab: 'tags',      label: 'Tags',      icon: <TagIcon       size={18} /> },
-  { tab: 'notes',     label: 'Notes',     icon: <NoteIcon      size={18} /> },
-  { tab: 'xrefs',     label: 'X-Refs',    icon: <XRefIcon      size={18} /> },
-  { tab: 'community', label: 'Discover', icon: <span className="text-base">🌐</span> },
+// Module level, so it cannot call the translation hook — it carries the key
+// and the label is resolved at render, the same shape the mobile screens use
+// for their module-level helpers.
+const NAV_ITEMS: { tab: NavTab; labelKey: TranslationKey; icon: ReactNode }[] = [
+  { tab: 'home',      labelKey: 'nav.home',     icon: <HomeIcon      size={20} /> },
+  { tab: 'library',   labelKey: 'nav.library',  icon: <LibraryIcon   size={20} /> },
+  { tab: 'tags',      labelKey: 'nav.tags',     icon: <TagIcon       size={18} /> },
+  { tab: 'notes',     labelKey: 'nav.notes',    icon: <NoteIcon      size={18} /> },
+  { tab: 'xrefs',     labelKey: 'nav.xrefs',    icon: <XRefIcon      size={18} /> },
+  { tab: 'community', labelKey: 'nav.discover', icon: <span className="text-base">🌐</span> },
 ];
 
 interface SidebarProps {
@@ -31,6 +36,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) {
+  const { t } = useTranslation();
   const [fullName, setFullName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,8 +59,8 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
   }
 
   const displayName = user
-    ? (fullName || user.user_metadata?.full_name || user.email || 'Reader')
-    : 'Guest';
+    ? (fullName || user.user_metadata?.full_name || user.email || t('nav.reader'))
+    : t('nav.guest');
 
   return (
     <div className="w-56 shrink-0 flex flex-col bg-[#1C2B35] text-white h-full">
@@ -66,7 +72,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
 
       {/* Nav items */}
       <nav className="flex-1 py-3">
-        {NAV_ITEMS.map(({ tab, label, icon }) => (
+        {NAV_ITEMS.map(({ tab, labelKey, icon }) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
@@ -77,7 +83,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
             }`}
           >
             <span className="w-5 flex items-center justify-center shrink-0">{icon}</span>
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </nav>
@@ -88,14 +94,14 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
           onClick={user ? handleSignOut : () => router.push('/login')}
           className="text-xs text-white/40 hover:text-white/70 transition-colors"
         >
-          {user ? 'Sign Out' : 'Sign In / Create Account'}
+          {user ? t('nav.signOut') : t('home.signInCreate')}
         </button>
         <button
           onClick={() => onTabChange('settings')}
           className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
         >
           <SettingsIcon size={14} color="currentColor" />
-          Settings
+          {t('nav.settings')}
         </button>
       </div>
     </div>

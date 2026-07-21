@@ -17,6 +17,7 @@ import SignInPrompt from './SignInPrompt';
 import CommunityPanel from './CommunityPanel';
 import TagsScreen from './TagsScreen';
 import XRefsScreen from './XRefsScreen';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
 
@@ -30,14 +31,6 @@ async function resolveBookId(bookId: string): Promise<string> {
     const { slugToUuid } = await loadSlugMaps(createClient());
     return slugToUuid.get(bookId) ?? bookId;
   } catch { return bookId; }
-}
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="h-full flex items-center justify-center text-gray-400 dark:text-[#5C7A8E] text-sm">
-      {label} — coming soon
-    </div>
-  );
 }
 
 export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string } | null;
@@ -57,6 +50,7 @@ interface AppShellProps {
 }
 
 export default function AppShell({ user, initialBookId }: AppShellProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<NavTab>(initialBookId ? 'library' : 'home');
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
     initialBookId ? { bookId: initialBookId } : null,
@@ -149,11 +143,11 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
           {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBookFromHome} onTabChange={tab => setActiveTab(tab as NavTab)} />}
           {activeTab === 'settings'  && <SettingsPanel user={user} />}
           {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'tags'      && !user && <SignInPrompt message="Create and organize quote compilations from across the library." />}
+          {activeTab === 'tags'      && !user && <SignInPrompt message={t('tags.signInBody')} />}
           {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'notes'     && !user && <SignInPrompt message="Attach personal notes to any passage you've highlighted." />}
+          {activeTab === 'notes'     && !user && <SignInPrompt message={t('notes.signInBody')} />}
           {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBook} />}
-          {activeTab === 'xrefs'     && !user && <SignInPrompt message="Link passages across different books and traditions." />}
+          {activeTab === 'xrefs'     && !user && <SignInPrompt message={t('xrefs.signInBody')} />}
           {activeTab === 'community' && <CommunityPanel user={user} onOpenBook={openBook} />}
         </div>
       ) : (
@@ -163,7 +157,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
               <button
                 onClick={() => setLibraryCollapsed(false)}
                 className="mt-4 w-8 h-8 flex items-center justify-center text-gray-400 dark:text-[#5C7A8E] hover:text-gray-700 dark:hover:text-[#B8C7D6] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg transition-colors text-lg font-medium"
-                title="Expand Library"
+                title={t('common.expandLibrary')}
               >
                 ›
               </button>

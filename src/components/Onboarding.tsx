@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import type { TranslationKey } from '@immerse/i18n';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface OnboardingProps {
   visible: boolean;
@@ -8,26 +10,28 @@ interface OnboardingProps {
 }
 
 interface Step {
-  img:     string;
-  title:   string;
-  caption: string;
+  img:        string;
+  titleKey:   TranslationKey;
+  captionKey: TranslationKey;
 }
 
 // Ordered intro screenshots (iPad onboarding set), copied to /public/onboarding.
+// Module level, so the copy is carried as keys and resolved at render.
 const STEPS: Step[] = [
-  { img: '1-Library-main.png',                          title: 'The Library',        caption: 'Browse a curated, multi-tradition library. Tap any book to start reading.' },
-  { img: '2-Library-search-results.png',                title: 'Search everything',  caption: 'Search across every book at once and jump straight to the passage.' },
-  { img: '3-Library-search-reseults-quick-add-Tag-1.png', title: 'Tag as you go',    caption: 'Add a tag to a passage right from the search results.' },
-  { img: '4-Library-search-reseults-quick-add-Tag-2.png', title: 'Build your tags',  caption: 'Group passages under your own tags for easy recall.' },
-  { img: '5-Reader-Screen-selecting-text-action-buttons.png', title: 'Select & act', caption: 'Select any text to highlight, tag, note, or cross-reference it.' },
-  { img: '6-Reader-screen-annotations-in-margin.png',   title: 'Margin annotations', caption: 'Your tags, notes, and cross-references live in the margin.' },
-  { img: '7-Reader-screen-viewing-TOC.png',             title: 'Navigate quickly',   caption: 'Open the table of contents to move around a book.' },
-  { img: '8-Tags-screen-main.png',                      title: 'Your tags',          caption: 'Revisit every tagged passage, organized by tag.' },
-  { img: '9-Xref-screen.png',                           title: 'Cross-references',   caption: 'Link related passages across books and traditions.' },
-  { img: '10-Share-Tag-screen.png',                     title: 'Share & publish',    caption: 'Share a quote or publish a tag for the community.' },
+  { img: '1-Library-main.png',                                titleKey: 'onboarding.libraryTitle',     captionKey: 'onboarding.libraryCaption' },
+  { img: '2-Library-search-results.png',                      titleKey: 'onboarding.searchTitle',      captionKey: 'onboarding.searchCaption' },
+  { img: '3-Library-search-reseults-quick-add-Tag-1.png',     titleKey: 'onboarding.tagAsYouGoTitle',  captionKey: 'onboarding.tagAsYouGoCaption' },
+  { img: '4-Library-search-reseults-quick-add-Tag-2.png',     titleKey: 'onboarding.buildTagsTitle',   captionKey: 'onboarding.buildTagsCaption' },
+  { img: '5-Reader-Screen-selecting-text-action-buttons.png', titleKey: 'onboarding.selectActTitle',   captionKey: 'onboarding.selectActCaption' },
+  { img: '6-Reader-screen-annotations-in-margin.png',         titleKey: 'onboarding.marginTitle',      captionKey: 'onboarding.marginCaption' },
+  { img: '7-Reader-screen-viewing-TOC.png',                   titleKey: 'onboarding.navigateTitle',    captionKey: 'onboarding.navigateCaption' },
+  { img: '8-Tags-screen-main.png',                            titleKey: 'onboarding.yourTagsTitle',    captionKey: 'onboarding.yourTagsCaption' },
+  { img: '9-Xref-screen.png',                                 titleKey: 'onboarding.xrefsTitle',       captionKey: 'onboarding.xrefsCaption' },
+  { img: '10-Share-Tag-screen.png',                           titleKey: 'onboarding.shareTitle',       captionKey: 'onboarding.shareCaption' },
 ];
 
 export default function Onboarding({ visible, onClose }: OnboardingProps) {
+  const { t } = useTranslation();
   const [i, setI] = useState(0);
   const last = STEPS.length - 1;
 
@@ -60,7 +64,7 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
         <button
           onClick={onClose}
           className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-gray-500 dark:text-[#8FA4B8] hover:bg-black/10 transition-colors"
-          aria-label="Close intro"
+          aria-label={t('onboarding.closeIntro')}
         >
           ✕
         </button>
@@ -70,15 +74,15 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/onboarding/${step.img}`}
-            alt={step.title}
+            alt={t(step.titleKey)}
             className="max-w-full max-h-[55vh] object-contain rounded-lg shadow-sm border border-gray-200 dark:border-[#2D4050]"
           />
         </div>
 
         {/* Caption + controls */}
         <div className="shrink-0 px-6 pt-4 pb-5 border-t border-gray-100 dark:border-[#2D4050]">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] text-center">{step.title}</h3>
-          <p className="text-sm text-gray-500 dark:text-[#8FA4B8] text-center mt-1 leading-relaxed min-h-[2.5rem]">{step.caption}</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] text-center">{t(step.titleKey)}</h3>
+          <p className="text-sm text-gray-500 dark:text-[#8FA4B8] text-center mt-1 leading-relaxed min-h-[2.5rem]">{t(step.captionKey)}</p>
 
           {/* Dots */}
           <div className="flex justify-center gap-1.5 mt-3">
@@ -86,7 +90,7 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
               <button
                 key={idx}
                 onClick={() => go(idx)}
-                aria-label={`Go to step ${idx + 1}`}
+                aria-label={t('onboarding.goToStep', { number: idx + 1 })}
                 className={`h-1.5 rounded-full transition-all ${idx === i ? 'w-5 bg-[#1B6B7B] dark:bg-[#2D9DB3]' : 'w-1.5 bg-gray-300 hover:bg-gray-400 dark:hover:bg-[#3F5468]'}`}
               />
             ))}
@@ -99,21 +103,21 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
               disabled={i === 0}
               className="text-sm text-gray-500 dark:text-[#8FA4B8] font-medium px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#2D4050] transition-colors disabled:opacity-0"
             >
-              ← Back
+              ← {t('common.back')}
             </button>
             {i < last ? (
               <button
                 onClick={() => go(i + 1)}
                 className="text-sm font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-5 py-2 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
               >
-                Next →
+                {t('common.next')} →
               </button>
             ) : (
               <button
                 onClick={onClose}
                 className="text-sm font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-5 py-2 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
               >
-                Done
+                {t('common.done')}
               </button>
             )}
           </div>

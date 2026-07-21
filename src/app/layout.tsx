@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
 import AppBanner from '@/components/AppBanner';
+import { LanguageProvider } from '@/contexts/LanguageProvider';
 
 const geist = Geist({ subsets: ['latin'] });
 
@@ -29,10 +30,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    // lang="en" is the server-rendered default; LanguageProvider updates
+    // document.documentElement.lang once the stored choice is known.
     <html lang="en" className="h-full">
       <body className={`${geist.className} h-full bg-[#F8F7F4] dark:bg-[#0F1923] antialiased`}>
-        <AppBanner playStoreId={PLAY_STORE_ID} appStoreId={APP_STORE_ID} />
-        {children}
+        <LanguageProvider>
+          <AppBanner playStoreId={PLAY_STORE_ID} appStoreId={APP_STORE_ID} />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

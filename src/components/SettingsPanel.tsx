@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
 import { applyFontSize, type FontSize } from '@/lib/fontSize';
 import { applyColorMode, getStoredColorMode, type ColorMode } from '@/lib/colorMode';
+import { UI_LANGUAGES } from '@immerse/i18n';
+import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import Onboarding from './Onboarding';
 import type { User } from '@supabase/supabase-js';
 import pkg from '../../package.json';
@@ -29,6 +31,8 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ user }: SettingsPanelProps) {
   const supabase = createClient();
+  const { t } = useTranslation();
+  const { uiLanguage, setUiLanguage } = useLanguage();
   const isGuest = !user;
   const [fontSize, setFontSize] = useState<FontSize>('Large');
   const [colorMode, setColorMode] = useState<ColorMode>('light');
@@ -134,12 +138,12 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-lg mx-auto px-8 py-10">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">Settings</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">{t('nav.settings')}</h1>
 
         {justUpgraded && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-800 text-sm rounded-2xl px-5 py-4 flex items-center gap-3">
             <span className="text-xl">🎉</span>
-            <p><span className="font-semibold">Welcome to Pro!</span> Your subscription is now active.</p>
+            <p><span className="font-semibold">{t('settings.welcomeToPro')}</span> {t('settings.proRestoredBody')}</p>
           </div>
         )}
 
@@ -153,14 +157,14 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
             {/* Account */}
             <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">Account</span>
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.account')}</span>
               </div>
 
               {!isGuest && (
                 <>
                   {/* Full Name */}
                   <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">Full Name</span>
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.fullName')}</span>
                     {editingName ? (
                       <div className="flex items-center gap-2 flex-1">
                         <input
@@ -171,21 +175,21 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                           className="flex-1 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3]"
                         />
                         <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold hover:underline disabled:opacity-50">
-                          {nameSaving ? 'Saving…' : 'Save'}
+                          {nameSaving ? t('common.saving') : t('common.save')}
                         </button>
-                        <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8]">Cancel</button>
+                        <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8]">{t('common.cancel')}</button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-3 flex-1 justify-end">
                         <span className="text-sm text-gray-700 dark:text-[#B8C7D6]">{fullName || '—'}</span>
-                        <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">Edit</button>
+                        <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{t('settings.edit')}</button>
                       </div>
                     )}
                   </div>
 
                   {/* Username */}
                   <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">Username</span>
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.username')}</span>
                     <span className="text-sm text-gray-700 dark:text-[#B8C7D6]">@{username || '—'}</span>
                   </div>
                 </>
@@ -193,10 +197,13 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
 
               {/* Plan */}
               <div className="px-5 py-4 flex items-center justify-between">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">Plan</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.plan')}</span>
                 <div className="flex items-center gap-3">
                   <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B] dark:text-[#2D9DB3]' : 'text-gray-500 dark:text-[#8FA4B8]'}`}>
-                    {isGuest ? 'Guest' : isTrial ? 'Pro Trial' : isPro ? 'Pro' : 'Standard'}
+                    {isGuest ? t('settings.planGuest')
+                      : isTrial ? t('settings.planTrial')
+                      : isPro ? t('settings.planPro')
+                      : t('settings.planStandard')}
                   </span>
                   {!isGuest && (isPro && !isTrial ? (
                     <button
@@ -204,7 +211,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                       disabled={stripeLoading}
                       className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8] hover:underline disabled:opacity-50"
                     >
-                      {stripeLoading ? 'Loading…' : 'Manage'}
+                      {stripeLoading ? t('common.loading') : t('settings.manage')}
                     </button>
                   ) : (
                     <button
@@ -212,7 +219,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                       disabled={stripeLoading}
                       className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-50"
                     >
-                      {stripeLoading ? 'Loading…' : 'Upgrade — $0.99/mo'}
+                      {stripeLoading ? t('common.loading') : t('settings.upgradeCta')}
                     </button>
                   ))}
                   {isGuest && (
@@ -224,6 +231,34 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     </a>
                   )}
                 </div>
+              </div>
+            </section>
+
+            {/* Language — the interface only. Which library you read is a
+                separate control in the Library header, as on mobile. */}
+            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.language')}</span>
+              </div>
+              <div className="px-5 py-4">
+                <div className="flex gap-2">
+                  {UI_LANGUAGES.map(({ code, label }) => (
+                    <button
+                      key={code}
+                      onClick={() => setUiLanguage(code)}
+                      className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                        uiLanguage === code
+                          ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
+                          : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-3">
+                  {t('settings.appLanguageHint')}
+                </p>
               </div>
             </section>
 
@@ -250,7 +285,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                   ))}
                 </div>
                 <p className="text-gray-500 dark:text-[#8FA4B8] border-t border-gray-100 dark:border-[#2D4050] pt-3" style={{ fontSize: previewSize, lineHeight: 1.7 }}>
-                  Preview text at {fontSize} size.
+                  {t('settings.fontPreview', { size: fontSize })}
                 </p>
               </div>
             </section>

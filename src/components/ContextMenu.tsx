@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 export interface MenuOption {
   label: string;
@@ -11,6 +12,7 @@ export interface MenuOption {
 }
 
 export function ContextMenu({ options }: { options: MenuOption[] }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,7 +43,7 @@ export function ContextMenu({ options }: { options: MenuOption[] }) {
         ref={buttonRef}
         onClick={handleOpen}
         className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg transition-colors shrink-0"
-        title="Options"
+        title={t('common.options')}
       >
         <span className="text-gray-400 dark:text-[#5C7A8E] text-lg">⋮</span>
       </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface AppBannerProps {
   playStoreId: string;   // e.g. "com.shadbakht.immerse" — empty = hidden
@@ -11,6 +12,7 @@ interface AppBannerProps {
 }
 
 export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<'android' | 'ios' | null>(null);
 
@@ -61,7 +63,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
       <div className="flex-1 min-w-0">
         <div className="text-base font-semibold leading-tight">Immerse</div>
         <div className="text-sm text-white/60 mt-1">
-          {platform === 'android' ? 'Get it on Google Play' : 'Download on the App Store'}
+          {platform === 'android' ? t('banner.googlePlay') : t('banner.appStore')}
         </div>
       </div>
 
@@ -70,14 +72,14 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
         onClick={openStore}
         className="shrink-0 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
       >
-        {platform === 'android' ? 'Install' : 'Get'}
+        {platform === 'android' ? t('banner.install') : t('banner.get')}
       </button>
 
       {/* Dismiss */}
       <button
         onClick={dismiss}
         className="shrink-0 text-white/40 hover:text-white/80 transition-colors text-xl leading-none ml-1.5"
-        aria-label="Dismiss"
+        aria-label={t('common.dismiss')}
       >
         ✕
       </button>

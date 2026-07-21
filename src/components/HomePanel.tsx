@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { loadCatalog, loadSlugMaps, collectionName } from '@/lib/catalog';
 import type { Catalog } from '@/lib/catalog';
 import { ContextMenu, type MenuOption } from './ContextMenu';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface Stats {
   tags: number;
@@ -29,6 +30,7 @@ interface HomePanelProps {
 
 export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanelProps) {
   const supabase = createClient();
+  const { t, uiLanguage } = useTranslation();
   const [stats, setStats]           = useState<Stats>({ tags: 0, notes: 0, xrefs: 0 });
   const [recentBooks, setRecentBooks] = useState<RecentBook[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -98,22 +100,24 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
   function formatDate(iso: string) {
     const d = new Date(iso);
     const diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    if (diff < 3600)   return t('common.minutesAgo', { count: Math.floor(diff / 60) });
+    if (diff < 86400)  return t('common.hoursAgo',   { count: Math.floor(diff / 3600) });
+    if (diff < 604800) return t('common.daysAgo',    { count: Math.floor(diff / 86400) });
+    // Month names come from the UI language, not the browser's, so the whole
+    // row reads in one language.
+    return d.toLocaleDateString(uiLanguage, { month: 'short', day: 'numeric' });
   }
 
   const statItems = [
-    { label: 'Tags',   count: stats.tags,  color: '#3B82F6', tab: 'tags'  },
-    { label: 'Notes',  count: stats.notes, color: '#F59E0B', tab: 'notes' },
-    { label: 'X-Refs', count: stats.xrefs, color: '#10B981', tab: 'xrefs' },
+    { label: t('home.tags'),  count: stats.tags,  color: '#3B82F6', tab: 'tags'  },
+    { label: t('home.notes'), count: stats.notes, color: '#F59E0B', tab: 'notes' },
+    { label: t('home.xrefs'), count: stats.xrefs, color: '#10B981', tab: 'xrefs' },
   ];
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-2xl mx-auto px-8 py-10">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">Home</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">{t('nav.home')}</h1>
 
         {loading ? (
           <div className="flex justify-center py-16">
@@ -139,28 +143,28 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
 
             {/* Recently read */}
             <h2 className="text-sm font-semibold text-gray-400 dark:text-[#5C7A8E] uppercase tracking-widest mb-4">
-              Recently Read
+              {t('home.recentlyViewed')}
             </h2>
             {!userId ? (
               <div className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm px-6 py-8 text-center">
                 <p className="text-sm text-gray-600 dark:text-[#8FA4B8] leading-relaxed mb-4">
-                  Sign in to see your recently read books, annotations, and more across all your devices.
+                  {t('home.signInBlurb')}
                 </p>
                 <a
                   href="/login"
                   className="inline-block bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-2.5 px-6 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
                 >
-                  Sign In or Create Account
+                  {t('common.signInCreate')}
                 </a>
               </div>
             ) : recentBooks.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-[#5C7A8E]">No reading history yet. Open a book from the Library to get started.</p>
+              <p className="text-sm text-gray-400 dark:text-[#5C7A8E]">{t('home.startReadingHint')}</p>
             ) : (
               <div className="space-y-2">
                 {recentBooks.map(book => {
                   const pct = Math.min(100, Math.max(0, Math.round(book.fraction * 100)));
                   const menuOptions: MenuOption[] = [{
-                    label: 'Remove from recently read',
+                    label: t('home.removeFromRecent'),
                     icon: '✕',
                     color: 'danger',
                     onClick: () => handleRemoveRecentBook(book.bookId),

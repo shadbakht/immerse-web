@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import PanelSheet from './PanelSheet';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface NotePanelProps {
   visible:       boolean;
@@ -11,6 +12,7 @@ interface NotePanelProps {
 }
 
 export default function NotePanel({ visible, onClose, selectionText, onSave }: NotePanelProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -37,18 +39,18 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
     <PanelSheet
       visible={visible}
       onClose={onClose}
-      title="Add Note"
+      title={t('note.addTitle')}
       footer={
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2D4050] text-sm text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors">
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !content.trim()}
             className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-40"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
       }
@@ -67,7 +69,7 @@ export default function NotePanel({ visible, onClose, selectionText, onSave }: N
           ref={textareaRef}
           value={content}
           onChange={e => setContent(e.target.value)}
-          placeholder="Write your note…"
+          placeholder={t('note.placeholder')}
           rows={5}
           className="w-full border border-gray-200 dark:border-[#2D4050] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-[#E2EAF2] outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] resize-none leading-relaxed"
         />
