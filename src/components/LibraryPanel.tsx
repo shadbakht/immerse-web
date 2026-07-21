@@ -10,15 +10,13 @@ import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { semanticSearch, reciprocalRankFusion, SEMANTIC_SEARCH_ENABLED } from '@/lib/semanticSearch';
+import { useTranslation } from '@/contexts/LanguageProvider';
+import { LANGUAGE_LABELS } from '@immerse/i18n';
 
 // Categories whose books have no canonical order and should display
 // alphabetically (mirrors the mobile LibraryScreen normalised sort).
 // Scripture categories (Bible, Tanakh, Qur'an, GGS, etc.) are left in their
 // catalog (canonical) order.
-const LANGUAGE_LABELS: Record<string, string> = {
-  en: 'English', es: 'Español', pt: 'Português', fr: 'Français',
-};
-
 const ALPHA_SORTED_CATEGORIES = new Set([
   'cat-bahai-bahullh',        // Bahá'u'lláh
   'cat-bahai-abdulbah',       // ‘Abdu'l-Bahá
@@ -61,6 +59,7 @@ interface ImportedBook {
 
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
+  const { t } = useTranslation();
 
   const [catalog, setCatalog]   = useState<Catalog | null>(null);
   const [slugMap, setSlugMap]   = useState<Map<string, string>>(new Map());
@@ -139,7 +138,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   function handleImportClick() {
     if (!userId) return;
     if (!isPro) {
-      setImportMsg({ text: 'Book import is a Pro feature. Upgrade in Settings to import your own books.', isError: false });
+      setImportMsg({ text: t('library.importProFeature'), isError: false });
       setTimeout(() => setImportMsg(null), 4000);
       return;
     }
@@ -160,9 +159,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     setImporting(false);
 
     if (!result.success) {
-      setImportMsg({ text: result.error ?? 'Import failed.', isError: true });
+      setImportMsg({ text: result.error ?? t('library.importFailed'), isError: true });
     } else {
-      setImportMsg({ text: `"${result.title}" imported successfully.`, isError: false });
+      setImportMsg({ text: t('library.importSucceeded', { title: result.title ?? '' }), isError: false });
       setTimeout(() => setImportMsg(null), 3000);
       await loadImportedBooks();
     }
@@ -651,7 +650,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Library</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">{t('library.title')}</h2>
             {/* The active language always reads out, and sits in its own pill:
                 a bare chevron on the heading looked like decoration, so nobody
                 found the switcher. */}
@@ -662,7 +661,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
                 </svg>
                 <select
-                  aria-label="Library language"
+                  aria-label={t('library.languageSheetTitle')}
                   value={contentLang}
                   onChange={e => setContentLang(e.target.value)}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -678,7 +677,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             {userId && (
               <button
                 onClick={handleImportClick}
-                title="Import a book (TXT, EPUB, DOCX, RTF, PDF)"
+                title={t('library.importTitle')}
                 disabled={importing}
                 className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#145860] bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 hover:bg-[#1B6B7B]/20 dark:hover:bg-[#2D9DB3]/20 rounded-lg transition-colors disabled:opacity-50"
               >
@@ -696,7 +695,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               <button
                 onClick={onCollapse}
                 className="w-7 h-7 flex items-center justify-center text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#145860] bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 hover:bg-[#1B6B7B]/20 dark:hover:bg-[#2D9DB3]/20 rounded-lg transition-colors text-base"
-                title="Collapse Library"
+                title={t('common.collapseLibrary')}
               >
                 ‹
               </button>
@@ -716,14 +715,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={selectedSlugs.size > 0 ? `Search ${selectedSlugs.size} selected book${selectedSlugs.size !== 1 ? 's' : ''}…` : 'Search all books…'}
+            placeholder={selectedSlugs.size > 0 ? t('library.searchSelected', { count: selectedSlugs.size }) : t('library.searchAll')}
             className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {(searchQuery || selectedSlugs.size > 0 || checkedResultIds.size > 0) && (
             <button
               onClick={() => { setSearchQuery(''); setSearchResults([]); setSelectedSlugs(new Set()); setCheckedResultIds(new Set()); }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]"
-            >Clear</button>
+            >{t('common.clear')}</button>
           )}
         </div>
         {SEMANTIC_SEARCH_ENABLED && searchQuery.trim() && selectedSlugs.size === 0 && (
@@ -738,7 +737,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
             </svg>
-            Related passages{semanticOn ? ' · on' : ''}
+            {t('library.relatedPassages')}{semanticOn ? ` · ${t('library.relatedOn')}` : ''}
           </button>
         )}
       </div>
@@ -756,10 +755,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               <div className="w-5 h-5 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : searchResults.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-10">No results for "{searchQuery}"</p>
+            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-10">{t('library.noResultsFor', { query: searchQuery })}</p>
           ) : (
             <div>
-              <p className="text-xs text-gray-400 dark:text-[#5C7A8E] px-4 py-2">{searchResults.length} results</p>
+              <p className="text-xs text-gray-400 dark:text-[#5C7A8E] px-4 py-2">{t('library.result', { count: searchResults.length })}</p>
               {searchResults.map(result => {
                 const isExpanded = expandedResults.has(result.passageId);
                 const isChecked  = checkedResultIds.has(result.passageId);
@@ -778,7 +777,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         onClick={() => setExpandedResults(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
                       >
                         <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mb-1 truncate">
-                          {result.semantic ? 'RELATED · ' : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
+                          {result.semantic ? `${t('library.relatedPrefix')} · ` : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
                           {isExpanded ? highlightQuery(result.content, searchQuery) : highlightQuery(snippet, searchQuery)}
@@ -788,7 +787,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                             onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, searchQuery.trim()); }}
                             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                           >
-                            Open in reader →
+                            {t('common.openInReader')} →
                           </button>
                         )}
                       </div>
@@ -842,7 +841,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   onClick={() => setMyBooksOpen(v => !v)}
                   className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
                 >
-                  <span className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">My Books</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{t('library.myBooks')}</span>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {importedBooks.length > 0 && (
                       <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{importedBooks.length}</span>
@@ -855,7 +854,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 <div className="bg-gray-50/30">
                   {importedBooks.length === 0 ? (
                     <p className="text-xs text-gray-400 dark:text-[#5C7A8E] pl-9 pr-4 py-3">
-                      No imported books yet. Use the button near the search bar to import a book.
+                      {t('library.noImportedBooks')}
                     </p>
                   ) : (
                     importedBooks.map(book => (
@@ -877,12 +876,12 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       {/* Tag action bar */}
       {checkedResultIds.size > 0 && (
         <div className="border-t border-gray-200 dark:border-[#2D4050] px-4 py-3 bg-white dark:bg-[#1B2A38] flex items-center justify-between gap-3 shrink-0">
-          <button onClick={() => setCheckedResultIds(new Set())} className="text-sm text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] transition-colors">Cancel</button>
+          <button onClick={() => setCheckedResultIds(new Set())} className="text-sm text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] transition-colors">{t('common.cancel')}</button>
           <button
             onClick={() => setTagPanelVisible(true)}
             className="flex-1 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
           >
-            Tag ({checkedResultIds.size})
+            {t('library.tagAction')} ({checkedResultIds.size})
           </button>
         </div>
       )}
@@ -920,23 +919,24 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
   onOpen: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (confirmDelete) {
     return (
       <div className="flex items-center border-b border-gray-100 dark:border-[#2D4050] px-4 py-2.5 bg-red-50/60">
-        <span className="text-xs text-gray-600 dark:text-[#8FA4B8] flex-1 truncate pr-2">Delete &quot;{book.title}&quot;?</span>
+        <span className="text-xs text-gray-600 dark:text-[#8FA4B8] flex-1 truncate pr-2">{t('library.deleteBookConfirm', { title: book.title })}</span>
         <button
           onClick={() => { setConfirmDelete(false); onDelete(); }}
           className="text-xs text-red-600 font-medium hover:text-red-700 mr-3 shrink-0"
         >
-          Delete
+          {t('common.delete')}
         </button>
         <button
           onClick={() => setConfirmDelete(false)}
           className="text-xs text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] shrink-0"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
       </div>
     );
@@ -952,7 +952,7 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
       </button>
       <button
         onClick={() => setConfirmDelete(true)}
-        title="Delete"
+        title={t('common.delete')}
         className="opacity-0 group-hover:opacity-100 shrink-0 p-1.5 text-gray-400 dark:text-[#5C7A8E] hover:text-red-500 transition-all mr-1"
       >
         <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor">

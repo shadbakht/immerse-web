@@ -14,6 +14,7 @@ import { TagIcon, NoteIcon, XRefIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
 import { loadSlugMaps } from '@/lib/catalog';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface Passage {
   id: string;
@@ -246,6 +247,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
   fetchQuotes: (tagId: string) => Promise<TagQuote[]>;
   onOpenBook?: (bookId: string, passageId: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [quotes, setQuotes] = useState<TagQuote[] | null>(null);
   const children = allTags.filter(t => t.parent_id === tag.id);
@@ -273,9 +275,9 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
         <div>
           <div style={{ paddingLeft: 20 + depth * 18 + 24 }} className="pr-4">
             {quotes === null ? (
-              <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">Loading…</p>
+              <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">{t('common.loading')}</p>
             ) : quotes.length === 0 ? (
-              <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">No quotes filed here.</p>
+              <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">{t('reader.noQuotesFiled')}</p>
             ) : (
               <div className="space-y-1.5 pb-1.5">
                 {quotes.map(q => <TagQuoteRow key={q.id} quote={q} onOpenBook={onOpenBook} />)}
@@ -292,6 +294,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
 }
 
 function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (bookId: string, passageId: string) => void }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="px-3 py-2 bg-gray-50 dark:bg-[#243040] rounded-lg border border-gray-100 dark:border-[#2D4050]">
@@ -308,7 +311,7 @@ function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (boo
               onClick={() => onOpenBook(quote.bookId!, quote.passageId)}
               className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
-              Open in reader →
+              {t('common.openInReader')} →
             </button>
           )}
         </>
@@ -322,8 +325,9 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
   onOpenBook?: (bookId: string, passageId: string) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const menuOptions: MenuOption[] = [{ label: 'Delete', icon: '🗑️', color: 'danger', onClick: onDelete }];
+  const menuOptions: MenuOption[] = [{ label: t('common.delete'), icon: '🗑️', color: 'danger', onClick: onDelete }];
   return (
     <div className="bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050] overflow-hidden">
       <div className="px-4 py-3 flex items-start gap-2">
@@ -340,7 +344,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
               onClick={() => onOpenBook(entry.otherBookId!, entry.otherPassageId)}
               className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
-              Open in reader →
+              {t('common.openInReader')} →
             </button>
           )}
         </div>
@@ -354,6 +358,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
 
 export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone }: ReaderPanelProps) {
   const supabase = createClient();
+  const { t } = useTranslation();
   const [passages, setPassages] = useState<Passage[]>([]);
   const [book, setBook] = useState<BookMeta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -608,7 +613,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       try {
         const record = await getLocalBook(localId);
         if (!record) {
-          setBook({ title: 'Book not found', authorName: '', citationFormat: 'author_book_paragraph' });
+          setBook({ title: t('reader.bookNotFound'), authorName: '', citationFormat: 'author_book_paragraph' });
           setLoading(false);
           return;
         }
@@ -640,7 +645,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         }
       } catch (err) {
         console.error('[ReaderPanel] local book load error:', err);
-        setBook({ title: 'Could not load book', authorName: '', citationFormat: 'author_book_paragraph' });
+        setBook({ title: t('reader.contentLoadFailed'), authorName: '', citationFormat: 'author_book_paragraph' });
       }
       setLoading(false);
       return;
@@ -666,7 +671,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         bookId = resolved;
       } else {
         console.error('[ReaderPanel] could not resolve book slug to uuid:', bookId);
-        setBook({ title: 'Could not load book', authorName: '', citationFormat: 'author_book_paragraph' });
+        setBook({ title: t('reader.contentLoadFailed'), authorName: '', citationFormat: 'author_book_paragraph' });
         setLoading(false);
         return;
       }
@@ -1042,7 +1047,7 @@ async function handleCopy() {
   async function handleDeleteNote() {
     if (!annotationPanel || annotationPanel.type !== 'note') return;
     const data = passageToNote.get(annotationPanel.passageId);
-    if (!data || !confirm('Delete this note?')) return;
+    if (!data || !confirm(`${t('note.deleteTitle')}\n\n${t('note.deleteBody')}`)) return;
     try {
       await supabase.from('notes').delete().eq('id', data.noteId);
       deleteRemote('notes', data.noteId).catch(() => {});
@@ -1121,7 +1126,7 @@ async function handleCopy() {
   }
 
   async function handleDeleteXref(passageId: string, xrefId: string) {
-    if (!confirm('Delete this cross-reference?')) return;
+    if (!confirm(t('xrefs.deleteConfirm'))) return;
     try {
       await supabase.from('xrefs').delete().eq('id', xrefId);
       deleteRemote('xrefs', xrefId).catch(() => {});
@@ -1425,7 +1430,7 @@ async function handleCopy() {
       <div className="h-full flex items-center justify-center text-gray-300 dark:text-[#4A6478]">
         <div className="text-center">
           <div className="text-5xl mb-3">✦</div>
-          <p className="text-sm">Select a book to begin reading</p>
+          <p className="text-sm">{t('reader.selectBook')}</p>
         </div>
       </div>
     );
@@ -1486,7 +1491,7 @@ async function handleCopy() {
         <button
           onClick={() => setTocOpen(o => !o)}
           className="absolute top-4 right-4 z-20 p-2 bg-white dark:bg-[#1B2A38] border border-gray-200 dark:border-[#2D4050] rounded-lg hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors shadow-sm"
-          title="Table of Contents"
+          title={t('reader.tableOfContents')}
         >
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
             <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-[#8FA4B8]" />
@@ -1505,7 +1510,7 @@ async function handleCopy() {
           <div className="absolute inset-0 z-10" onClick={() => setTocOpen(false)} />
           <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white dark:bg-[#1B2A38] rounded-xl shadow-xl border border-gray-200 dark:border-[#2D4050]">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-[#2D4050] font-semibold text-sm text-gray-700 dark:text-[#B8C7D6]">
-              Table of Contents
+              {t('reader.tableOfContents')}
             </div>
             {tocDisplay.map(({ entry, i, key, hasChildren }) => (
               <div key={i} className="flex items-stretch border-b border-gray-50 dark:border-[#2D4050]/60 last:border-0">
@@ -1521,8 +1526,8 @@ async function handleCopy() {
                   <button
                     onClick={() => toggleTocSection(key)}
                     className="w-10 shrink-0 flex items-center justify-center text-gray-400 dark:text-[#5C7A8E] hover:text-gray-700 dark:hover:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
-                    title={collapsedToc.has(key) ? 'Expand' : 'Collapse'}
-                    aria-label={collapsedToc.has(key) ? 'Expand section' : 'Collapse section'}
+                    title={collapsedToc.has(key) ? t('reader.expand') : t('reader.collapse')}
+                    aria-label={collapsedToc.has(key) ? t('reader.expandSection') : t('reader.collapseSection')}
                   >
                     <span className={`text-base inline-block transition-transform duration-150 ${collapsedToc.has(key) ? '' : 'rotate-90'}`}>›</span>
                   </button>
@@ -1541,15 +1546,15 @@ async function handleCopy() {
           style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
           {(editingSel
-            ? [{ label: savingEdit ? 'Updating…' : 'Update selection', onClick: confirmEditSelection }]
+            ? [{ label: savingEdit ? t('reader.updating') : t('reader.updateSelection'), onClick: confirmEditSelection }]
             : xrefPickFrom
-            ? [{ label: 'Pick as X-Ref', onClick: handlePickFromSelection }]
+            ? [{ label: t('reader.pickAsXref'), onClick: handlePickFromSelection }]
             : [
-                { label: 'Tag',  onClick: () => openPanel('tag') },
-                { label: 'Note', onClick: () => openPanel('note') },
-                { label: 'Xref', onClick: handleXrefStart },
-                { label: 'AI',   onClick: () => openPanel('ai') },
-                { label: 'Copy', onClick: handleCopy },
+                { label: t('reader.actionTag'),  onClick: () => openPanel('tag') },
+                { label: t('reader.actionNote'), onClick: () => openPanel('note') },
+                { label: t('reader.actionXref'), onClick: handleXrefStart },
+                { label: t('reader.actionAi'),   onClick: () => openPanel('ai') },
+                { label: t('reader.actionCopy'), onClick: handleCopy },
               ]
           ).map(({ label, onClick }, i, arr) => (
             <div key={label} className="flex items-center">
@@ -1570,7 +1575,7 @@ async function handleCopy() {
       {editingSel && (
         <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
           <p className="flex-1 min-w-0 text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">
-            Highlight the new text for this annotation, then choose <span className="font-semibold">Update selection</span>.
+            {t('reader.editSelectionHint')} <span className="font-semibold">{t('reader.updateSelection')}</span>.
           </p>
           <button
             onClick={cancelEditSelection}
@@ -1588,11 +1593,11 @@ async function handleCopy() {
             {pickSaving ? (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] font-medium">Saving cross-reference…</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] font-medium">{t('reader.savingXref')}</span>
               </div>
             ) : (
               <>
-                <p className="text-sm font-semibold text-[#1B6B7B] dark:text-[#2D9DB3]">Select text or click a passage to link</p>
+                <p className="text-sm font-semibold text-[#1B6B7B] dark:text-[#2D9DB3]">{t('reader.pickTargetHint')}</p>
                 <p className="text-xs text-gray-500 dark:text-[#8FA4B8] truncate mt-0.5">
                   "{xrefPickFrom.text.length > 80 ? xrefPickFrom.text.slice(0, 80) + '…' : xrefPickFrom.text}"
                 </p>
@@ -1751,7 +1756,7 @@ async function handleCopy() {
                         <button
                           onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}
                           className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
-                          title="View tags"
+                          title={t('reader.viewTags')}
                         >
                           <TagIcon size={20} />
                         </button>
@@ -1760,7 +1765,7 @@ async function handleCopy() {
                         <button
                           onClick={e => { e.stopPropagation(); handleNoteIconClick(passage.id); }}
                           className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
-                          title="View note"
+                          title={t('reader.viewNote')}
                         >
                           <NoteIcon size={20} />
                         </button>
@@ -1769,7 +1774,7 @@ async function handleCopy() {
                         <button
                           onClick={e => { e.stopPropagation(); handleXrefIconClick(passage.id); }}
                           className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
-                          title="View cross-references"
+                          title={t('reader.viewXrefs')}
                         >
                           <XRefIcon size={20} />
                         </button>
@@ -1813,10 +1818,10 @@ async function handleCopy() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-bold text-[#1B6B7B] dark:text-[#2D9DB3] uppercase tracking-widest mb-2 block">
-                  Footnote {activeFootnote.num}
+                  {t('reader.footnote')} {activeFootnote.num}
                 </span>
                 <p className="text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed">
-                  {activeFootnote.text || <span className="text-gray-400 dark:text-[#5C7A8E]">Footnote text not available in the web version.</span>}
+                  {activeFootnote.text || <span className="text-gray-400 dark:text-[#5C7A8E]">{t('reader.footnoteUnavailable')}</span>}
                 </p>
               </div>
               <button
@@ -1831,17 +1836,17 @@ async function handleCopy() {
       )}
 
       {/* Sign-in prompt for guests */}
-      <PanelSheet visible={activePanel === 'signin'} onClose={closePanel} title="Sign In Required">
+      <PanelSheet visible={activePanel === 'signin'} onClose={closePanel} title={t('reader.signInRequired')}>
         <div className="px-5 py-8 text-center">
           <div className="text-4xl mb-4">✦</div>
           <p className="text-sm text-gray-600 dark:text-[#8FA4B8] leading-relaxed mb-6">
-            Sign in to tag, annotate, and save passages across all your devices.
+            {t('reader.signInBody')}
           </p>
           <a
             href="/login"
             className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
           >
-            Sign In or Create Account
+            {t('common.signInCreate')}
           </a>
         </div>
       </PanelSheet>
@@ -1880,7 +1885,7 @@ async function handleCopy() {
           <PanelSheet
             visible={annotationPanel?.type === 'tags'}
             onClose={closeAnnotationPanel}
-            title="Tags"
+            title={t('tagPanel.viewTitle')}
           >
             {data && (
               <div className="pt-4 pb-4">
@@ -1891,10 +1896,10 @@ async function handleCopy() {
                   onClick={() => startEditSelection([data.selectionId], { type: 'tags', passageId: annotationPanel!.passageId })}
                   className="mx-5 mb-3 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                 >
-                  Edit text selection
+                  {t('panel.editSelection')}
                 </button>
                 {data.tags.length === 0 ? (
-                  <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-4">No tags on this selection.</p>
+                  <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-4">{t('tagPanel.emptyView')}</p>
                 ) : (
                   <div>
                     {data.tags.map(tag => (
@@ -1922,20 +1927,20 @@ async function handleCopy() {
           <PanelSheet
             visible={annotationPanel?.type === 'note'}
             onClose={closeAnnotationPanel}
-            title="Note"
+            title={t('note.title')}
             footer={
               <div className="flex gap-3">
                 <button
                   onClick={handleDeleteNote}
                   className="px-4 py-2.5 rounded-xl border border-red-200 text-sm text-red-600 hover:bg-red-50 transition-colors"
                 >
-                  Delete
+                  {t('common.delete')}
                 </button>
                 <button
                   onClick={handleSaveEditNote}
                   className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
                 >
-                  Save
+                  {t('common.save')}
                 </button>
               </div>
             }
@@ -1949,7 +1954,7 @@ async function handleCopy() {
                   onClick={() => startEditSelection([data.selectionId], { type: 'note', passageId: annotationPanel!.passageId })}
                   className="mb-4 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                 >
-                  Edit text selection
+                  {t('panel.editSelection')}
                 </button>
                 <textarea
                   autoFocus
@@ -1985,7 +1990,7 @@ async function handleCopy() {
           <PanelSheet
             visible={annotationPanel?.type === 'xrefs'}
             onClose={closeAnnotationPanel}
-            title="Cross-Reference"
+            title={t('xref.title')}
           >
             <div className="px-5 pt-4 pb-4">
               {thisSnap && (
@@ -1998,11 +2003,11 @@ async function handleCopy() {
                   onClick={() => startEditSelection(editSelIds, { type: 'xrefs', passageId: annotationPanel!.passageId })}
                   className="mb-4 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                 >
-                  Edit text selection
+                  {t('panel.editSelection')}
                 </button>
               )}
               {entries.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-4">No cross-references found.</p>
+                <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-4">{t('xref.noneFound')}</p>
               ) : (
                 <div className="space-y-3">
                   {entries.map(entry => (

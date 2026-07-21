@@ -8,6 +8,8 @@ import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
 import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
+import { useTranslation } from '@/contexts/LanguageProvider';
+import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 
 interface NoteRow {
   noteId:       string;
@@ -30,17 +32,24 @@ interface NotesScreenProps {
   onOpenBook: (bookId: string, passageId?: string) => void;
 }
 
-function formatDate(iso: string) {
+// Module-level, so the locale has to be handed in rather than hooked for.
+function formatDate(
+  iso: string,
+  t: (key: TranslationKey, vars?: TranslateVars) => string,
+  uiLanguage: string,
+) {
   const d = new Date(iso), diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (diff < 3600)   return t('common.minutesAgo', { count: Math.floor(diff / 60) });
+  if (diff < 86400)  return t('common.hoursAgo',   { count: Math.floor(diff / 3600) });
+  if (diff < 604800) return t('common.daysAgo',    { count: Math.floor(diff / 86400) });
+  // Month names follow the UI language, not the browser's, so the row reads
+  // in one language.
+  return d.toLocaleDateString(uiLanguage, { month: 'short', day: 'numeric' });
 }
 
 // "June 2026" — section header for the by-date journal view
-function formatMonthLabel(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+function formatMonthLabel(iso: string, uiLanguage: string) {
+  return new Date(iso).toLocaleDateString(uiLanguage, { month: 'long', year: 'numeric' });
 }
 
 // Stable year-month grouping key (e.g. "2026-05")
@@ -59,6 +68,7 @@ function NoteItem({
   onSave:   (id: string, content: string) => void;
   dateIso?: string;
 }) {
+  const { t, uiLanguage }       = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing]   = useState(false);
   const [draft, setDraft]       = useState(note.content);
@@ -73,8 +83,8 @@ function NoteItem({
   };
 
   const menuOptions: MenuOption[] = [
-    { label: 'Edit', icon: '✏️', onClick: startEdit },
-    { label: 'Delete', icon: '🗑️', color: 'danger', onClick: () => { if (confirm('Delete this note?')) onDelete(note.noteId); } },
+    { label: t('common.edit'), icon: '✏️', onClick: startEdit },
+    { label: t('common.delete'), icon: '🗑️', color: 'danger', onClick: () => { if (confirm(`${t('notes.deleteConfirm')}\n\n${t('notes.deleteBody')}`)) onDelete(note.noteId); } },
   ];
 
   return (
@@ -83,7 +93,7 @@ function NoteItem({
         variant="note"
         quote={note.snapshotText}
         citation={note.citation}
-        date={formatDate(dateIso ?? note.updatedAt)}
+        date={formatDate(dateIso ?? note.updatedAt, t, uiLanguage)}
         query={searchQuery}
         quoteLines={1}
         citationFirst
@@ -94,7 +104,7 @@ function NoteItem({
             onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
             className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
           >
-            Open in reader →
+            {t('common.openInReader')} →
           </button>
         ) : undefined}
       >
@@ -112,9 +122,9 @@ function NoteItem({
             />
             <div className="flex gap-2 justify-end mt-2">
               <button onClick={cancelEdit}
-                className="px-3 py-1.5 text-xs text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg">Cancel</button>
+                className="px-3 py-1.5 text-xs text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-100 dark:hover:bg-[#2D4050] rounded-lg">{t('common.cancel')}</button>
               <button onClick={saveEdit}
-                className="px-3 py-1.5 text-xs bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90">Save</button>
+                className="px-3 py-1.5 text-xs bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90">{t('common.save')}</button>
             </div>
           </div>
         ) : (
@@ -129,6 +139,7 @@ function NoteItem({
 
 export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   const supabase = createClient();
+  const { t, uiLanguage } = useTranslation();
   const [notes, setNotes]               = useState<NoteRow[]>([]);
   const [loading, setLoading]           = useState(true);
   const [searchQuery, setSearchQuery]   = useState('');
@@ -194,7 +205,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           bookSlug,
           bookTitle:   catBook?.title ?? '',
           rootCatId:   root?.id   ?? 'uncategorized',
-          rootCatName: root?.name ?? 'Other',
+          rootCatName: root?.name ?? t('common.otherTradition'),
           rootCatSort: root?.sortOrder ?? 9999,
         });
       }
@@ -280,13 +291,13 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     for (const n of sorted) {
       const k = monthKey(n.createdAt);
       if (!cur || cur.key !== k) {
-        cur = { key: k, label: formatMonthLabel(n.createdAt), notes: [] };
+        cur = { key: k, label: formatMonthLabel(n.createdAt, uiLanguage), notes: [] };
         groups.push(cur);
       }
       cur.notes.push(n);
     }
     return groups;
-  }, [filtered]);
+  }, [filtered, uiLanguage]);
 
   // A "small" tradition expands all the way (books + their notes) on a single
   // tap, so the user doesn't have to tap the tradition then each book. Applies
@@ -406,7 +417,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">
-              {searchQuery ? 'No notes match your search.' : 'No notes yet. Select a passage in the reader to add one.'}
+              {searchQuery ? t('notes.noMatch') : t('notes.empty')}
             </p>
           ) : body}
         </div>
@@ -418,7 +429,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
     <div className="h-full flex flex-col w-full">
       {/* Header + search — spans both columns */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">Notes</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('notes.title')}</h1>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -426,20 +437,20 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search notes…"
+            placeholder={t('notes.searchPlaceholder')}
             className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>
 
       {/* Two-column split: By Book | By Date */}
       <div className="flex-1 flex overflow-hidden">
-        {renderColumn('By Book', bookBody)}
+        {renderColumn(t('notes.byBook'), bookBody)}
         <div className="w-px bg-gray-200 dark:bg-[#354759] shrink-0" />
-        {renderColumn('By Date', dateBody)}
+        {renderColumn(t('notes.byDate'), dateBody)}
       </div>
     </div>
   );

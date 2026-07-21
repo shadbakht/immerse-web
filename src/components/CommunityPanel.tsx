@@ -12,6 +12,8 @@ import {
 } from '@/lib/communitySync';
 import { exportAsDocx, exportAsPdf, type TagRow } from '@/lib/tagExport';
 import { AnnotationCard } from './AnnotationCard';
+import { useTranslation } from '@/contexts/LanguageProvider';
+import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 
 const EMPTY_SET: Set<string> = new Set();
 
@@ -94,6 +96,7 @@ async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
 // ── One expandable quote (feed + profile) ────────────────────────────────────
 
 function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBook?: OpenBookFn; depth?: number }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [opening, setOpening]   = useState(false);
   const citation = sel.citation ?? sel.bookTitle;
@@ -119,7 +122,7 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
             disabled={opening}
             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline disabled:opacity-60"
           >
-            {opening ? 'Opening…' : 'Open in reader →'}
+            {opening ? t('common.opening') : `${t('common.openInReader')} →`}
           </button>
         ) : undefined}
       />
@@ -127,14 +130,21 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
   );
 }
 
-function formatDate(iso: string) {
+// Module-level, so the locale has to be handed in rather than hooked for.
+function formatDate(
+  iso: string,
+  t: (key: TranslationKey, vars?: TranslateVars) => string,
+  uiLanguage: string,
+) {
   const d    = new Date(iso);
   const diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 60)     return 'just now';
-  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (diff < 60)     return t('common.justNow');
+  if (diff < 3600)   return t('common.minutesAgo', { count: Math.floor(diff / 60) });
+  if (diff < 86400)  return t('common.hoursAgo',   { count: Math.floor(diff / 3600) });
+  if (diff < 604800) return t('common.daysAgo',    { count: Math.floor(diff / 86400) });
+  // Month names follow the UI language, not the browser's, so the row reads
+  // in one language.
+  return d.toLocaleDateString(uiLanguage, { month: 'short', day: 'numeric' });
 }
 
 // ── Payload tree helpers + tri-state checkbox ────────────────────────────────
@@ -243,9 +253,10 @@ function TagCard({
   onToggleSelect: (ct: CommunityTag, exportId: string) => void;
   showAuthor?:    boolean;
 }) {
+  const { t, uiLanguage } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [importing, setImporting] = useState(false);
-  const displayName = ct.profiles?.username ?? 'Anonymous';
+  const displayName = ct.profiles?.username ?? t('discover.anonymous');
 
   const payload = Array.isArray(ct.payload) ? ct.payload : [];
   const root = rootNodeOf(payload);
@@ -293,8 +304,8 @@ function TagCard({
                 {'  ·  '}
               </>
             )}
-            {formatDate(lastAddedAt)}
-            {'  ·  '}{ct.import_count} {ct.import_count === 1 ? 'import' : 'imports'}
+            {formatDate(lastAddedAt, t, uiLanguage)}
+            {'  ·  '}{t('discover.import', { count: ct.import_count })}
           </div>
         </div>
 
@@ -302,10 +313,10 @@ function TagCard({
           {(isOwn || isImported) ? (
             <button
               disabled
-              title={isOwn ? 'This is your own tag' : 'Already imported'}
+              title={isOwn ? t('discover.ownTag') : t('discover.alreadyImported')}
               className="text-xs font-semibold text-gray-400 dark:text-[#5C7A8E] bg-gray-100 dark:bg-[#2D4050] px-3 py-1 rounded-full cursor-not-allowed"
             >
-              {isOwn ? 'Import' : 'Imported'}
+              {isOwn ? t('discover.import') : t('discover.imported')}
             </button>
           ) : (
             <button
@@ -313,7 +324,7 @@ function TagCard({
               disabled={importing}
               className="text-xs font-semibold text-white bg-[#1B6B7B] dark:bg-[#2D9DB3] hover:bg-[#155a68] dark:hover:bg-[#2589A0] disabled:opacity-60 px-3 py-1 rounded-full transition-colors"
             >
-              {importing ? '…' : 'Import'}
+              {importing ? '…' : t('discover.import')}
             </button>
           )}
 
@@ -377,6 +388,7 @@ function FeedColumn({
   onToggleSelect: (ct: CommunityTag, exportId: string) => void;
   currentUserId?: string;
 }) {
+  const { t } = useTranslation();
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return tags;
@@ -400,8 +412,8 @@ function FeedColumn({
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
             <p className="text-3xl mb-3">{searchQuery ? '🔍' : '🏷️'}</p>
-            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{searchQuery ? 'No results' : 'No shared tags yet'}</p>
-            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{searchQuery ? 'Try a different search term.' : 'Be the first to share a tag.'}</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{searchQuery ? t('discover.noResults') : t('discover.noneYet')}</p>
+            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{searchQuery ? t('discover.tryDifferent') : t('discover.beFirst')}</p>
           </div>
         ) : (
           <div>
@@ -496,6 +508,7 @@ function ProfileView({
     setFollowLoading(false);
   }
 
+  const { t } = useTranslation();
   const initials = profile.displayName[0]?.toUpperCase() ?? '?';
 
   return (
@@ -505,7 +518,7 @@ function ProfileView({
         <button
           onClick={onBack}
           className="text-2xl text-[#1B6B7B] dark:text-[#2D9DB3] leading-none w-8 shrink-0"
-          aria-label="Back"
+          aria-label={t('common.back')}
         >
           ‹
         </button>
@@ -525,7 +538,7 @@ function ProfileView({
         <div className="flex items-center gap-2 shrink-0">
           {profile.userId !== currentUserId && (
             <span className="text-[10px] leading-tight text-gray-400 dark:text-[#5C7A8E] text-right max-w-[120px]">
-              Auto-imports user&apos;s public tags to your app
+              {t('usertags.autoImports')}
             </span>
           )}
           <button
@@ -539,7 +552,7 @@ function ProfileView({
                   : 'border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] hover:bg-[#1B6B7B]/5 dark:hover:bg-[#2D9DB3]/5'
             }`}
           >
-            {profile.userId === currentUserId ? 'Follow' : followLoading ? '…' : isFollowing ? 'Unfollow' : 'Follow'}
+            {profile.userId === currentUserId ? t('usertags.follow') : followLoading ? '…' : isFollowing ? t('usertags.unfollow') : t('usertags.follow')}
           </button>
         </div>
       </div>
@@ -553,8 +566,8 @@ function ProfileView({
         ) : tags.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-3xl mb-3">🏷️</p>
-            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">No public tags</p>
-            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">This user hasn't shared any tags yet.</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{t('usertags.noTags')}</p>
+            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('usertags.noTagsBody')}</p>
           </div>
         ) : (
           <div>
@@ -583,6 +596,7 @@ function ProfileView({
 
 export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps) {
   const supabase = createClient();
+  const { t } = useTranslation();
   const [recentTags, setRecentTags]       = useState<CommunityTag[]>([]);
   const [trendingTags, setTrendingTags]   = useState<CommunityTag[]>([]);
   const [recentLoading, setRecentLoading]   = useState(true);
@@ -709,9 +723,9 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, [user?.id]);
 
   const handleProfilePress = useCallback((ct: CommunityTag) => {
-    const displayName = ct.profiles?.username ?? 'Anonymous';
+    const displayName = ct.profiles?.username ?? t('discover.anonymous');
     setProfileView({ userId: ct.user_id, displayName, username: ct.profiles?.username ?? null });
-  }, []);
+  }, [t]);
 
   // ── Profile view ────────────────────────────────────────────────────────────
   if (profileView && user?.id) {
@@ -735,7 +749,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100 dark:border-[#2D4050]">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">Discover</h1>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">{t('nav.discover')}</h1>
           {selectedCount > 0 && (
             <div className="flex items-center gap-2">
               <div className="relative" ref={exportMenuRef}>
@@ -743,14 +757,14 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
                   onClick={() => setShowExportMenu(v => !v)}
                   disabled={exporting}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
-                  title="Export selected tags"
+                  title={t('tags.exportSelected')}
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  {exporting ? 'Exporting…' : `Export (${selectedCount})`}
+                  {exporting ? t('tags.exporting') : `${t('tags.export')} (${selectedCount})`}
                 </button>
                 {showExportMenu && (
                   <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px] py-1">
@@ -776,11 +790,11 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder={selectedCount > 0 ? 'Search selected tags…' : 'Search tags and users…'}
+            placeholder={selectedCount > 0 ? t('discover.searchSelected') : t('discover.searchPlaceholder')}
             className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {(searchQuery || selectedCount > 0) && (
-            <button onClick={() => { setSearchQuery(''); clearSelection(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
+            <button onClick={() => { setSearchQuery(''); clearSelection(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>
@@ -788,7 +802,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       {/* Two-column split */}
       <div className="flex-1 flex overflow-hidden">
         <FeedColumn
-          title="Recent"
+          title={t('discover.recent')}
           tags={recentTags}
           loading={recentLoading}
           searchQuery={searchQuery}
@@ -802,7 +816,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         />
         <div className="w-px bg-gray-200 dark:bg-[#354759] shrink-0" />
         <FeedColumn
-          title="Trending"
+          title={t('discover.trending')}
           tags={trendingTags}
           loading={trendingLoading}
           searchQuery={searchQuery}
@@ -821,15 +835,15 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-8">
           <div className="glass rounded-2xl p-8 max-w-sm w-full text-center">
             <div className="text-4xl mb-4">✦</div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">Sign In to Access Discover</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">{t('discover.signInTitle')}</h2>
             <p className="text-sm text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-6">
-              See what other readers are discovering across all traditions.
+              {t('discover.signInBody')}
             </p>
             <a
               href="/login"
               className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
             >
-              Sign In or Create Account
+              {t('common.signInCreate')}
             </a>
           </div>
         </div>

@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t } = useTranslation();
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -17,9 +19,9 @@ export default function ResetPasswordPage() {
 
   async function handleSubmit() {
     setError('');
-    if (!password || !confirm) { setError('Please enter and confirm your new password.'); return; }
-    if (password.length < 8)   { setError('Password must be at least 8 characters.'); return; }
-    if (password !== confirm)  { setError('Passwords don’t match.'); return; }
+    if (!password || !confirm) { setError(t('auth.enterConfirmPassword')); return; }
+    if (password.length < 8)   { setError(t('auth.passwordTooShort')); return; }
+    if (password !== confirm)  { setError(t('auth.passwordsDontMatch')); return; }
 
     setLoading(true);
     try {
@@ -27,7 +29,7 @@ export default function ResetPasswordPage() {
       if (error) throw error;
       setDone(true);
     } catch (err: any) {
-      setError(err.message ?? 'Could not update your password. The reset link may have expired — please request a new one.');
+      setError(err.message ?? t('auth.resetFailed'));
     } finally {
       setLoading(false);
     }
@@ -40,27 +42,27 @@ export default function ResetPasswordPage() {
           <div className="flex justify-center mb-4">
             <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Reset Password</h1>
-          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">Choose a new password for your account</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">{t('auth.resetPassword')}</h1>
+          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">{t('auth.chooseNewPassword')}</p>
         </div>
 
         {done ? (
           <div className="text-center space-y-4">
             <div className="text-4xl">✅</div>
-            <p className="text-white font-semibold text-lg">Password updated</p>
-            <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed">You can now use your new password.</p>
+            <p className="text-white font-semibold text-lg">{t('auth.passwordUpdated')}</p>
+            <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed">{t('auth.passwordUpdatedBody')}</p>
             <button
               onClick={() => { router.push('/'); router.refresh(); }}
               className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition"
             >
-              Continue to Immerse
+              {t('auth.continueToImmerse')}
             </button>
           </div>
         ) : (
           <div className="space-y-3">
             <input
               type="password"
-              placeholder="New password"
+              placeholder={t('auth.newPasswordPlaceholder')}
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoFocus
@@ -68,7 +70,7 @@ export default function ResetPasswordPage() {
             />
             <input
               type="password"
-              placeholder="Confirm new password"
+              placeholder={t('auth.confirmNewPasswordPlaceholder')}
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
@@ -82,7 +84,7 @@ export default function ResetPasswordPage() {
               disabled={loading}
               className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition disabled:opacity-50"
             >
-              {loading ? 'Please wait…' : 'Update Password'}
+              {loading ? t('common.pleaseWait') : t('auth.updatePassword')}
             </button>
           </div>
         )}

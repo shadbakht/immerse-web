@@ -4,12 +4,14 @@ import { useState, useRef, useEffect, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') ?? '/';
   const supabase = createClient();
+  const { t } = useTranslation();
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -48,16 +50,16 @@ function LoginPageInner() {
 
   async function handleForgot() {
     setError('');
-    if (!email) { setError('Please enter your email address.'); return; }
+    if (!email) { setError(t('auth.enterEmailBody')); return; }
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
       });
       if (error) throw error;
-      setSuccess(`We sent a password reset link to ${email}`);
+      setSuccess(t('auth.resetLinkSent', { email }));
     } catch (err: any) {
-      setError(err.message ?? 'Something went wrong.');
+      setError(err.message ?? t('common.somethingWrong'));
     } finally {
       setLoading(false);
     }
@@ -65,16 +67,16 @@ function LoginPageInner() {
 
   async function handleSubmit() {
     setError('');
-    if (!email || !password) { setError('Please enter email and password.'); return; }
+    if (!email || !password) { setError(t('auth.missingFieldsBody')); return; }
 
     if (isSignUp) {
       const raw = username.toLowerCase().trim();
       if (!raw || !/^[a-z0-9_]{3,20}$/.test(raw)) {
-        setError('Username must be 3–20 characters: letters, numbers, underscores only.');
+        setError(t('auth.invalidUsernameBody'));
         return;
       }
-      if (usernameStatus === 'taken')     { setError('Username is already taken.'); return; }
-      if (usernameStatus !== 'available') { setError('Please wait for username validation.'); return; }
+      if (usernameStatus === 'taken')     { setError(t('auth.usernameAlreadyTaken')); return; }
+      if (usernameStatus !== 'available') { setError(t('auth.checkUsernameBody')); return; }
     }
 
     setLoading(true);
@@ -99,10 +101,10 @@ function LoginPageInner() {
             full_name:  fullName || email,
           }).then(() => {}); // best-effort; doesn't block the signup flow
         }
-        setSuccess(`Check your email — we sent a confirmation link to ${email}`);
+        setSuccess(t('auth.checkEmailBody', { email }));
       }
     } catch (err: any) {
-      setError(err.message ?? 'Something went wrong.');
+      setError(err.message ?? t('common.somethingWrong'));
     } finally {
       setLoading(false);
     }
@@ -117,26 +119,26 @@ function LoginPageInner() {
             <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Immerse</h1>
-          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">Sacred texts from all traditions</p>
+          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">{t('auth.tagline')}</p>
         </div>
 
         {success ? (
           <div className="text-center space-y-4">
             <div className="text-4xl">📬</div>
-            <p className="text-white font-semibold text-lg">Check your email</p>
+            <p className="text-white font-semibold text-lg">{t('auth.checkEmail')}</p>
             <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed">{success}</p>
             <button onClick={() => { setSuccess(''); setIsSignUp(false); setForgotMode(false); }} className="text-[#1B6B7B] dark:text-[#2D9DB3] text-sm hover:underline">
-              Back to Sign In
+              {t('auth.backToSignIn')}
             </button>
           </div>
         ) : forgotMode ? (
           <div className="space-y-3">
             <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed text-center mb-1">
-              Enter your email address and we&apos;ll send you a link to reset your password.
+              {t('auth.forgotBlurb')}
             </p>
             <input
               type="email"
-              placeholder="Email *"
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleForgot(); }}
@@ -151,14 +153,14 @@ function LoginPageInner() {
               disabled={loading}
               className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition disabled:opacity-50"
             >
-              {loading ? 'Please wait…' : 'Send Reset Link'}
+              {loading ? t('common.pleaseWait') : t('auth.sendResetLink')}
             </button>
 
             <button
               onClick={() => { setForgotMode(false); setError(''); }}
               className="w-full text-center text-gray-400 dark:text-[#5C7A8E] text-sm py-2 hover:text-white transition"
             >
-              Back to Sign In
+              {t('auth.backToSignIn')}
             </button>
           </div>
         ) : (
@@ -169,7 +171,7 @@ function LoginPageInner() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Username *"
+                    placeholder={t('auth.usernamePlaceholder')}
                     value={username}
                     onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                     autoCapitalize="none"
@@ -185,15 +187,15 @@ function LoginPageInner() {
                       usernameStatus === 'taken'     ? 'text-red-400'   :
                       usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400 dark:text-[#5C7A8E]'
                     }`}>
-                      {usernameStatus === 'checking'  ? '…'            :
-                       usernameStatus === 'available' ? '✓ Available'  :
-                       usernameStatus === 'taken'     ? '✗ Taken'      : '3–20 chars'}
+                      {usernameStatus === 'checking'  ? '…'                          :
+                       usernameStatus === 'available' ? t('auth.usernameAvailable')  :
+                       usernameStatus === 'taken'     ? t('auth.usernameTakenShort') : t('auth.usernameHint')}
                     </span>
                   )}
                 </div>
                 <input
                   type="text"
-                  placeholder="Full Name"
+                  placeholder={t('auth.fullNamePlaceholder')}
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
@@ -203,7 +205,7 @@ function LoginPageInner() {
 
             <input
               type="email"
-              placeholder="Email *"
+              placeholder={t('auth.emailPlaceholder')}
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
@@ -211,7 +213,7 @@ function LoginPageInner() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder={isSignUp ? 'Create Password *' : 'Password *'}
+                placeholder={isSignUp ? t('auth.createPasswordPlaceholder') : t('auth.passwordPlaceholder')}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
@@ -245,7 +247,7 @@ function LoginPageInner() {
               disabled={loading}
               className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition disabled:opacity-50"
             >
-              {loading ? 'Please wait…' : isSignUp ? 'Create Account' : 'Sign In'}
+              {loading ? t('common.pleaseWait') : isSignUp ? t('auth.createAccount') : t('auth.signIn')}
             </button>
 
             {!isSignUp && (
@@ -253,7 +255,7 @@ function LoginPageInner() {
                 onClick={() => { setForgotMode(true); setError(''); }}
                 className="w-full text-center text-[#1B6B7B] dark:text-[#2D9DB3] text-sm py-1 hover:underline"
               >
-                Forgot password?
+                {t('auth.forgotPassword')}
               </button>
             )}
 
@@ -265,12 +267,12 @@ function LoginPageInner() {
               onClick={switchMode}
               className="w-full border border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 dark:hover:bg-[#2D9DB3]/10 transition"
             >
-              {isSignUp ? 'Sign In' : 'Sign Up'}
+              {isSignUp ? t('auth.signIn') : t('auth.signUp')}
             </button>
 
             <div className="flex items-center gap-3 my-1">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs text-gray-600 dark:text-[#8FA4B8]">or</span>
+              <span className="text-xs text-gray-600 dark:text-[#8FA4B8]">{t('common.or')}</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
 
@@ -278,7 +280,7 @@ function LoginPageInner() {
               href="/?guest=1"
               className="block w-full text-center border border-white/15 text-white/70 font-medium py-3.5 rounded-xl hover:bg-white/5 hover:text-white transition"
             >
-              Continue as Guest
+              {t('auth.browseWithout')}
             </a>
           </div>
         )}

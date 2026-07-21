@@ -1,7 +1,11 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 export default function ConfirmedPage() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-[#0F1923] flex items-center justify-center px-4">
       <div className="w-full max-w-sm text-center">
@@ -9,15 +13,15 @@ export default function ConfirmedPage() {
           <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
         </div>
         <div className="text-5xl mb-4">✅</div>
-        <h1 className="text-2xl font-bold text-white mb-3">Email Confirmed</h1>
+        <h1 className="text-2xl font-bold text-white mb-3">{t('auth.emailConfirmed')}</h1>
         <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed mb-8">
-          Your account is ready. Sign in with your email and password to get started.
+          {t('auth.accountReadySignIn')}
         </p>
         <Link
           href="/login"
           className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
         >
-          Sign In to Immerse
+          {t('auth.signInToImmerse')}
         </Link>
       </div>
     </div>

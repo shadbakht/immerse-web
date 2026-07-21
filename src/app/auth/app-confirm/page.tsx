@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useTranslation } from '@/contexts/LanguageProvider';
 
 // Pivot page for mobile-app signup confirmations.
 //
@@ -24,6 +25,7 @@ function isMobile(): boolean {
 }
 
 export default function AppConfirmPage() {
+  const { t } = useTranslation();
   const [mobile, setMobile] = useState(false);
 
   // The fragment carries the tokens; forward it verbatim to the app.
@@ -46,37 +48,36 @@ export default function AppConfirmPage() {
           <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
         </div>
         <div className="text-5xl mb-4">✅</div>
-        <h1 className="text-2xl font-bold text-white mb-3">Email Confirmed</h1>
+        <h1 className="text-2xl font-bold text-white mb-3">{t('auth.emailConfirmed')}</h1>
 
         {mobile ? (
           <>
             <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed mb-8">
-              Your account is ready. Opening the Immerse app and signing you in…
+              {t('auth.openingApp')}
             </p>
             <a
               href={appUrl()}
               className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
             >
-              Open Immerse
+              {t('auth.openImmerse')}
             </a>
             <Link
               href="/login"
               className="block w-full text-gray-400 dark:text-[#5C7A8E] text-sm py-3 mt-1 hover:text-white transition-colors"
             >
-              Continue on the web instead
+              {t('auth.continueOnWeb')}
             </Link>
           </>
         ) : (
           <>
             <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed mb-8">
-              Your account is ready. Open the Immerse app on your phone to sign in,
-              or continue on the web below.
+              {t('auth.accountReadyOpenApp')}
             </p>
             <Link
               href="/login"
               className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
             >
-              Sign In to Immerse
+              {t('auth.signInToImmerse')}
             </Link>
           </>
         )}

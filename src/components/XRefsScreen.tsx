@@ -6,6 +6,8 @@ import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushXref, deleteRemote } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
+import { useTranslation } from '@/contexts/LanguageProvider';
+import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 
 interface XRefRow {
   id:           string;
@@ -30,12 +32,19 @@ function Highlight({ text, q }: { text: string; q: string }) {
   return <>{text.split(pat).map((p, i) => pat.test(p) ? <mark key={i} className="bg-yellow-100 text-yellow-900 rounded px-0.5">{p}</mark> : <span key={i}>{p}</span>)}</>;
 }
 
-function formatDate(iso: string) {
+// Module-level, so the locale has to be handed in rather than hooked for.
+function formatDate(
+  iso: string,
+  t: (key: TranslationKey, vars?: TranslateVars) => string,
+  uiLanguage: string,
+) {
   const d = new Date(iso), diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (diff < 3600)   return t('common.minutesAgo', { count: Math.floor(diff / 60) });
+  if (diff < 86400)  return t('common.hoursAgo',   { count: Math.floor(diff / 3600) });
+  if (diff < 604800) return t('common.daysAgo',    { count: Math.floor(diff / 86400) });
+  // Month names follow the UI language, not the browser's, so the row reads
+  // in one language.
+  return d.toLocaleDateString(uiLanguage, { month: 'short', day: 'numeric' });
 }
 
 function XRefCard({
@@ -47,6 +56,7 @@ function XRefCard({
   onDelete: (id: string) => void;
   onLabelSave: (id: string, label: string | null) => void;
 }) {
+  const { t, uiLanguage }           = useTranslation();
   const [expanded, setExpanded]     = useState(false);
   const [editing, setEditing]       = useState(false);
   const [draftLabel, setDraftLabel] = useState('');
@@ -71,7 +81,7 @@ function XRefCard({
   ];
 
   const menuOptions: MenuOption[] = [
-    { label: 'Delete', icon: '🗑️', color: 'danger', onClick: () => { if (confirm('Delete this cross-reference?')) onDelete(row.id); } },
+    { label: t('common.delete'), icon: '🗑️', color: 'danger', onClick: () => { if (confirm(t('xrefs.deleteConfirm'))) onDelete(row.id); } },
   ];
 
   return (
@@ -88,7 +98,7 @@ function XRefCard({
             onChange={e => setDraftLabel(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit(); } if (e.key === 'Escape') { setEditing(false); } }}
-            placeholder="Add label…"
+            placeholder={t('xrefs.addLabel')}
             className="flex-1 text-sm font-semibold text-[#1B6B7B] dark:text-[#2D9DB3] outline-none bg-transparent border-b border-[#1B6B7B]/40 dark:border-[#2D9DB3]/40 pb-0.5 placeholder:text-gray-400 dark:text-[#5C7A8E] placeholder:font-normal"
           />
         ) : row.label ? (
@@ -97,10 +107,10 @@ function XRefCard({
           </button>
         ) : (
           <button onClick={startEdit} className="flex-1 text-sm text-gray-400 dark:text-[#5C7A8E] text-left hover:text-gray-500 dark:hover:text-[#8FA4B8] transition-colors">
-            Add label…
+            {t('xrefs.addLabel')}
           </button>
         )}
-        <p className="text-xs text-gray-300 dark:text-[#4A6478] shrink-0">{formatDate(row.createdAt)}</p>
+        <p className="text-xs text-gray-300 dark:text-[#4A6478] shrink-0">{formatDate(row.createdAt, t, uiLanguage)}</p>
         <div onClick={e => e.stopPropagation()}>
           <ContextMenu options={menuOptions} />
         </div>
@@ -124,7 +134,7 @@ function XRefCard({
                 onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId); }}
                 className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline text-left"
               >
-                Open in reader →
+                {t('common.openInReader')} →
               </button>
             )}
           </div>
@@ -138,6 +148,7 @@ function XRefCard({
 
 export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   const supabase = createClient();
+  const { t } = useTranslation();
   const [rows, setRows]               = useState<XRefRow[]>([]);
   const [loading, setLoading]         = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -181,7 +192,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         const slug    = uuidToSlug.get(bookUuid) ?? '';
         const catBook = slug ? bookMap.get(slug) : null;
         const root    = catBook ? getRootCat(catBook.categoryId) : null;
-        return { id: root?.id ?? bookUuid, name: root?.name ?? 'Other' };
+        return { id: root?.id ?? bookUuid, name: root?.name ?? t('common.otherTradition') };
       };
 
       function getSel(id: string) {
@@ -284,7 +295,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">Cross-References</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('xrefs.title')}</h1>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -292,11 +303,11 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search passages or labels…"
+            placeholder={t('xrefs.searchPlaceholder')}
             className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">Clear</button>
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>
@@ -309,7 +320,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           </div>
         ) : hierarchy.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-6">
-            {searchQuery ? 'No cross-references match your search.' : 'No cross-references yet. Select passages in the reader to link them.'}
+            {searchQuery ? t('xrefs.noMatch') : t('xrefs.empty')}
           </p>
         ) : (
           <div>

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
 import { applyFontSize, type FontSize } from '@/lib/fontSize';
 import { applyColorMode, getStoredColorMode, type ColorMode } from '@/lib/colorMode';
-import { UI_LANGUAGES } from '@immerse/i18n';
+import { UI_LANGUAGES, type TranslationKey } from '@immerse/i18n';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import Onboarding from './Onboarding';
 import type { User } from '@supabase/supabase-js';
@@ -17,6 +17,14 @@ const APP_VERSION = pkg.version;
 // Full feature walkthrough on YouTube (About → "Watch Full Feature Video").
 // Same constant exists in the mobile repo: src/screens/SettingsScreen.js.
 const FEATURE_VIDEO_URL = 'https://youtu.be/z4pgyDj5QFY';
+
+// Module-level so the light/dark/system buttons can name themselves without a
+// switch at the call site.
+const APPEARANCE_KEYS = {
+  light:  'settings.appearanceLight',
+  dark:   'settings.appearanceDark',
+  system: 'settings.appearanceSystem',
+} as const satisfies Record<ColorMode, TranslationKey>;
 
 const FONT_OPTIONS: { key: FontSize; size: number }[] = [
   { key: 'Small',  size: 14 },
@@ -227,7 +235,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                       href="/login"
                       className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
                     >
-                      Sign In or Create Account
+                      {t('common.signInCreate')}
                     </a>
                   )}
                 </div>
@@ -265,7 +273,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
             {/* Font size */}
             <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">Font Size</span>
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.fontSize')}</span>
               </div>
               <div className="px-5 py-4">
                 <div className="flex gap-2 mb-4">
@@ -293,7 +301,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
             {/* Appearance */}
             <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">Appearance</span>
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.appearance')}</span>
               </div>
               <div className="px-5 py-4 flex gap-2">
                 {(['light', 'dark', 'system'] as ColorMode[]).map(mode => (
@@ -306,7 +314,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                         : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
                     }`}
                   >
-                    {mode}
+                    {t(APPEARANCE_KEYS[mode])}
                   </button>
                 ))}
               </div>
@@ -315,39 +323,39 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
             {/* About */}
             <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">About</span>
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.about')}</span>
               </div>
               <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Version</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.version')}</span>
                 <span className="text-sm text-gray-500 dark:text-[#8FA4B8]">{APP_VERSION}</span>
               </div>
               <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Privacy Policy</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.privacyPolicy')}</span>
                 <a
-                  href="/privacy"
+                  href={uiLanguage === 'en' ? '/privacy' : `/privacy?lang=${uiLanguage}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
                 >
-                  View →
+                  {t('settings.viewExternal')}
                 </a>
               </div>
               <button
                 onClick={() => setShowIntro(true)}
                 className="w-full px-5 py-4 flex items-center justify-between text-left border-b border-gray-50 dark:border-[#2D4050]/60 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
               >
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Intro Tour</span>
-                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">Replay on-boarding screenshots →</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.introTour')}</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{t('settings.replayOnboarding')} →</span>
               </button>
               <div className="px-5 py-4 flex items-center justify-between">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">Full Feature Video</span>
+                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.fullFeatureVideo')}</span>
                 <a
                   href={FEATURE_VIDEO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
                 >
-                  Watch Full Feature Video →
+                  {t('settings.watchFeatureVideo')} →
                 </a>
               </div>
             </section>
