@@ -109,7 +109,7 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
   }
 
   return (
-    <div className="pr-4 py-1.5" style={{ paddingLeft: 32 + depth * 16 }}>
+    <div className="pe-4 py-1.5" style={{ paddingLeft: 32 + depth * 16 }}>
       <AnnotationCard
         variant="discover"
         quote={sel.snapshotText}
@@ -183,7 +183,7 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   return (
     <button
       onClick={e => { e.stopPropagation(); onChange(); }}
-      className="flex items-center justify-center shrink-0 w-7 h-7 -ml-1"
+      className="flex items-center justify-center shrink-0 w-7 h-7 -ms-1"
     >
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
         state === 'checked'       ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3]' :
@@ -211,9 +211,9 @@ function SubTagNode({ node, payload, depth, selectedIds, onToggleSelect, onOpenB
     <div>
       {/* Sub-level divider: hairline inset to this sub-tag's indentation */}
       <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 16 + depth * 16 }} />
-      <div className="flex items-center gap-2 py-2 pr-4" style={{ paddingLeft: 16 + depth * 16 }}>
+      <div className="flex items-center gap-2 py-2 pe-4" style={{ paddingLeft: 16 + depth * 16 }}>
         <Checkbox state={nodeCheckState(payload, node.exportId, selectedIds)} onChange={() => onToggleSelect(node.exportId)} />
-        <button className="flex-1 min-w-0 text-left text-sm text-gray-700 dark:text-[#B8C7D6] truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
+        <button className="flex-1 min-w-0 text-start text-sm text-gray-700 dark:text-[#B8C7D6] truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{sels.length}</span>
         <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
       </div>
@@ -537,7 +537,7 @@ function ProfileView({
 
         <div className="flex items-center gap-2 shrink-0">
           {profile.userId !== currentUserId && (
-            <span className="text-[10px] leading-tight text-gray-400 dark:text-[#5C7A8E] text-right max-w-[120px]">
+            <span className="text-[10px] leading-tight text-gray-400 dark:text-[#5C7A8E] text-end max-w-[120px]">
               {t('usertags.autoImports')}
             </span>
           )}
@@ -767,12 +767,12 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
                   {exporting ? t('tags.exporting') : `${t('tags.export')} (${selectedCount})`}
                 </button>
                 {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px] py-1">
+                  <div className="absolute end-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px] py-1">
                     {([{ label: 'PDF', format: 'pdf' }, { label: 'Word (.docx)', format: 'docx' }] as const).map(({ label, format }) => (
                       <button
                         key={format}
                         onClick={() => handleExport(format)}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                        className="w-full text-start px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
                       >
                         {label}
                       </button>
@@ -784,17 +784,17 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
           )}
         </div>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={selectedCount > 0 ? t('discover.searchSelected') : t('discover.searchPlaceholder')}
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
+            className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {(searchQuery || selectedCount > 0) && (
-            <button onClick={() => { setSearchQuery(''); clearSelection(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
+            <button onClick={() => { setSearchQuery(''); clearSelection(); }} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>

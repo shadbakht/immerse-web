@@ -136,7 +136,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
                 <button
                   key={p.id}
                   onClick={() => { setSelected(p); setStep(2); }}
-                  className="w-full text-left bg-gray-50 dark:bg-[#243040] hover:bg-[#1B6B7B]/5 dark:hover:bg-[#2D9DB3]/5 border border-gray-100 dark:border-[#2D4050] hover:border-[#1B6B7B]/30 dark:hover:border-[#2D9DB3]/30 rounded-xl px-3 py-2.5 transition-colors"
+                  className="w-full text-start bg-gray-50 dark:bg-[#243040] hover:bg-[#1B6B7B]/5 dark:hover:bg-[#2D9DB3]/5 border border-gray-100 dark:border-[#2D4050] hover:border-[#1B6B7B]/30 dark:hover:border-[#2D9DB3]/30 rounded-xl px-3 py-2.5 transition-colors"
                 >
                   <p className="text-sm text-gray-800 dark:text-[#D2DCE8] line-clamp-2">"{p.content.slice(0, 120)}…"</p>
                   <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-1">{citationFor(p)}</p>

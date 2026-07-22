@@ -182,7 +182,7 @@ function LoginPageInner() {
                     }`}
                   />
                   {usernameStatus && (
-                    <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
+                    <span className={`absolute end-4 top-1/2 -translate-y-1/2 text-xs font-medium ${
                       usernameStatus === 'available' ? 'text-green-400' :
                       usernameStatus === 'taken'     ? 'text-red-400'   :
                       usernameStatus === 'invalid'   ? 'text-red-400'   : 'text-gray-400 dark:text-[#5C7A8E]'
@@ -217,12 +217,12 @@ function LoginPageInner() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-                className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 pr-11 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
+                className="w-full bg-white/10 text-white placeholder-gray-500 rounded-xl px-4 pe-11 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-[#8FA4B8] hover:text-gray-300 dark:hover:text-[#4A6478] transition"
+                className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-[#8FA4B8] hover:text-gray-300 dark:hover:text-[#4A6478] transition"
                 tabIndex={-1}
               >
                 {showPassword ? (

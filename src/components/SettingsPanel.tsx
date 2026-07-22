@@ -342,7 +342,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
               <button
                 onClick={() => setShowIntro(true)}
-                className="w-full px-5 py-4 flex items-center justify-between text-left border-b border-gray-50 dark:border-[#2D4050]/60 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                className="w-full px-5 py-4 flex items-center justify-between text-start border-b border-gray-50 dark:border-[#2D4050]/60 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
               >
                 <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.introTour')}</span>
                 <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{t('settings.replayOnboarding')} →</span>

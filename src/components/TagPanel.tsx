@@ -183,7 +183,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
               to reveal its quotes + sub-tags. */}
           <button
             onClick={() => toggleNode(tag.id)}
-            className="flex-1 flex items-center gap-1.5 min-w-0 text-left cursor-pointer"
+            className="flex-1 flex items-center gap-1.5 min-w-0 text-start cursor-pointer"
           >
             <span className="truncate text-sm text-gray-800 dark:text-[#D2DCE8]">{tag.name}</span>
             <span className={`inline-block text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
@@ -207,7 +207,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
         {/* Inline quote reveal — this tag's existing selections (mobile parity).
             Loaded-and-empty renders nothing at all. */}
         {isOpen && tagQuotes[tag.id]?.length !== 0 && (
-          <div className="pr-5 pb-1" style={{ paddingLeft: 20 + tag.depth * 20 + 28 }}>
+          <div className="pe-5 pb-1" style={{ paddingLeft: 20 + tag.depth * 20 + 28 }}>
             {tagQuotes[tag.id] === undefined ? (
               <p className="text-xs text-gray-400 dark:text-[#5C7A8E] py-1">…</p>
             ) : (
@@ -256,7 +256,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             <span className="text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">
               {tags.find(t => t.id === newTagParentId)?.name}
             </span>
-            <button onClick={() => setNewTagParentId(null)} className="text-gray-300 dark:text-[#4A6478] hover:text-gray-500 dark:hover:text-[#8FA4B8] text-xs ml-1">✕</button>
+            <button onClick={() => setNewTagParentId(null)} className="text-gray-300 dark:text-[#4A6478] hover:text-gray-500 dark:hover:text-[#8FA4B8] text-xs ms-1">✕</button>
           </div>
         )}
         <div className="flex gap-2">
@@ -298,7 +298,7 @@ function TagQuoteRow({ quote, isFirst }: { quote: { text: string; citation: stri
       {!isFirst && <div className="border-t border-gray-100 dark:border-[#2D4050]" />}
       <button
         onClick={() => setExpanded(v => !v)}
-        className="block w-full text-left py-1.5 cursor-pointer"
+        className="block w-full text-start py-1.5 cursor-pointer"
       >
         <p className={`text-xs text-gray-500 dark:text-[#8FA4B8] italic ${expanded ? '' : 'line-clamp-2'}`}>
           "{quote.text}"

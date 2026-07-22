@@ -60,7 +60,7 @@ export function ContextMenu({ options }: { options: MenuOption[] }) {
                 option.onClick();
                 setOpen(false);
               }}
-              className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors border-b border-gray-100 dark:border-[#2D4050] last:border-b-0 ${
+              className={`w-full px-4 py-2.5 text-start text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors border-b border-gray-100 dark:border-[#2D4050] last:border-b-0 ${
                 option.color === 'danger' ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 dark:text-[#B8C7D6]'
               }`}
             >

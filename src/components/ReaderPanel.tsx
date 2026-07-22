@@ -177,7 +177,7 @@ function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp:
         <sup
           key={kp + i}
           onClick={e => { e.stopPropagation(); onFootnoteClick(m[1]); }}
-          className="text-[10px] text-[#1B6B7B] dark:text-[#2D9DB3] font-medium ml-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
+          className="text-[10px] text-[#1B6B7B] dark:text-[#2D9DB3] font-medium ms-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
           title={`Footnote ${m[1]}`}
         >
           {m[1]}
@@ -264,7 +264,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
     <div>
       <button
         onClick={toggle}
-        className="w-full flex items-center gap-2 py-2.5 pr-4 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left"
+        className="w-full flex items-center gap-2 py-2.5 pe-4 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-start"
         style={{ paddingLeft: 20 + depth * 18 }}
       >
         <TagIcon size={16} />
@@ -273,7 +273,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
       </button>
       {open && (
         <div>
-          <div style={{ paddingLeft: 20 + depth * 18 + 24 }} className="pr-4">
+          <div style={{ paddingLeft: 20 + depth * 18 + 24 }} className="pe-4">
             {quotes === null ? (
               <p className="py-1.5 text-xs text-gray-400 dark:text-[#5C7A8E]">{t('common.loading')}</p>
             ) : quotes.length === 0 ? (
@@ -1490,7 +1490,7 @@ async function handleCopy() {
       {toc.length > 0 && (
         <button
           onClick={() => setTocOpen(o => !o)}
-          className="absolute top-4 right-4 z-20 p-2 bg-white dark:bg-[#1B2A38] border border-gray-200 dark:border-[#2D4050] rounded-lg hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors shadow-sm"
+          className="absolute top-4 end-4 z-20 p-2 bg-white dark:bg-[#1B2A38] border border-gray-200 dark:border-[#2D4050] rounded-lg hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors shadow-sm"
           title={t('reader.tableOfContents')}
         >
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
@@ -1508,7 +1508,7 @@ async function handleCopy() {
       {tocOpen && (
         <>
           <div className="absolute inset-0 z-10" onClick={() => setTocOpen(false)} />
-          <div className="absolute top-12 right-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white dark:bg-[#1B2A38] rounded-xl shadow-xl border border-gray-200 dark:border-[#2D4050]">
+          <div className="absolute top-12 end-4 z-20 w-72 max-h-[768px] overflow-y-auto bg-white dark:bg-[#1B2A38] rounded-xl shadow-xl border border-gray-200 dark:border-[#2D4050]">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-[#2D4050] font-semibold text-sm text-gray-700 dark:text-[#B8C7D6]">
               {t('reader.tableOfContents')}
             </div>
@@ -1516,8 +1516,8 @@ async function handleCopy() {
               <div key={i} className="flex items-stretch border-b border-gray-50 dark:border-[#2D4050]/60 last:border-0">
                 <button
                   onClick={() => scrollToPassage(entry.passageId)}
-                  className={`flex-1 text-left py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors ${
-                    entry.depth ? 'pl-10 pr-2 text-gray-500 dark:text-[#8FA4B8]' : 'px-4 text-gray-700 dark:text-[#B8C7D6] font-medium'
+                  className={`flex-1 text-start py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors ${
+                    entry.depth ? 'ps-10 pe-2 text-gray-500 dark:text-[#8FA4B8]' : 'px-4 text-gray-700 dark:text-[#B8C7D6] font-medium'
                   }`}
                 >
                   {entry.label}
@@ -1573,7 +1573,7 @@ async function handleCopy() {
 
       {/* Edit-text-selection banner */}
       {editingSel && (
-        <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
+        <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 ps-5 pe-16 py-3 flex items-center justify-between gap-3 z-10">
           <p className="flex-1 min-w-0 text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">
             {t('reader.editSelectionHint')} <span className="font-semibold">{t('reader.updateSelection')}</span>.
           </p>
@@ -1588,7 +1588,7 @@ async function handleCopy() {
 
       {/* Xref pick-mode banner */}
       {xrefPickFrom && (
-        <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 pl-5 pr-16 py-3 flex items-center justify-between gap-3 z-10">
+        <div className="shrink-0 bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/10 border-b border-[#1B6B7B]/20 dark:border-[#2D9DB3]/20 ps-5 pe-16 py-3 flex items-center justify-between gap-3 z-10">
           <div className="flex-1 min-w-0">
             {pickSaving ? (
               <div className="flex items-center gap-2">
@@ -1751,7 +1751,7 @@ async function handleCopy() {
                   onClick={undefined}
                 >
                   {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
-                    <div className="absolute -left-8 top-1 flex flex-col gap-1">
+                    <div className="absolute -start-8 top-1 flex flex-col gap-1">
                       {taggedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}
@@ -1782,7 +1782,7 @@ async function handleCopy() {
                     </div>
                   )}
                   {(tdMargin != null || passage.paragraph_number != null) && !isLetterDate && (
-                    <span className="absolute -right-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-right leading-relaxed tabular-nums">
+                    <span className="absolute -end-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-end leading-relaxed tabular-nums">
                       {tdMargin ?? passage.paragraph_number}
                     </span>
                   )}
@@ -1800,7 +1800,7 @@ async function handleCopy() {
                       prayerBreaks={hasParagraphBreaks}
                     />
                     {attribution && (
-                      <span className="block text-right italic text-gray-500 dark:text-[#8FA4B8] mt-2">{attribution}</span>
+                      <span className="block text-end italic text-gray-500 dark:text-[#8FA4B8] mt-2">{attribution}</span>
                     )}
                   </p>
                 </div>
@@ -1814,7 +1814,7 @@ async function handleCopy() {
       {activeFootnote && (
         <>
           <div className="absolute inset-0 z-30" onClick={() => setActiveFootnote(null)} />
-          <div className="absolute bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#1B2A38] border-t border-gray-200 dark:border-[#2D4050] shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
+          <div className="absolute bottom-0 start-0 end-0 z-40 bg-white dark:bg-[#1B2A38] border-t border-gray-200 dark:border-[#2D4050] shadow-xl rounded-t-2xl px-6 py-5 min-h-[40vh] max-h-[60vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-bold text-[#1B6B7B] dark:text-[#2D9DB3] uppercase tracking-widest mb-2 block">

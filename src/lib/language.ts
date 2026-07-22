@@ -9,7 +9,7 @@
 // an English speaker browsing the Spanish Bible should not have the app flip to
 // Spanish underneath them.
 
-import { SUPPORTED_UI_LANGUAGES } from '@immerse/i18n';
+import { SUPPORTED_UI_LANGUAGES, directionOf } from '@immerse/i18n';
 
 const STORAGE_KEY = 'immerse_ui_language';
 
@@ -38,9 +38,18 @@ export function getStoredUiLanguage(): string {
   return SUPPORTED_UI_LANGUAGES.includes(detected) ? detected : DEFAULT_UI_LANGUAGE;
 }
 
-/** Persist the choice and keep <html lang> honest for screen readers. */
+/**
+ * Persist the choice, keep <html lang> honest for screen readers, and set
+ * <html dir> so the layout mirrors for right-to-left languages.
+ *
+ * `dir` is what makes RTL work at all: it flips text direction, flex `row`,
+ * and every logical property (`ms-`, `pe-`, `start-`, `text-start`) in one
+ * move. It does not touch physical ones — `ml-`, `left-`, `text-left` stay
+ * put — which is why the components use logical utilities throughout.
+ */
 export function applyUiLanguage(lang: string) {
   if (typeof document === 'undefined') return;
   document.documentElement.lang = lang;
+  document.documentElement.dir = directionOf(lang);
   try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* ignore */ }
 }

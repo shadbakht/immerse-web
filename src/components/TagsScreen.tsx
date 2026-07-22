@@ -94,12 +94,12 @@ function SortableTagRow({ tag, count, isOpen, hasQuotes, onToggleOpen, canIndent
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, paddingLeft: 12 + depth * 16 }}
-      className={`flex items-center gap-2 py-3 pr-3 border-b border-gray-100 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
+      className={`flex items-center gap-2 py-3 pe-3 border-b border-gray-100 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
     >
       <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 dark:text-[#5C7A8E] touch-none" aria-label={t('common.dragToReorder')}>
         <DragGrip />
       </button>
-      <button onClick={onToggleOpen} className="flex-1 flex items-center gap-2 min-w-0 text-left">
+      <button onClick={onToggleOpen} className="flex-1 flex items-center gap-2 min-w-0 text-start">
         <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#E2EAF2] truncate">{tag.name}</span>
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{count}</span>
         {hasQuotes && <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>}
@@ -118,7 +118,7 @@ function SortableQuoteRow({ sel, depth }: { sel: SelRow; depth: number }) {
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, paddingLeft: 20 + depth * 16 }}
-      className={`flex items-center gap-3 py-2 pr-4 border-b border-gray-50 dark:border-[#243543] bg-gray-50/40 dark:bg-[#16232F] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
+      className={`flex items-center gap-3 py-2 pe-4 border-b border-gray-50 dark:border-[#243543] bg-gray-50/40 dark:bg-[#16232F] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
     >
       <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-[#3A4D60] touch-none" aria-label={t('common.dragToReorder')}>
         <DragGrip />
@@ -139,7 +139,7 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   return (
     <button
       onClick={e => { e.stopPropagation(); onChange(); }}
-      className="flex items-center justify-center shrink-0 w-8 h-8 -ml-1"
+      className="flex items-center justify-center shrink-0 w-8 h-8 -ms-1"
     >
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
         state === 'checked'       ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3]' :
@@ -183,7 +183,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: Se
   ];
 
   return (
-    <div className="pr-3 py-1.5" style={{ paddingLeft: 36 + depth * 14 }}>
+    <div className="pe-3 py-1.5" style={{ paddingLeft: 36 + depth * 14 }}>
       <AnnotationCard
         variant="tag"
         quote={sel.snapshot_text}
@@ -280,12 +280,12 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
         </div>
       )}
       <div
-        className="flex items-center py-3.5 pr-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+        className="flex items-center py-3.5 pe-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
         style={{ paddingLeft: rowPaddingLeft }}
         onClick={() => onToggleOpen?.()}
       >
         <Checkbox state={selectState} onChange={onToggleSelect} />
-        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate ml-1 min-w-0">
+        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate ms-1 min-w-0">
           <Highlight text={tag.name} q={searchQuery} />
         </span>
         {(tag.visibility === 'published' || tag.visibility === 'imported') && (
@@ -295,7 +295,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
         )}
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0 mx-2">{count ?? tag.selections.length}</span>
         <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
-        <div onClick={e => e.stopPropagation()} className="ml-2">
+        <div onClick={e => e.stopPropagation()} className="ms-2">
           <ContextMenu options={menuOptions} />
         </div>
       </div>
@@ -714,7 +714,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                 {exporting ? t('tags.exporting') : `${t('tags.export')} (${selectedTagIds.size})`}
               </button>
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[200px]">
+                <div className="absolute end-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[200px]">
                   <div className="px-4 pt-3 pb-2 border-b border-gray-100 dark:border-[#2D4050]">
                     <p className="text-[10px] text-gray-400 dark:text-[#5C7A8E] font-semibold uppercase tracking-widest mb-2">{t('tags.exportInclude')}</p>
                     {([
@@ -742,7 +742,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                       <button
                         key={format}
                         onClick={() => handleExport(format)}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                        className="w-full text-start px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
                       >
                         {label}
                       </button>
@@ -754,10 +754,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           )}
         </div>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={t('tags.searchTagsPassages')} className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]" />
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={t('tags.searchTagsPassages')} className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]" />
           {(searchQuery || selectedTagIds.size > 0) && (
-            <button onClick={() => { setSearchQuery(''); setSelectedTagIds(new Set()); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
+            <button onClick={() => { setSearchQuery(''); setSelectedTagIds(new Set()); }} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>

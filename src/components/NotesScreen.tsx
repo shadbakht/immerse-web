@@ -88,7 +88,7 @@ function NoteItem({
   ];
 
   return (
-    <div className="pl-12 pr-4 py-1.5">
+    <div className="ps-12 pe-4 py-1.5">
       <AnnotationCard
         variant="note"
         quote={note.snapshotText}
@@ -357,7 +357,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
             {ti > 0 && <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1 }} />}
             {/* Tradition header */}
             <button
-              className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
+              className="w-full flex items-center gap-2 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-start select-none"
               onClick={() => toggleTradition(trad)}
             >
               <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{trad.name}</span>
@@ -373,7 +373,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                   <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 32 }} />
                   {/* Book sub-header */}
                   <button
-                    className="w-full flex items-center gap-2 pl-8 pr-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-left select-none"
+                    className="w-full flex items-center gap-2 ps-8 pe-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-start select-none"
                     onClick={() => toggleBook(book.bookKey)}
                   >
                     <span className="flex-1 text-sm text-gray-700 dark:text-[#B8C7D6] truncate">{book.title}</span>
@@ -431,17 +431,17 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('notes.title')}</h1>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('notes.searchPlaceholder')}
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
+            className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
+            <button onClick={() => setSearchQuery('')} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>

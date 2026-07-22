@@ -278,11 +278,11 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               <Checkbox
                 state={isChecked ? 'checked' : 'unchecked'}
                 onChange={() => toggleSlugs([book.id])}
-                className="pr-1 py-2.5 shrink-0"
+                className="pe-1 py-2.5 shrink-0"
               />
               <button
                 onClick={() => onOpenBook(uuid)}
-                className="flex-1 text-left pr-4 py-2.5 min-w-0"
+                className="flex-1 text-start pe-4 py-2.5 min-w-0"
               >
                 <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
               </button>
@@ -307,16 +307,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 <Checkbox
                   state={state}
                   onChange={() => toggleSlugs(childSlugs)}
-                  className="pr-1 py-3 shrink-0"
+                  className="pe-1 py-3 shrink-0"
                 />
                 <button
                   onClick={() => toggleNode(child.id)}
-                  className="flex-1 flex items-center justify-between pr-4 py-3 text-left min-w-0"
+                  className="flex-1 flex items-center justify-between pe-4 py-3 text-start min-w-0"
                 >
                   <span className={`truncate ${level === 0 ? 'text-sm font-medium text-gray-800 dark:text-[#D2DCE8]' : 'text-sm text-gray-700 dark:text-[#B8C7D6]'}`}>
                     {child.name}
                   </span>
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <div className="flex items-center gap-2 shrink-0 ms-2">
                     <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{childImmediate}</span>
                     <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
@@ -709,19 +709,19 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         )}
 
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={selectedSlugs.size > 0 ? t('library.searchSelected', { count: selectedSlugs.size }) : t('library.searchAll')}
-            className="w-full pl-9 pr-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
+            className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
           {(searchQuery || selectedSlugs.size > 0 || checkedResultIds.size > 0) && (
             <button
               onClick={() => { setSearchQuery(''); setSearchResults([]); setSelectedSlugs(new Set()); setCheckedResultIds(new Set()); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]"
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]"
             >{t('common.clear')}</button>
           )}
         </div>
@@ -770,10 +770,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                       <Checkbox
                         state={isChecked ? 'checked' : 'unchecked'}
                         onChange={() => setCheckedResultIds(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
-                        className="pl-3 pr-1 pt-3.5 shrink-0"
+                        className="ps-3 pe-1 pt-3.5 shrink-0"
                       />
                       <div
-                        className="flex-1 text-left pr-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                        className="flex-1 text-start pe-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
                         onClick={() => setExpandedResults(prev => { const n = new Set(prev); n.has(result.passageId) ? n.delete(result.passageId) : n.add(result.passageId); return n; })}
                       >
                         <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mb-1 truncate">
@@ -810,13 +810,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             return (
               <div key={root.id}>
                 <div className="flex items-center hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors">
-                  <Checkbox state={state} onChange={() => toggleSlugs(rootSlugs)} className="pl-3 pr-1 py-3.5 shrink-0" />
+                  <Checkbox state={state} onChange={() => toggleSlugs(rootSlugs)} className="ps-3 pe-1 py-3.5 shrink-0" />
                   <button
                     onClick={() => toggleNode(root.id)}
-                    className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
+                    className="flex-1 flex items-center justify-between pe-4 py-3.5 text-start min-w-0"
                   >
                     <span className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{root.name}</span>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <div className="flex items-center gap-2 shrink-0 ms-2">
                       <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{immediateCount}</span>
                       <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
@@ -835,14 +835,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 <Checkbox
                   state={checkState(importedBooks.map(b => b.id))}
                   onChange={() => toggleSlugs(importedBooks.map(b => b.id))}
-                  className="pl-3 pr-1 py-3.5 shrink-0"
+                  className="ps-3 pe-1 py-3.5 shrink-0"
                 />
                 <button
                   onClick={() => setMyBooksOpen(v => !v)}
-                  className="flex-1 flex items-center justify-between pr-4 py-3.5 text-left min-w-0"
+                  className="flex-1 flex items-center justify-between pe-4 py-3.5 text-start min-w-0"
                 >
                   <span className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{t('library.myBooks')}</span>
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <div className="flex items-center gap-2 shrink-0 ms-2">
                     {importedBooks.length > 0 && (
                       <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{importedBooks.length}</span>
                     )}
@@ -853,7 +853,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               {myBooksOpen && (
                 <div className="bg-gray-50/30">
                   {importedBooks.length === 0 ? (
-                    <p className="text-xs text-gray-400 dark:text-[#5C7A8E] pl-9 pr-4 py-3">
+                    <p className="text-xs text-gray-400 dark:text-[#5C7A8E] ps-9 pe-4 py-3">
                       {t('library.noImportedBooks')}
                     </p>
                   ) : (
@@ -925,10 +925,10 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
   if (confirmDelete) {
     return (
       <div className="flex items-center border-b border-gray-100 dark:border-[#2D4050] px-4 py-2.5 bg-red-50/60">
-        <span className="text-xs text-gray-600 dark:text-[#8FA4B8] flex-1 truncate pr-2">{t('library.deleteBookConfirm', { title: book.title })}</span>
+        <span className="text-xs text-gray-600 dark:text-[#8FA4B8] flex-1 truncate pe-2">{t('library.deleteBookConfirm', { title: book.title })}</span>
         <button
           onClick={() => { setConfirmDelete(false); onDelete(); }}
-          className="text-xs text-red-600 font-medium hover:text-red-700 mr-3 shrink-0"
+          className="text-xs text-red-600 font-medium hover:text-red-700 me-3 shrink-0"
         >
           {t('common.delete')}
         </button>
@@ -947,13 +947,13 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
       className="flex items-center border-b border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors group"
       style={{ paddingLeft: 36 }}
     >
-      <button onClick={onOpen} className="flex-1 text-left py-2.5 min-w-0 pr-2">
+      <button onClick={onOpen} className="flex-1 text-start py-2.5 min-w-0 pe-2">
         <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
       </button>
       <button
         onClick={() => setConfirmDelete(true)}
         title={t('common.delete')}
-        className="opacity-0 group-hover:opacity-100 shrink-0 p-1.5 text-gray-400 dark:text-[#5C7A8E] hover:text-red-500 transition-all mr-1"
+        className="opacity-0 group-hover:opacity-100 shrink-0 p-1.5 text-gray-400 dark:text-[#5C7A8E] hover:text-red-500 transition-all me-1"
       >
         <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M9 3h2a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1zm4 2V4a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3v1H4a1 1 0 0 0 0 2h.1l.9 10.1A2 2 0 0 0 7 19h6a2 2 0 0 0 2-1.9L15.9 7H16a1 1 0 0 0 0-2h-3z" clipRule="evenodd" />

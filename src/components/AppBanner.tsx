@@ -78,7 +78,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
       {/* Dismiss */}
       <button
         onClick={dismiss}
-        className="shrink-0 text-white/40 hover:text-white/80 transition-colors text-xl leading-none ml-1.5"
+        className="shrink-0 text-white/40 hover:text-white/80 transition-colors text-xl leading-none ms-1.5"
         aria-label={t('common.dismiss')}
       >
         ✕

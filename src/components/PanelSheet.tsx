@@ -45,7 +45,7 @@ export default function PanelSheet({ visible, onClose, title, children, footer, 
       >
         {/* Handle + Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
-          <div className="w-8 h-1 rounded-full bg-gray-200 dark:bg-[#354759] absolute top-2 left-1/2 -translate-x-1/2" />
+          <div className="w-8 h-1 rounded-full bg-gray-200 dark:bg-[#354759] absolute top-2 start-1/2 -translate-x-1/2" />
           <h3 className="text-base font-semibold text-gray-900 dark:text-[#E2EAF2]">{title}</h3>
           <button
             onClick={onClose}

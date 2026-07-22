@@ -63,7 +63,7 @@ export default function Onboarding({ visible, onClose }: OnboardingProps) {
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-gray-500 dark:text-[#8FA4B8] hover:bg-black/10 transition-colors"
+          className="absolute top-3 end-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-gray-500 dark:text-[#8FA4B8] hover:bg-black/10 transition-colors"
           aria-label={t('onboarding.closeIntro')}
         >
           ✕
