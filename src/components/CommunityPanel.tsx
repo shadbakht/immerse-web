@@ -768,7 +768,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
                 </button>
                 {showExportMenu && (
                   <div className="absolute end-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px] py-1">
-                    {([{ label: 'PDF', format: 'pdf' }, { label: 'Word (.docx)', format: 'docx' }] as const).map(({ label, format }) => (
+                    {([{ label: 'PDF', format: 'pdf' }, { label: t('export.docxShort'), format: 'docx' }] as const).map(({ label, format }) => (
                       <button
                         key={format}
                         onClick={() => handleExport(format)}

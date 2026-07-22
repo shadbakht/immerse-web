@@ -737,7 +737,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                   <div className="py-1">
                     {([
                       { label: 'PDF',           format: 'pdf'  },
-                      { label: 'Word (.docx)',   format: 'docx' },
+                      { label: t('export.docxShort'), format: 'docx' },
                     ] as const).map(({ label, format }) => (
                       <button
                         key={format}
