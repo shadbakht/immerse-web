@@ -1,6 +1,8 @@
 'use client';
 
+import { translate, type TranslationKey, type TranslateVars } from '@immerse/i18n';
 import { createClient } from './supabase/client';
+import { getStoredUiLanguage } from './language';
 import {
   AlignmentType,
   Document,
@@ -126,13 +128,24 @@ async function fetchEnrichedData(allSelIds: string[], opts: ExportOptions): Prom
 
 // ─── Export: DOCX ─────────────────────────────────────────────────────────────
 
+/**
+ * Translation for the export document, which is assembled outside React.
+ * Both builders run in the browser, so the stored language is readable
+ * directly rather than threaded through every call site.
+ */
+const exportTranslator = () => {
+  const lang = getStoredUiLanguage();
+  return (key: TranslationKey, vars?: TranslateVars) => translate(lang, key, vars);
+};
+
 const DOC_PRIMARY = '1B6B7B';
 const DOC_BODY    = '1C2B35';
 const DOC_MUTED   = '6B7280';
 const DOC_FAINT   = '9CA3AF';
 
 export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
-  const allSelIds = selectedTags.flatMap(t => t.selections.map(s => s.id));
+  const t = exportTranslator();
+  const allSelIds = selectedTags.flatMap(tag => tag.selections.map(s => s.id));
   const { notesBySelId, xrefsBySel } = await fetchEnrichedData(allSelIds, opts);
 
   const children: Paragraph[] = [];
@@ -153,7 +166,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
     if (tag.selections.length === 0) {
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: '(no passages tagged)', italics: true, size: 20, color: DOC_FAINT })],
+          children: [new TextRun({ text: t('export.noPassagesTagged'), italics: true, size: 20, color: DOC_FAINT })],
           indent:  D > 0 ? { left: dI } : undefined,
           spacing: { after: 200 },
         }),
@@ -236,7 +249,8 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
 // ─── Export: PDF (print-to-PDF via browser) ───────────────────────────────────
 
 export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
-  const allSelIds = selectedTags.flatMap(t => t.selections.map(s => s.id));
+  const t = exportTranslator();
+  const allSelIds = selectedTags.flatMap(tag => tag.selections.map(s => s.id));
   const { notesBySelId, xrefsBySel } = await fetchEnrichedData(allSelIds, opts);
 
   let body = '';
@@ -245,7 +259,7 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
     body += `\n  <h2 class="tag-heading">${escapeHtml(tag.name)}</h2>`;
 
     if (tag.selections.length === 0) {
-      body += `\n  <p class="empty">(no passages tagged)</p>`;
+      body += `\n  <p class="empty">${escapeHtml(t('export.noPassagesTagged'))}</p>`;
       continue;
     }
 
@@ -271,7 +285,7 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>${escapeHtml(selectedTags.map(t => t.name).join(', '))}</title>
+  <title>${escapeHtml(selectedTags.map(tag => tag.name).join(', '))}</title>
   <style>
     body { font-family: Georgia, 'Times New Roman', serif; max-width: 640px; margin: 0 auto; padding: 40px 36px; line-height: 1.75; color: #1C2B35; font-size: 14px; }
     .tag-heading { font-size: 22px; color: #1B6B7B; font-weight: 400; margin: 48px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #E5E7EB; }
