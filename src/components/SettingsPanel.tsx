@@ -242,13 +242,19 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
             </section>
 
-            {/* Language — the interface only. Which library you read is a
-                separate control in the Library header, as on mobile. */}
+            {/* App language — the INTERFACE only, which is why the heading says
+                so. Which library you read is a separate control in the Library
+                header, as on mobile. Nothing library-related belongs here: web
+                streams every library from the server, so unlike mobile there is
+                no download to manage. */}
             <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.language')}</span>
+                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.appLanguage')}</span>
               </div>
               <div className="px-5 py-4">
+                <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mb-3">
+                  {t('settings.appLanguageHint')}
+                </p>
                 <div className="flex gap-2">
                   {UI_LANGUAGES.map(({ code, label }) => (
                     <button
@@ -264,9 +270,6 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-3">
-                  {t('settings.appLanguageHint')}
-                </p>
               </div>
             </section>
 
