@@ -255,20 +255,36 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mb-3">
                   {t('settings.appLanguageHint')}
                 </p>
-                <div className="flex gap-2">
-                  {UI_LANGUAGES.map(({ code, label }) => (
-                    <button
-                      key={code}
-                      onClick={() => setUiLanguage(code)}
-                      className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors ${
-                        uiLanguage === code
-                          ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
-                          : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                {/* A checkable list, not a segmented row: equal-width segments
+                    only fit two or three labels, and "Français"/"Русский"/"فارسی"
+                    would be squeezed once the library grows past a handful of
+                    languages. Mirrors the mobile Settings list. */}
+                <div role="radiogroup" className="flex flex-col">
+                  {UI_LANGUAGES.map(({ code, label }) => {
+                    const active = uiLanguage === code;
+                    return (
+                      <button
+                        key={code}
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setUiLanguage(code)}
+                        className={`flex items-center justify-between gap-3 py-2.5 text-start text-sm transition-colors ${
+                          active
+                            ? 'text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold'
+                            : 'text-gray-600 dark:text-[#8FA4B8] hover:text-gray-900 dark:hover:text-[#D2DCE8]'
+                        }`}
+                      >
+                        <span>{label}</span>
+                        {active && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                               strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </section>
