@@ -1643,6 +1643,17 @@ async function handleCopy() {
             if (showChapter) lastChapter = passage.chapter_label!;
             if (showSection) lastSection = passage.section_title!;
 
+            // A chunk's leading <h2>/<h3> is stored as a passage row of its own —
+            // its data-pid is a real annotation anchor, so the sync scripts must
+            // keep it — which means the heading text arrives here a second time,
+            // as a body paragraph identical to the divider we just drew above it.
+            // Draw the divider, skip the echo. The row's wrapper stays so a
+            // selection anchored at the chapter start keeps its gutter icon.
+            const isHeadingEcho =
+              passage.paragraph_number === 0 &&
+              (passage.content === passage.chapter_label ||
+               passage.content === passage.section_title);
+
             // Prayer-style books: split "Section, Title" into a centered divider +
             // title, and peel a trailing attribution off the body.
             let prayerSection: string | null = null;
@@ -1747,7 +1758,15 @@ async function handleCopy() {
                   </>
                 )}
                 <div
-                  className="relative"
+                  className={`relative${
+                    // A hidden heading echo collapses to zero height, which would
+                    // stack its gutter icons exactly on top of the next passage's
+                    // and make a chapter-start annotation unclickable. Reserve a
+                    // row's worth of space, but only when there is one to reach.
+                    isHeadingEcho && !isImported &&
+                    (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id))
+                      ? ' min-h-9' : ''
+                  }`}
                   onClick={undefined}
                 >
                   {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
@@ -1781,12 +1800,12 @@ async function handleCopy() {
                       )}
                     </div>
                   )}
-                  {(tdMargin != null || passage.paragraph_number != null) && !isLetterDate && (
+                  {(tdMargin != null || passage.paragraph_number != null) && !isLetterDate && !isHeadingEcho && (
                     <span className="absolute -end-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-end leading-relaxed tabular-nums">
                       {tdMargin ?? passage.paragraph_number}
                     </span>
                   )}
-                  <p
+                  {!isHeadingEcho && <p
                     data-pid={passage.id}
                     className={`font-serif text-gray-800 dark:text-[#D2DCE8] leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
                     style={{ fontSize: 'var(--quote-font-size)' }}
@@ -1802,7 +1821,7 @@ async function handleCopy() {
                     {attribution && (
                       <span className="block text-end italic text-gray-500 dark:text-[#8FA4B8] mt-2">{attribution}</span>
                     )}
-                  </p>
+                  </p>}
                 </div>
               </div>
             );
