@@ -1800,7 +1800,13 @@ async function handleCopy() {
                       )}
                     </div>
                   )}
-                  {(tdMargin != null || passage.paragraph_number != null) && !isLetterDate && !isHeadingEcho && (
+                  {/* paragraph_number 0 is the corpus-wide "not numbered" sentinel —
+                      real numbering starts at 1 — so a truthiness test is what
+                      belongs here. `!= null` printed a literal "0" beside headings
+                      and unnumbered matter like a translator's colophon. */}
+                  {/* Boolean(), not a bare truthiness test: JSX renders a falsy
+                      NUMBER, so `0 && <span/>` puts a literal "0" in the DOM. */}
+                  {(tdMargin != null || Boolean(passage.paragraph_number)) && !isLetterDate && !isHeadingEcho && (
                     <span className="absolute -end-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-end leading-relaxed tabular-nums">
                       {tdMargin ?? passage.paragraph_number}
                     </span>
