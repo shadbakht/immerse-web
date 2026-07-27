@@ -38,17 +38,25 @@ interface BookMeta {
 /**
  * Coerce `books.language` to a real BCP-47 tag.
  *
- * The column is not clean: Supabase holds 465 rows saying `English` against 43
- * saying `en` (plus 125 `es`). Mobile normalises the same mess in a SQLite
- * migration, but nothing ever normalised the server, and until now nothing on
- * the web read the column so nothing noticed. Rendering it raw would put
- * `lang="English"` in the DOM — not a tag any browser resolves, so the font and
- * hyphenation the attribute exists to select are silently skipped.
+ * The server data is clean as of 2026-07-27: the column held 465 rows saying
+ * `English` against 43 saying `en`, and was normalised in place (mobile had
+ * been fixing the same mess twice over — a SQLite migration for existing
+ * installs and a CASE in the ingester's INSERT — but nothing had ever touched
+ * Supabase, and until the reader started reading the column nothing noticed).
  *
- * The direction lookup happens to survive an unnormalised value, since anything
- * unrecognised falls to left-to-right and these are all left-to-right books.
- * That is luck, not correctness, and it stops being luck the first time a
- * right-to-left library is written in as `Persian`.
+ * This is kept as a guard rather than deleted with the mess it was written for,
+ * on two grounds. The `?? 'en'` is load-bearing regardless of how clean the
+ * column is: `language` is optional because imported books live in IndexedDB
+ * and carry no language at all, so this call site needs a default either way.
+ * And nothing *enforces* the invariant — the column is free text with no CHECK
+ * constraint, so it is one hand-written ingest script away from drifting again.
+ *
+ * What it buys is small and quiet: a bad value renders `lang="English"`, which
+ * no browser resolves, so the font and hyphenation the attribute exists to
+ * select are skipped with nothing shown to say so. The direction lookup would
+ * survive the same bad value, but only because anything unrecognised falls to
+ * left-to-right — luck that runs out the first time a right-to-left library is
+ * written in as `Persian`.
  */
 function bcp47(language: string | undefined): string {
   const raw = (language ?? '').trim().toLowerCase();
