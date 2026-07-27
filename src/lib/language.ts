@@ -15,12 +15,26 @@ const STORAGE_KEY = 'immerse_ui_language';
 
 export const DEFAULT_UI_LANGUAGE = 'en';
 
-/** Browser locale reduced to a bare language tag, e.g. "es-419" → "es". */
-function browserLanguage(): string {
-  if (typeof navigator === 'undefined') return DEFAULT_UI_LANGUAGE;
-  const tag = navigator.language || DEFAULT_UI_LANGUAGE;
-  const base = String(tag).split(/[-_]/)[0].toLowerCase();
-  return base || DEFAULT_UI_LANGUAGE;
+/** A locale tag reduced to its language subtag, e.g. "es-419" → "es". */
+export function baseLanguage(tag: string): string {
+  return String(tag).split(/[-_]/)[0].toLowerCase();
+}
+
+/**
+ * The browser's preferred languages, in order, reduced to language subtags.
+ *
+ * `navigator.languages` rather than `navigator.language`, because the two
+ * disagree in exactly the case worth getting right: someone whose first choice
+ * is a language Immerse does not speak. A browser set to [de, fr, en] gets
+ * French rather than English, which is what that list is for — reading only the
+ * first entry throws the rest of the user's stated preference away.
+ */
+function browserLanguages(): string[] {
+  if (typeof navigator === 'undefined') return [];
+  const tags = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language].filter(Boolean);
+  return tags.map(baseLanguage).filter(Boolean);
 }
 
 /**
@@ -29,27 +43,78 @@ function browserLanguage(): string {
  * deterministic — see LanguageProvider for why that matters.
  */
 export function getStoredUiLanguage(): string {
-  if (typeof window === 'undefined') return DEFAULT_UI_LANGUAGE;
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && SUPPORTED_UI_LANGUAGES.includes(saved)) return saved;
-  } catch { /* private mode — fall through to the browser locale */ }
-  const detected = browserLanguage();
-  return SUPPORTED_UI_LANGUAGES.includes(detected) ? detected : DEFAULT_UI_LANGUAGE;
+  return getChosenUiLanguage() ?? detectedUiLanguage();
 }
 
 /**
- * Persist the choice, keep <html lang> honest for screen readers, and set
- * <html dir> so the layout mirrors for right-to-left languages.
+ * The language this browser was *told* to use, or null if nobody ever said.
+ *
+ * The distinction matters only for account sync: a stored value is a choice
+ * worth seeding an empty account with, while the browser locale is a guess and
+ * must not be written to the account as though the user had made it. Everything
+ * else should call getStoredUiLanguage() and not care which it got.
+ */
+export function getChosenUiLanguage(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && SUPPORTED_UI_LANGUAGES.includes(saved)) return saved;
+  } catch { /* private mode — no stored choice to read */ }
+  return null;
+}
+
+/** The first of the browser's languages that Immerse actually speaks. */
+export function detectedUiLanguage(): string {
+  return browserLanguages().find(l => SUPPORTED_UI_LANGUAGES.includes(l))
+    ?? DEFAULT_UI_LANGUAGE;
+}
+
+// ─── Content language ────────────────────────────────────────────────────────
+// Which library is being read, as opposed to which language the chrome is in.
+// It moved here from LibraryPanel's local state when the two settings started
+// syncing to the account: they are one pair of preferences and reconciling them
+// in two different components would have meant two different rules.
+
+const CONTENT_KEY = 'immerse:contentLang';
+
+export const DEFAULT_CONTENT_LANGUAGE = 'en';
+
+/** The library language this browser was told to use, or null if never set. */
+export function getChosenContentLanguage(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(CONTENT_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function storeContentLanguage(lang: string) {
+  try { localStorage.setItem(CONTENT_KEY, lang); } catch { /* ignore */ }
+}
+
+/**
+ * Keep <html lang> honest for screen readers, and set <html dir> so the layout
+ * mirrors for right-to-left languages.
  *
  * `dir` is what makes RTL work at all: it flips text direction, flex `row`,
  * and every logical property (`ms-`, `pe-`, `start-`, `text-start`) in one
  * move. It does not touch physical ones — `ml-`, `left-`, `text-left` stay
  * put — which is why the components use logical utilities throughout.
+ *
+ * Deliberately does NOT persist. It used to, which was harmless until the
+ * languages started syncing: applying the *detected* browser language on mount
+ * wrote it to storage, and one frame later it was indistinguishable from a
+ * language the user had chosen — enough to seed an empty account with a guess.
+ * Storing is now its own call, made only where there is a choice to store.
  */
 export function applyUiLanguage(lang: string) {
   if (typeof document === 'undefined') return;
   document.documentElement.lang = lang;
   document.documentElement.dir = directionOf(lang);
+}
+
+/** Record a UI language the user chose, or one adopted from their account. */
+export function storeUiLanguage(lang: string) {
   try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* ignore */ }
 }

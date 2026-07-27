@@ -10,7 +10,7 @@ import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { semanticSearch, reciprocalRankFusion, SEMANTIC_SEARCH_ENABLED } from '@/lib/semanticSearch';
-import { useTranslation } from '@/contexts/LanguageProvider';
+import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
 
 // Categories whose books have no canonical order and should display
@@ -60,6 +60,7 @@ interface ImportedBook {
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
+  const { contentLanguage, setContentLanguage } = useLanguage();
 
   const [catalog, setCatalog]   = useState<Catalog | null>(null);
   const [slugMap, setSlugMap]   = useState<Map<string, string>>(new Map());
@@ -69,17 +70,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   // Which content language the library is scoped to. Mirrors the mobile scope
   // switcher: books carry a language tag and the tree shows one language at a
-  // time. Persisted so a Spanish reader stays in Spanish across sessions.
-  const [contentLang, setContentLangState] = useState('en');
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('immerse:contentLang') : null;
-    if (saved) setContentLangState(saved);
-  }, []);
+  // time. Owned by LanguageProvider rather than by this component, because it
+  // is persisted to the account alongside the interface language and the two
+  // have to be reconciled by one rule, not two.
   const setContentLang = useCallback((lang: string) => {
-    setContentLangState(lang);
-    try { localStorage.setItem('immerse:contentLang', lang); } catch { /* ignore */ }
+    setContentLanguage(lang);
     setOpenNodes(new Set());   // collapse: the previous language's open nodes don't apply
-  }, []);
+  }, [setContentLanguage]);
 
   // My Books
   const [isPro, setIsPro]                 = useState(false);
@@ -182,6 +179,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     for (const b of catalog?.books ?? []) counts.set(bookLang(b), (counts.get(bookLang(b)) ?? 0) + 1);
     return [...counts.keys()].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : a.localeCompare(b)));
   }, [catalog]);
+
+  // The language the tree actually renders in, which is the account's choice
+  // unless this catalog has nothing in it — a library the account was reading
+  // elsewhere may simply not exist here. Falling back is a display decision and
+  // is deliberately not written back: the preference stays as the user set it,
+  // ready for the moment that library does appear. Before the catalog loads the
+  // list is empty and the preference stands unchallenged.
+  const contentLang = availableLanguages.length === 0 || availableLanguages.includes(contentLanguage)
+    ? contentLanguage
+    : 'en';
 
   // Categories that contain at least one book in the active language, at any
   // depth. Categories are shared across languages, so without this the Spanish
