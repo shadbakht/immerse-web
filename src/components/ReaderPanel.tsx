@@ -15,6 +15,7 @@ import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
 import { loadSlugMaps } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { directionOf } from '@immerse/i18n';
 
 interface Passage {
   id: string;
@@ -29,6 +30,30 @@ interface BookMeta {
   title: string;
   authorName: string;
   citationFormat: string;
+  // BCP-47 tag from books.language. Optional because imported books are held in
+  // IndexedDB and carry no language of their own; those fall back to English.
+  language?: string;
+}
+
+/**
+ * Coerce `books.language` to a real BCP-47 tag.
+ *
+ * The column is not clean: Supabase holds 465 rows saying `English` against 43
+ * saying `en` (plus 125 `es`). Mobile normalises the same mess in a SQLite
+ * migration, but nothing ever normalised the server, and until now nothing on
+ * the web read the column so nothing noticed. Rendering it raw would put
+ * `lang="English"` in the DOM — not a tag any browser resolves, so the font and
+ * hyphenation the attribute exists to select are silently skipped.
+ *
+ * The direction lookup happens to survive an unnormalised value, since anything
+ * unrecognised falls to left-to-right and these are all left-to-right books.
+ * That is luck, not correctness, and it stops being luck the first time a
+ * right-to-left library is written in as `Persian`.
+ */
+function bcp47(language: string | undefined): string {
+  const raw = (language ?? '').trim().toLowerCase();
+  if (!raw) return 'en';
+  return raw === 'english' ? 'en' : raw;
 }
 
 // Books whose TOC is genuinely two-level (chapter_label = chapter, section_title =
@@ -700,12 +725,12 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       };
 
       const [{ data: bookData }, passageData] = await Promise.all([
-        supabase.from('books').select('title, citation_format, authors(name), footnotes').eq('id', bookId).single(),
+        supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single(),
         fetchAllPassages(),
       ]);
 
       if (bookData) {
-        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph' });
+        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language) });
         setFootnoteMap((bookData as any).footnotes ?? {});
       }
 
@@ -1629,7 +1654,15 @@ async function handleCopy() {
 
       {/* Passage content */}
       {!pdfUrl && <div ref={scrollRef} className="flex-1 overflow-y-auto" onMouseUp={isImported ? undefined : handleMouseUp}>
-        <div className="max-w-[70ch] mx-auto px-8 py-12">
+        {/* lang/dir come from the BOOK, not the interface. <html dir> is set from
+            the UI language, and without this the reader inherited it — so a
+            right-to-left interface right-aligned every English and Spanish
+            passage. Also gives the browser the right font fallback per script. */}
+        <div
+          className="max-w-[70ch] mx-auto px-8 py-12"
+          lang={bcp47(book?.language)}
+          dir={directionOf(bcp47(book?.language))}
+        >
           {book && (
             <div className="mb-12 text-center">
               <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] leading-snug">{book.title}</h1>
