@@ -19,6 +19,7 @@ export interface SelRow {
   snapshot_text: string;
   passage_id: string;
   book_id: string;
+  book_title?: string;
   citation: string;
 }
 
@@ -52,9 +53,24 @@ function safeFilename(name: string): string {
   return name.replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, ' ').trim() || 'tag';
 }
 
+/**
+ * Filename stem for an export: the main (top-level) tag heading, which is what
+ * the document leads with. Falls back to the first tag when the selection is
+ * sub-tags only.
+ */
+function exportBaseName(selectedTags: TagRow[]): string {
+  const root = selectedTags.find(t => (t.depth ?? 0) === 0) ?? selectedTags[0];
+  return safeFilename(root?.name ?? 'tags');
+}
+
 function citationInParens(raw: string): string {
   if (!raw) return '';
   return `(${raw.replace(/^—\s*/, '').replace(/\.$/, '')})`;
+}
+
+function citationBare(raw: string): string {
+  if (!raw) return '';
+  return raw.replace(/^—\s*/, '').replace(/\.$/, '');
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -76,7 +92,14 @@ interface EnrichedData {
   selFullMap:   Record<string, { start_pid: string; end_pid: string; start_offset: number; end_offset: number; created_at: string }>;
 }
 
-async function fetchEnrichedData(allSelIds: string[], opts: ExportOptions): Promise<EnrichedData> {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function fetchEnrichedData(selIds: string[], opts: ExportOptions): Promise<EnrichedData> {
+  // A Discover export carries synthetic selection ids ("<ctId>:<exportId>:<i>"),
+  // since nothing has been imported: there are no rows to enrich, and sending
+  // those to PostgREST is a guaranteed invalid-uuid error. Quotes and citations
+  // come from the payload either way; notes and xrefs are never shared.
+  const allSelIds = selIds.filter(id => UUID_RE.test(id));
   if (!allSelIds.length) return { notesBySelId: {}, xrefsBySel: {}, selFullMap: {} };
 
   const supabase = createClient();
@@ -243,7 +266,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
   const blob = new Blob([new Uint8Array(buffer)], {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   });
-  triggerDownload(blob, `${safeFilename(selectedTags[0]?.name ?? 'tags')}.docx`);
+  triggerDownload(blob, `${exportBaseName(selectedTags)}.docx`);
 }
 
 // ─── Export: PDF (print-to-PDF via browser) ───────────────────────────────────
@@ -268,36 +291,45 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
       const xrefs = opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [];
       const cit   = citationInParens(sel.citation);
 
-      body += `\n  <div class=”passage-block”>`;
-      body += `\n    <p class=”quote”>”${escapeHtml(sel.snapshot_text)}”</p>`;
-      body += `\n    <p class=”citation”>${escapeHtml(cit)}</p>`;
+      // NB: straight quotes on the attributes. These were curly, which the HTML
+      // parser reads as part of an unquoted value — every class was wrong and
+      // none of the stylesheet below applied.
+      body += `\n  <div class="passage-block">`;
+      body += `\n    <p class="quote">“${escapeHtml(sel.snapshot_text)}”</p>`;
+      body += `\n    <p class="citation">${escapeHtml(cit)}</p>`;
       for (const note of notes) {
-        body += `\n    <p class=”note”>•  ${escapeHtml(note)}</p>`;
+        body += `\n    <p class="note">•  ${escapeHtml(note)}</p>`;
       }
       for (const xref of xrefs) {
-        body += `\n    <p class=”xref”>↔  ${escapeHtml(xref)}</p>`;
+        body += `\n    <p class="xref">↔  ${escapeHtml(xref)}</p>`;
       }
       body += `\n  </div>`;
     }
   }
 
+  // The browser's print-to-PDF names the file after the document title, so the
+  // title is the main tag heading rather than a joined list of every tag.
   const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>${escapeHtml(selectedTags.map(tag => tag.name).join(', '))}</title>
+  <title>${escapeHtml(exportBaseName(selectedTags))}</title>
   <style>
-    body { font-family: Georgia, 'Times New Roman', serif; max-width: 640px; margin: 0 auto; padding: 40px 36px; line-height: 1.75; color: #1C2B35; font-size: 14px; }
-    .tag-heading { font-size: 22px; color: #1B6B7B; font-weight: 400; margin: 48px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #E5E7EB; }
+    /* 1in margins on every page. Without this the print dialog's own default
+       applies and a line landing on the page break is cut through. */
+    @page { size: letter; margin: 1in; }
+    body { font-family: Georgia, 'Times New Roman', serif; margin: 0 auto; padding: 40px 36px; line-height: 1.75; color: #1C2B35; font-size: 14px; max-width: 640px; orphans: 2; widows: 2; }
+    .tag-heading { font-size: 22px; color: #1B6B7B; font-weight: 400; margin: 48px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #E5E7EB; page-break-after: avoid; break-after: avoid; }
     .tag-heading:first-child { margin-top: 0; }
-    .passage-block { margin-bottom: 24px; }
+    /* Keep a quote with its citation, notes and cross-references */
+    .passage-block { margin-bottom: 24px; page-break-inside: avoid; break-inside: avoid; }
     .quote { margin: 0; text-align: justify; }
     .citation { margin: 0; text-align: right; font-size: 11px; color: #6B7280; font-style: italic; }
     .note { margin: 6px 0 3px; font-size: 13px; padding-left: 20px; text-indent: -12px; }
     .xref { margin: 4px 0 3px; font-size: 12px; color: #1B6B7B; font-style: italic; padding-left: 20px; text-indent: -14px; }
     .empty { font-style: italic; color: #9CA3AF; font-size: 13px; }
     .footer { text-align: center; font-size: 10px; color: #9CA3AF; font-style: italic; margin-top: 48px; }
-    @media print { body { padding: 0; } }
+    @media print { body { padding: 0; max-width: none; } }
   </style>
 </head>
 <body>${body}
@@ -312,4 +344,98 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
     win.focus();
     setTimeout(() => win.print(), 400);
   }
+}
+
+// ─── Export: CSV ──────────────────────────────────────────────────────────────
+
+/** Wrap a CSV field value — quotes it if it contains comma, quote, or newline. */
+function csvField(value: string): string {
+  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+/** Column-for-column identical to the mobile CSV export. */
+export async function exportAsCsv(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
+  const allSelIds = selectedTags.flatMap(tag => tag.selections.map(s => s.id));
+  const { notesBySelId, xrefsBySel } = await fetchEnrichedData(allSelIds, opts);
+
+  const rows: string[] = [
+    ['Tag', 'Sub-tag', 'Book', 'Citation', 'Quote', 'Notes', 'See Also']
+      .map(csvField).join(','),
+  ];
+
+  // Track the root tag name as we walk the tree-ordered list
+  let currentRootName = '';
+
+  for (const tag of selectedTags) {
+    if ((tag.depth ?? 0) === 0) currentRootName = tag.name;
+    const tagCol    = currentRootName;
+    const subTagCol = (tag.depth ?? 0) > 0 ? tag.name : '';
+
+    for (const sel of tag.selections) {
+      const notes = opts.includeNotes ? (notesBySelId[sel.id] ?? []) : [];
+      const xrefs = opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [];
+      rows.push(
+        [
+          tagCol,
+          subTagCol,
+          sel.book_title ?? '',
+          citationBare(sel.citation),
+          sel.snapshot_text,
+          notes.join('; '),
+          xrefs.join('; '),
+        ].map(csvField).join(','),
+      );
+    }
+  }
+
+  // BOM so Excel opens the accented citations as UTF-8
+  const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  triggerDownload(blob, `${exportBaseName(selectedTags)}.csv`);
+}
+
+// ─── Export: Markdown ─────────────────────────────────────────────────────────
+
+export async function exportAsMarkdown(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
+  const t = exportTranslator();
+  const allSelIds = selectedTags.flatMap(tag => tag.selections.map(s => s.id));
+  const { notesBySelId, xrefsBySel } = await fetchEnrichedData(allSelIds, opts);
+
+  const lines: string[] = [];
+
+  for (const tag of selectedTags) {
+    const prefix = '#'.repeat(Math.min((tag.depth ?? 0) + 1, 4));
+    if (lines.length > 0) lines.push('');
+    lines.push(`${prefix} ${tag.name}`);
+
+    if (tag.selections.length === 0) {
+      lines.push('', `*${t('export.noPassagesTagged')}*`);
+      continue;
+    }
+
+    for (const sel of tag.selections) {
+      const notes = opts.includeNotes ? (notesBySelId[sel.id] ?? []) : [];
+      const xrefs = opts.includeXrefs ? (xrefsBySel[sel.id] ?? []) : [];
+
+      lines.push('');
+      lines.push(`> "${sel.snapshot_text}"`);
+      lines.push(`> *${citationInParens(sel.citation)}*`);
+
+      for (const note of notes) {
+        lines.push('');
+        lines.push(`- ${note}`);
+      }
+
+      if (xrefs.length > 0) {
+        lines.push('');
+        lines.push(`◇ *${t('export.seeAlso')}*`);
+        for (const xref of xrefs) lines.push(`  - ${xref}`);
+      }
+    }
+  }
+
+  lines.push('', '---', '*Made with Immerse*');
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+  triggerDownload(blob, `${exportBaseName(selectedTags)}.md`);
 }

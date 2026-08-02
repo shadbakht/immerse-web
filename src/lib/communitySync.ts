@@ -353,57 +353,133 @@ export async function unpublishTag(rootTagId: string, userId: string): Promise<v
 // ─── Import ───────────────────────────────────────────────────────────────────
 
 /**
- * Import a community tag into the user's local library and subscribe to updates.
- * Returns the new local root tag ID.
+ * Resolve payload pids to Supabase passage uuids.
+ *
+ * A payload carries the portable pid ("efb81dbb4653"), but `selections.passage_id`
+ * is a uuid FK into `passages` — writing the pid there is rejected by Postgres,
+ * and supabase-js reports that in `error` rather than throwing, so an import that
+ * gets this wrong silently produces a tag with no quotes in it.
+ */
+async function resolvePassageIds(
+  supabase: ReturnType<typeof createClient>,
+  pids: string[],
+): Promise<Record<string, string>> {
+  const map: Record<string, string> = {};
+  const unique = [...new Set(pids.filter(Boolean))];
+  const CHUNK = 200;   // keep the `in` list well inside PostgREST's URL limit
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const { data } = await supabase
+      .from('passage_pid_map')
+      .select('pid, passage_id')
+      .in('pid', unique.slice(i, i + CHUNK));
+    for (const r of (data ?? []) as { pid: string; passage_id: string }[]) {
+      map[r.pid] = r.passage_id;
+    }
+  }
+  return map;
+}
+
+/** Build the selections rows for one payload tag, skipping unresolvable pids. */
+function selectionRowsFor(
+  tagExport: ImmTagExport,
+  userId: string,
+  pidMap: Record<string, string>,
+  now: string,
+) {
+  const rows: Record<string, unknown>[] = [];
+  for (const sel of tagExport.selections) {
+    const passageId = pidMap[sel.startPid];
+    if (!passageId) {
+      console.warn('[communitySync] Skipping selection — unknown passage:', sel.startPid);
+      continue;
+    }
+    rows.push({
+      id:                    crypto.randomUUID(),
+      user_id:               userId,
+      passage_id:            passageId,
+      start_pid:             sel.startPid,
+      end_pid:               sel.endPid ?? sel.startPid,
+      book_local_id:         sel.bookId ?? null,
+      anchor_schema_version: 1,
+      start_offset:          sel.startOffset,
+      end_offset:            sel.endOffset,
+      snapshot_text:         sel.snapshotText,
+      created_at:            sel.createdAt,
+      updated_at:            now,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Import a community tag into the user's library and subscribe to updates.
+ * Returns the local root tag ID.
+ *
+ * Idempotent: a second import of the same community tag returns the root that
+ * already exists instead of building a second copy of the whole tree. Repeated
+ * taps on Import used to leave a user with three identical tag trees.
  */
 export async function importCommunityTag(ct: CommunityTagRow, userId: string): Promise<string> {
   const supabase = createClient();
   const now      = new Date().toISOString();
+
+  // Already subscribed, and the root tag still exists? Nothing to import.
+  const { data: existingSub } = await supabase
+    .from('community_tag_subscriptions')
+    .select('local_tag_id')
+    .eq('subscriber_id', userId)
+    .eq('community_tag_id', ct.id)
+    .maybeSingle();
+
+  if (existingSub?.local_tag_id) {
+    const { data: rootStillThere } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('id', existingSub.local_tag_id as string)
+      .maybeSingle();
+    if (rootStillThere) return existingSub.local_tag_id as string;
+  }
+
   const idMap: Record<string, string> = {};
   let   rootLocalTagId = '';
 
   // Parents before children
   const sorted = [...ct.payload].sort((a, b) => a.depth - b.depth);
+  const pidMap = await resolvePassageIds(
+    supabase,
+    sorted.flatMap(t => (t.selections ?? []).map(s => s.startPid)),
+  );
 
   for (const tagExport of sorted) {
     const newTagId = crypto.randomUUID();
     idMap[tagExport.exportId] = newTagId;
     if (tagExport.depth === 0) rootLocalTagId = newTagId;
 
-    await supabase.from('tags').insert({
+    const { error: tagErr } = await supabase.from('tags').insert({
       id:         newTagId,
       user_id:    userId,
       parent_id:  tagExport.parentExportId ? (idMap[tagExport.parentExportId] ?? null) : null,
       name:       tagExport.name,
       depth:      tagExport.depth,
       sort_order: tagExport.sortOrder,
+      visibility: 'imported',
       created_at: now,
     });
+    if (tagErr) throw tagErr;
 
-    for (const sel of tagExport.selections) {
-      const selId = crypto.randomUUID();
-      try {
-        await supabase.from('selections').insert({
-          id:            selId,
-          user_id:       userId,
-          passage_id:    sel.startPid,
-          start_offset:  sel.startOffset,
-          end_offset:    sel.endOffset,
-          snapshot_text: sel.snapshotText,
-          created_at:    sel.createdAt,
-        });
-        await supabase.from('selection_tags').insert({
-          selection_id: selId,
-          tag_id:       newTagId,
-          created_at:   now,
-        });
-      } catch (e) {
-        console.warn('[communitySync] Skipping selection:', sel.startPid, e);
-      }
-    }
+    const selRows = selectionRowsFor(tagExport, userId, pidMap, now);
+    if (selRows.length === 0) continue;
+
+    const { error: selErr } = await supabase.from('selections').insert(selRows);
+    if (selErr) throw selErr;
+
+    const { error: linkErr } = await supabase.from('selection_tags').insert(
+      selRows.map(r => ({ selection_id: r.id as string, tag_id: newTagId, created_at: now })),
+    );
+    if (linkErr) throw linkErr;
   }
 
-  await supabase.from('community_tag_subscriptions').upsert(
+  const { error: subErr } = await supabase.from('community_tag_subscriptions').upsert(
     {
       subscriber_id:          userId,
       community_tag_id:       ct.id,
@@ -412,6 +488,7 @@ export async function importCommunityTag(ct: CommunityTagRow, userId: string): P
     },
     { onConflict: 'subscriber_id,community_tag_id' },
   );
+  if (subErr) throw subErr;
 
   return rootLocalTagId;
 }
@@ -482,6 +559,7 @@ export async function syncSubscribedTags(userId: string): Promise<void> {
               name:       tagExport.name,
               depth:      tagExport.depth,
               sort_order: tagExport.sortOrder,
+              visibility: 'imported',
               created_at: now,
             });
           } catch (e) {
@@ -493,7 +571,9 @@ export async function syncSubscribedTags(userId: string): Promise<void> {
           localTagId = newTagId;
         }
 
-        // Fingerprint existing selections for this tag to avoid duplicates
+        // Fingerprint existing selections for this tag to avoid duplicates.
+        // Fingerprints are keyed on start_pid — the payload speaks pids, and
+        // passage_id is only resolvable for passages this catalogue carries.
         const { data: existingSTs } = await supabase
           .from('selection_tags')
           .select('selection_id')
@@ -505,36 +585,32 @@ export async function syncSubscribedTags(userId: string): Promise<void> {
         if (existingSelIds.length > 0) {
           const { data: existingSels } = await supabase
             .from('selections')
-            .select('passage_id, start_offset')
+            .select('start_pid, start_offset')
             .in('id', existingSelIds);
-          for (const s of (existingSels ?? []) as { passage_id: string; start_offset: number }[]) {
-            existingFp.add(`${s.passage_id}::${s.start_offset}`);
+          for (const s of (existingSels ?? []) as { start_pid: string; start_offset: number }[]) {
+            existingFp.add(`${s.start_pid}::${s.start_offset}`);
           }
         }
 
-        for (const sel of tagExport.selections) {
-          if (existingFp.has(`${sel.startPid}::${sel.startOffset}`)) continue;
+        const fresh = {
+          ...tagExport,
+          selections: tagExport.selections.filter(
+            sel => !existingFp.has(`${sel.startPid}::${sel.startOffset}`),
+          ),
+        };
+        if (fresh.selections.length === 0) continue;
 
-          const selId = crypto.randomUUID();
-          try {
-            await supabase.from('selections').insert({
-              id:            selId,
-              user_id:       userId,
-              passage_id:    sel.startPid,
-              start_offset:  sel.startOffset,
-              end_offset:    sel.endOffset,
-              snapshot_text: sel.snapshotText,
-              created_at:    sel.createdAt,
-            });
-            await supabase.from('selection_tags').insert({
-              selection_id: selId,
-              tag_id:       localTagId,
-              created_at:   now,
-            });
-          } catch (e) {
-            console.warn('[communitySync] Sync insert error:', e);
-          }
-        }
+        const pidMap  = await resolvePassageIds(supabase, fresh.selections.map(s => s.startPid));
+        const selRows = selectionRowsFor(fresh, userId, pidMap, now);
+        if (selRows.length === 0) continue;
+
+        const { error: selErr } = await supabase.from('selections').insert(selRows);
+        if (selErr) { console.warn('[communitySync] Sync insert error:', selErr); continue; }
+
+        const { error: linkErr } = await supabase.from('selection_tags').insert(
+          selRows.map(r => ({ selection_id: r.id as string, tag_id: localTagId, created_at: now })),
+        );
+        if (linkErr) console.warn('[communitySync] Sync link error:', linkErr);
       }
 
       await supabase

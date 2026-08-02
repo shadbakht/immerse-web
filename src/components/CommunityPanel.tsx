@@ -10,7 +10,7 @@ import {
   unfollowUser,
   type CommunityTagRow,
 } from '@/lib/communitySync';
-import { exportAsDocx, exportAsPdf, type TagRow } from '@/lib/tagExport';
+import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow } from '@/lib/tagExport';
 import { AnnotationCard } from './AnnotationCard';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
@@ -640,14 +640,16 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
 
   const clearSelection = useCallback(() => setSelection(new Map()), []);
 
-  async function handleExport(format: 'pdf' | 'docx') {
+  async function handleExport(format: 'pdf' | 'docx' | 'csv' | 'markdown') {
     setShowExportMenu(false);
     setExporting(true);
     try {
       const tagRows = [...selection.values()].flatMap(({ ct, ids }) => payloadToTagRows(ct, ids));
       const opts = { includeNotes: false, includeXrefs: false };
-      if (format === 'pdf') await exportAsPdf(tagRows, opts);
-      else                  await exportAsDocx(tagRows, opts);
+      if (format === 'pdf')       await exportAsPdf(tagRows, opts);
+      if (format === 'docx')      await exportAsDocx(tagRows, opts);
+      if (format === 'csv')       await exportAsCsv(tagRows, opts);
+      if (format === 'markdown')  await exportAsMarkdown(tagRows, opts);
     } catch (e) {
       console.warn('[Community] export error:', e);
     } finally {
@@ -768,7 +770,12 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
                 </button>
                 {showExportMenu && (
                   <div className="absolute end-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px] py-1">
-                    {([{ label: 'PDF', format: 'pdf' }, { label: t('export.docxShort'), format: 'docx' }] as const).map(({ label, format }) => (
+                    {([
+                      { label: 'PDF',                 format: 'pdf'      },
+                      { label: t('export.docxShort'), format: 'docx'     },
+                      { label: 'CSV',                 format: 'csv'      },
+                      { label: 'MD',                  format: 'markdown' },
+                    ] as const).map(({ label, format }) => (
                       <button
                         key={format}
                         onClick={() => handleExport(format)}

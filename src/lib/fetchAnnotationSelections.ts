@@ -12,6 +12,7 @@ export interface SelInfo {
   snapshot_text: string;
   passage_id:    string;
   book_id:       string;
+  book_title:    string;
   citation:      string;
 }
 
@@ -53,6 +54,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
       snapshot_text: sel.snapshot_text ?? '',
       passage_id:    sel.passage_id    ?? '',
       book_id:       passage?.book_id  ?? '',
+      book_title:    book?.title       ?? '',
       citation:      buildCitation(passage, book, (author as any)?.name),
     };
   }

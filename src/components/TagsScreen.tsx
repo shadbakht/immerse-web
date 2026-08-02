@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { publishTag, unpublishTag } from '@/lib/communitySync';
-import { exportAsDocx, exportAsPdf, type TagRow, type SelRow } from '@/lib/tagExport';
+import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
@@ -573,14 +573,16 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     });
   }
 
-  async function handleExport(format: 'pdf' | 'docx') {
+  async function handleExport(format: 'pdf' | 'docx' | 'csv' | 'markdown') {
     setShowExportMenu(false);
     setExporting(true);
     try {
       const selected = tags.filter(t => selectedTagIds.has(t.id));
       const opts = { includeNotes: includeNotes && hasNotesForSelectedTags, includeXrefs: includeXrefs && hasXrefsForSelectedTags };
-      if (format === 'pdf')  await exportAsPdf(selected, opts);
-      if (format === 'docx') await exportAsDocx(selected, opts);
+      if (format === 'pdf')       await exportAsPdf(selected, opts);
+      if (format === 'docx')      await exportAsDocx(selected, opts);
+      if (format === 'csv')       await exportAsCsv(selected, opts);
+      if (format === 'markdown')  await exportAsMarkdown(selected, opts);
     } catch (e) {
       console.error('[TagExport] failed:', e);
     } finally {
@@ -736,8 +738,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                   </div>
                   <div className="py-1">
                     {([
-                      { label: 'PDF',           format: 'pdf'  },
-                      { label: t('export.docxShort'), format: 'docx' },
+                      { label: 'PDF',                 format: 'pdf'      },
+                      { label: t('export.docxShort'), format: 'docx'     },
+                      { label: 'CSV',                 format: 'csv'      },
+                      { label: 'MD',                  format: 'markdown' },
                     ] as const).map(({ label, format }) => (
                       <button
                         key={format}
