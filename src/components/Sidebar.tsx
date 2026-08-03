@@ -14,19 +14,25 @@ import {
   TagIcon,
   NoteIcon,
   XRefIcon,
+  DiscoverIcon,
   SettingsIcon,
 } from './Icons';
 
 // Module level, so it cannot call the translation hook — it carries the key
 // and the label is resolved at render, the same shape the mobile screens use
 // for their module-level helpers.
-const NAV_ITEMS: { tab: NavTab; labelKey: TranslationKey; icon: ReactNode }[] = [
-  { tab: 'home',      labelKey: 'nav.home',     icon: <HomeIcon      size={20} /> },
-  { tab: 'library',   labelKey: 'nav.library',  icon: <LibraryIcon   size={20} /> },
-  { tab: 'tags',      labelKey: 'nav.tags',     icon: <TagIcon       size={18} /> },
-  { tab: 'notes',     labelKey: 'nav.notes',    icon: <NoteIcon      size={18} /> },
-  { tab: 'xrefs',     labelKey: 'nav.xrefs',    icon: <XRefIcon      size={18} /> },
-  { tab: 'community', labelKey: 'nav.discover', icon: <span className="text-base">🌐</span> },
+//
+// Every destination is one flat geometric glyph in its own colour, so the row
+// is identifiable by shape and hue alike. Home is the only neutral one — it
+// brightens to white when selected and sits back in grey when it isn't, which
+// is why `icon` is a function of the active state rather than an element.
+const NAV_ITEMS: { tab: NavTab; labelKey: TranslationKey; icon: (active: boolean) => ReactNode }[] = [
+  { tab: 'home',      labelKey: 'nav.home',     icon: (active) => <HomeIcon size={20} color={active ? '#FFFFFF' : 'rgba(255,255,255,0.80)'} /> },
+  { tab: 'library',   labelKey: 'nav.library',  icon: () => <LibraryIcon  size={18} /> },
+  { tab: 'tags',      labelKey: 'nav.tags',     icon: () => <TagIcon      size={18} /> },
+  { tab: 'notes',     labelKey: 'nav.notes',    icon: () => <NoteIcon     size={18} /> },
+  { tab: 'xrefs',     labelKey: 'nav.xrefs',    icon: () => <XRefIcon     size={18} /> },
+  { tab: 'community', labelKey: 'nav.discover', icon: () => <DiscoverIcon size={18} /> },
 ];
 
 interface SidebarProps {
@@ -82,7 +88,8 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <span className="w-5 flex items-center justify-center shrink-0">{icon}</span>
+            {/* w-6 — wide enough for the Library glyph, the widest of the six */}
+            <span className="w-6 flex items-center justify-center shrink-0">{icon(activeTab === tab)}</span>
             {t(labelKey)}
           </button>
         ))}
