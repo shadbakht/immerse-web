@@ -22,6 +22,39 @@ interface RecentBook {
   fraction:   number;
 }
 
+/**
+ * Apple-Watch-style progress ring: the old horizontal bar's colour and 4px
+ * thickness, closed clockwise around the percentage instead of laid out under
+ * the title. Always clockwise — rings don't mirror in RTL.
+ */
+function ProgressRing({ percent, size = 44, stroke = 4 }: { percent: number; size?: number; stroke?: number }) {
+  const pct = Math.min(100, Math.max(0, percent));
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="absolute inset-0 -rotate-90">
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke}
+          className="stroke-gray-100 dark:stroke-[#2D4050]"
+        />
+        {pct > 0 && (
+          <circle
+            cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - pct / 100)}
+            className="stroke-[#1B6B7B] dark:stroke-[#2D9DB3] transition-all"
+          />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">
+        {pct}%
+      </div>
+    </div>
+  );
+}
+
 interface HomePanelProps {
   userId:      string;
   onOpenBook:  (bookId: string, passageId?: string) => void;
@@ -160,7 +193,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
             ) : recentBooks.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-[#5C7A8E]">{t('home.startReadingHint')}</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {recentBooks.map(book => {
                   const pct = Math.min(100, Math.max(0, Math.round(book.fraction * 100)));
                   const menuOptions: MenuOption[] = [{
@@ -176,26 +209,16 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                     >
                       <button
                         onClick={() => onOpenBook(book.bookId, book.passageId ?? undefined)}
-                        className="flex-1 min-w-0 text-start px-5 py-4"
+                        className="flex flex-1 min-w-0 items-center gap-4 text-start px-5 py-3"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="min-w-0 me-4">
-                            <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
-                            {book.subtitle && (
-                              <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 truncate">{book.subtitle}</div>
-                            )}
-                          </div>
-                          <div className="text-end shrink-0">
-                            <div className="text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">{pct}%</div>
-                            <div className="text-xs text-gray-300 dark:text-[#4A6478] mt-0.5">{formatDate(book.updatedAt)}</div>
-                          </div>
+                        <ProgressRing percent={pct} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
+                          {book.subtitle && (
+                            <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 truncate">{book.subtitle}</div>
+                          )}
                         </div>
-                        <div className="h-1 bg-gray-100 dark:bg-[#2D4050] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[#1B6B7B] dark:bg-[#2D9DB3] rounded-full transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
+                        <div className="text-xs text-gray-300 dark:text-[#4A6478] shrink-0">{formatDate(book.updatedAt)}</div>
                       </button>
                       <div className="shrink-0 pe-2">
                         <ContextMenu options={menuOptions} />
