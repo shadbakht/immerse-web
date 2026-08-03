@@ -1,5 +1,90 @@
 @import "tailwindcss";
 
+/* ── Reader typefaces ─────────────────────────────────────────────────────────
+   Subsets of five OFL 1.1 families, byte-identical to the ones the mobile app
+   bundles (see Immerse/assets/fonts/README.md for provenance and licences).
+   Before this, `font-serif` resolved to Georgia on macOS and TIMES NEW ROMAN
+   everywhere else — which is the single biggest reason web reading looked worse
+   than iOS.
+
+   `font-display: swap` keeps text visible while a face loads; `unicode-range`
+   is what lets a Latin face and a script face coexist without one shadowing
+   the other, and it means a French reader never downloads the 1.5 MB CJK
+   file. */
+
+@font-face {
+  font-family: 'Literata';
+  src: url('/fonts/literata-roman.woff2') format('woff2');
+  font-weight: 200 900;      /* variable wght axis, preserved by the subsetter */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Literata';
+  src: url('/fonts/literata-italic.woff2') format('woff2');
+  font-weight: 200 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('/fonts/charis-regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('/fonts/charis-italic.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('/fonts/charis-bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('/fonts/charis-bolditalic.woff2') format('woff2');
+  font-weight: 700; font-style: italic; font-display: swap;
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/fonts/ebgaramond-roman.woff2') format('woff2');
+  font-weight: 400 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/fonts/ebgaramond-italic.woff2') format('woff2');
+  font-weight: 400 800; font-style: italic; font-display: swap;
+}
+
+/* Script faces. Chosen by the BOOK's language, never by the reader — a Persian
+   book needs naskh whichever Latin face is selected.
+
+   ⚠️ The unicode-range on this one is NOT optional. Noto Naskh Arabic contains
+   Latin glyphs; without the range it would win over the chosen reading face for
+   ordinary English text. The range covers Arabic + Supplement + Extended-A +
+   both Presentation Forms blocks, which is what holds Persian's پ چ ژ گ, farsi
+   yeh U+06CC, keheh U+06A9 and the Persian digits U+06F0-06F9 — none of which
+   are in the Arabic alphabet proper. */
+@font-face {
+  font-family: 'Noto Naskh Arabic';
+  src: url('/fonts/noto-naskh-arabic.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('/fonts/noto-serif-sc.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+
 /* Class-based dark mode: `dark:` utilities apply when a `.dark` ancestor exists.
    The Settings panel toggles `.dark` on <html> (light / dark / system). */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -9,6 +94,27 @@
   --foreground: #171717;
   /* Reading/quote font size, controlled by Settings (default = Large). */
   --quote-font-size: 20px;
+
+  /* ── Reader typography ──────────────────────────────────────────────────
+     Set by applyReaderPrefs() in src/lib/readerPrefs.ts. Defaults here mirror
+     DEFAULT_READER_PREFS in src/lib/readerTypography.ts — keep them in step. */
+  --reader-font-family: 'Literata', Georgia, serif;
+  --reader-line-height: 1.5;
+  --reader-bg: #FFFFFF;
+  --reader-fg: #1C2B35;
+  --reader-muted: #8A97A3;
+  --reader-rule: #E5E7EB;
+  --reader-accent: #1B6B7B;
+  --reader-pad: 42px;
+  --reader-max-width: 700px;
+  --reader-gutter: 34px;
+  --reader-text-align: start;
+  --reader-indent: 0;
+  --reader-para-gap: 1em;
+  --reader-letter-spacing: 0em;
+  --reader-word-spacing: 0em;
+  --reader-weight: 400;
+  --reader-pnum-display: block;
   /* Liquid-glass material tokens (light) — mirrors the mobile GLASS_LIGHT. */
   --glass-bg:     rgba(248, 249, 250, 0.40);
   --glass-border: rgba(255, 255, 255, 0.7);
@@ -50,6 +156,87 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Reader page ──────────────────────────────────────────────────────────────
+   Mirrors the rules in the mobile reader engine (Immerse/src/reader/readerHtml.ts).
+   Applied via .reader-page on the passage container in ReaderPanel. */
+.reader-page {
+  background: var(--reader-bg);
+  color: var(--reader-fg);
+  font-family: var(--reader-font-family);
+  font-size: var(--quote-font-size);
+  line-height: var(--reader-line-height);
+  font-weight: var(--reader-weight);
+  letter-spacing: var(--reader-letter-spacing);
+  word-spacing: var(--reader-word-spacing);
+  max-width: var(--reader-max-width);
+  padding-inline: var(--reader-pad);
+  /* Hyphenation is what makes justified text readable in a narrow measure —
+     without it the browser opens rivers between words instead. The `lang`
+     attribute on this container selects the dictionary. */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  /* Turn on the font's own kerning and ligature tables; browsers do not at
+     body sizes without being asked. */
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures contextual;
+  font-optical-sizing: auto;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+.reader-page p[data-pid] {
+  text-align: var(--reader-text-align);
+  text-indent: var(--reader-indent);
+  margin-bottom: var(--reader-para-gap);
+  /* Widow control. Progressive enhancement — older engines ignore it. */
+  text-wrap: pretty;
+}
+
+/* An indented paragraph must not indent the first one after a heading: the
+   indent means "another paragraph", and there is nothing before it to separate
+   from. This is what makes indented mode read like a printed book.
+
+   ⚠️ Driven by [data-opens-section], set in ReaderPanel, NOT by a structural
+   selector. Every passage is wrapped in its own div and its chapter heading
+   renders inside that same wrapper, so there is no `section > :first-child` or
+   `h2 + p` relationship here for CSS to match — an earlier version of this rule
+   used exactly those and silently never fired. */
+.reader-page [data-opens-section] p[data-pid],
+.reader-page h1 + p[data-pid],
+.reader-page h2 + p[data-pid],
+.reader-page h3 + p[data-pid] {
+  text-indent: 0;
+}
+
+/* Hyphens and indents are for prose only — in a heading or an attribution they
+   read as a typo. */
+.reader-page h1, .reader-page h2, .reader-page h3,
+.reader-page .attribution, .reader-page .chapter-label {
+  hyphens: none;
+  -webkit-hyphens: none;
+  text-indent: 0;
+  text-wrap: balance;
+}
+
+/* Paragraph numbers. Logical inset so the gutter mirrors in right-to-left
+   books instead of landing on top of the first word. */
+.reader-page .pnum {
+  display: var(--reader-pnum-display);
+  inset-inline-end: calc(-1 * var(--reader-gutter));
+  color: var(--reader-muted);
+  text-indent: 0;
+  letter-spacing: 0;
+}
+
+/* Antialiasing thins serif stems: crisper on a dark ground, anaemic on a light
+   one. Applied per theme rather than globally — this is the difference people
+   notice and cannot name when a reader looks "sharper". */
+.reader-page[data-smoothing='dark'] {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Search term highlight in reader — fades out after 5s */

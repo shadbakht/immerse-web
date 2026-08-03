@@ -16,6 +16,8 @@ import { resolveIsPro } from '@/lib/proStatus';
 import { loadSlugMaps } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { directionOf } from '@immerse/i18n';
+import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerPrefs';
+import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
 
 interface Passage {
   id: string;
@@ -394,6 +396,12 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const { t } = useTranslation();
   const [passages, setPassages] = useState<Passage[]>([]);
   const [book, setBook] = useState<BookMeta | null>(null);
+
+  // Reader typography. The values themselves live on :root as CSS variables so
+  // a change repaints without re-rendering the passage list — on a long chapter
+  // that is the difference between instant and visibly janky. Only the two
+  // things React actually needs to branch on are held in state.
+  const [readerSmoothing, setReaderSmoothing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [toc, setToc] = useState<TocEntry[]>([]);
@@ -444,6 +452,41 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     if (!userId) return;
     resolveIsPro(supabase, userId).then(setIsPro);
   }, [userId]);
+
+  // ── Reader typography ──────────────────────────────────────────────────────
+  // Re-applied whenever the book changes as well as on mount, because the font
+  // stack depends on the BOOK's language: a Persian book needs Noto Naskh
+  // appended whichever Latin face the reader chose.
+  //
+  // `appearance-changed` is dispatched by the Settings panel. A CustomEvent
+  // rather than lifted state deliberately — Settings and the reader are
+  // siblings under AppShell, and threading a dozen typography props through it
+  // to repaint something that is really just CSS variables would be worse.
+  useEffect(() => {
+    const isDark = () => document.documentElement.classList.contains('dark');
+    const fontPx = () =>
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--quote-font-size'),
+      ) || 20;
+
+    const apply = (prefs: ReaderPrefs) => {
+      applyReaderPrefs(prefs, {
+        fontSizePx: fontPx(),
+        isDark: isDark(),
+        bookLanguage: book?.language,
+      });
+      setReaderSmoothing(resolveTheme(prefs.theme, isDark()).isDarkChrome);
+    };
+
+    apply(getStoredPrefs());
+    initReaderPrefs(supabase, userId ?? null, {
+      fontSizePx: fontPx(), isDark: isDark(),
+    }).then(apply);
+
+    const onChange = (e: Event) => apply((e as CustomEvent<ReaderPrefs>).detail);
+    window.addEventListener('appearance-changed', onChange);
+    return () => window.removeEventListener('appearance-changed', onChange);
+  }, [userId, book?.language]);
 
   // Pre-compute max sort_order once passages load (for fraction calculation)
   const maxSortOrder = useMemo(
@@ -1666,8 +1709,15 @@ async function handleCopy() {
             the UI language, and without this the reader inherited it — so a
             right-to-left interface right-aligned every English and Spanish
             passage. Also gives the browser the right font fallback per script. */}
+        {/* .reader-page carries the typography (globals.css) — typeface, line
+            height, measure, margins, justification, indent, spacing, weight and
+            page colour, all driven by CSS variables that applyReaderPrefs()
+            sets on :root. The fixed `max-w-[70ch] px-8` and `leading-relaxed`
+            it replaces were what made these unadjustable on web.
+            data-smoothing is what turns on antialiasing for dark themes only. */}
         <div
-          className="max-w-[70ch] mx-auto px-8 py-12"
+          className="reader-page mx-auto py-12"
+          data-smoothing={readerSmoothing ? 'dark' : undefined}
           lang={bcp47(book?.language)}
           dir={directionOf(bcp47(book?.language))}
         >
@@ -1742,8 +1792,23 @@ async function handleCopy() {
               }
             }
 
+            // Indented paragraphs must not indent the first one under a
+            // heading — the indent means "another paragraph", and there is
+            // nothing before it to separate from. It is flagged here rather
+            // than matched in CSS because every passage is its own wrapper and
+            // the heading renders INSIDE that same wrapper, so there is no
+            // sibling or `section > :first-child` relationship for a selector
+            // to find.
+            const opensSection =
+              showChapter || showSection || showPrayerDivider || showTabletDivider;
+
             return (
-              <div key={passage.id} id={`p-${passage.id}`} data-pid={passage.id}>
+              <div
+                key={passage.id}
+                id={`p-${passage.id}`}
+                data-pid={passage.id}
+                data-opens-section={opensSection ? '' : undefined}
+              >
                 {isPrayerStyle ? (
                   <>
                     {showPrayerDivider && (
@@ -1848,14 +1913,23 @@ async function handleCopy() {
                   {/* Boolean(), not a bare truthiness test: JSX renders a falsy
                       NUMBER, so `0 && <span/>` puts a literal "0" in the DOM. */}
                   {(tdMargin != null || Boolean(passage.paragraph_number)) && !isLetterDate && !isHeadingEcho && (
-                    <span className="absolute -end-8 top-[3px] text-[11px] text-gray-400 dark:text-[#5C7A8E] select-none w-7 text-end leading-relaxed tabular-nums">
+                    /* .pnum: the inline-end inset, muted colour and the
+                       show/hide toggle all come from the reader variables, so
+                       the gutter tracks the margin setting and can be turned
+                       off entirely. */
+                    <span className="pnum absolute top-[3px] text-[11px] select-none w-7 text-end leading-relaxed tabular-nums">
                       {tdMargin ?? passage.paragraph_number}
                     </span>
                   )}
+                  {/* No font-serif / leading-relaxed / text-gray-800 / mb-4 and
+                      no inline fontSize: every one of those is now a reader
+                      variable on .reader-page, which is what makes typeface,
+                      line spacing, colour and paragraph gap adjustable at all.
+                      Prayer-style centring and the letter-date weight stay —
+                      they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`font-serif text-gray-800 dark:text-[#D2DCE8] leading-relaxed mb-4${isLetterDate ? ' font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
-                    style={{ fontSize: 'var(--quote-font-size)' }}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}

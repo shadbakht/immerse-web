@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
 import { applyFontSize, type FontSize } from '@/lib/fontSize';
 import { applyColorMode, getStoredColorMode, type ColorMode } from '@/lib/colorMode';
+import AppearanceSection from './AppearanceSection';
 import { UI_LANGUAGES, type TranslationKey } from '@immerse/i18n';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import Onboarding from './Onboarding';
@@ -141,7 +142,6 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     applyColorMode(mode);   // toggles .dark on <html> + persists to localStorage
   }
 
-  const previewSize = FONT_OPTIONS.find(f => f.key === fontSize)?.size ?? 20;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -289,55 +289,20 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
             </section>
 
-            {/* Font size */}
-            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.fontSize')}</span>
-              </div>
-              <div className="px-5 py-4">
-                <div className="flex gap-2 mb-4">
-                  {FONT_OPTIONS.map(({ key, size }) => (
-                    <button
-                      key={key}
-                      onClick={() => handleFontChange(key)}
-                      className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border transition-colors ${
-                        fontSize === key
-                          ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
-                          : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
-                      }`}
-                    >
-                      <span className="font-semibold" style={{ fontSize: Math.min(size, 20) }}>A</span>
-                      <span className="text-[10px] mt-1 font-medium">{key}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-gray-500 dark:text-[#8FA4B8] border-t border-gray-100 dark:border-[#2D4050] pt-3" style={{ fontSize: previewSize, lineHeight: 1.7 }}>
-                  {t('settings.fontPreview', { size: fontSize })}
-                </p>
-              </div>
-            </section>
-
-            {/* Appearance */}
-            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.appearance')}</span>
-              </div>
-              <div className="px-5 py-4 flex gap-2">
-                {(['light', 'dark', 'system'] as ColorMode[]).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => handleColorModeChange(mode)}
-                    className={`flex-1 py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
-                      colorMode === mode
-                        ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
-                        : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
-                    }`}
-                  >
-                    {t(APPEARANCE_KEYS[mode])}
-                  </button>
-                ))}
-              </div>
-            </section>
+            {/* Appearance — font size, typeface, line spacing, margins,
+                justification, paragraph style, page colour and the light/dark
+                mode, all in one section. Mirrors mobile's Appearance screen and
+                shares its scales via lib/readerTypography. */}
+            <AppearanceSection
+              supabase={supabase}
+              userId={user?.id ?? null}
+              fontSize={fontSize}
+              onFontChange={handleFontChange}
+              fontOptions={FONT_OPTIONS}
+              colorMode={colorMode}
+              onColorModeChange={handleColorModeChange}
+              appearanceKeys={APPEARANCE_KEYS}
+            />
 
             {/* About */}
             <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
