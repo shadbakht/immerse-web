@@ -686,7 +686,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   }, [tags, openTagIds, searchQuery]);
 
   return (
-    <div className="h-full flex flex-col max-w-2xl mx-auto w-full">
+    <div className="h-full flex flex-col max-w-2xl mx-auto w-full bg-white dark:bg-[#1B2A38]">
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">

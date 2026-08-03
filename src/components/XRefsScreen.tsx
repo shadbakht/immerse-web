@@ -295,7 +295,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   // across two quotes, so 7xl is what puts each side at roughly the max-w-2xl
   // a single Tags quote gets.
   return (
-    <div className="h-full flex flex-col max-w-7xl mx-auto w-full">
+    <div className="h-full flex flex-col max-w-7xl mx-auto w-full bg-white dark:bg-[#1B2A38]">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('xrefs.title')}</h1>

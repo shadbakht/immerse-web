@@ -512,7 +512,7 @@ function ProfileView({
   const initials = profile.displayName[0]?.toUpperCase() ?? '?';
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-white dark:bg-[#1B2A38]">
       {/* Header */}
       <div className="px-6 pt-5 pb-4 shrink-0 border-b border-gray-100 dark:border-[#2D4050] flex items-center gap-3">
         <button
@@ -747,7 +747,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
 
   // ── Feed view ───────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col w-full relative">
+    <div className="h-full flex flex-col w-full relative bg-white dark:bg-[#1B2A38]">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 shrink-0 border-b border-gray-100 dark:border-[#2D4050]">
         <div className="flex items-center justify-between mb-3">

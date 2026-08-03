@@ -426,7 +426,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
   }
 
   return (
-    <div className="h-full flex flex-col w-full">
+    <div className="h-full flex flex-col w-full bg-white dark:bg-[#1B2A38]">
       {/* Header + search — spans both columns */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('notes.title')}</h1>
