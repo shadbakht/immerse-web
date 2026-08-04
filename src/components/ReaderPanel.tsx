@@ -75,6 +75,12 @@ const NESTED_TOC_BOOKS = new Set<string>([
   '723f4d43-cb81-4e72-b6f0-c74211586048', // The Summons of the Lord of Hosts (Súriy-i-Haykal → 5 king tablets)
   '94f79149-ac9f-43b1-b004-20224eb7cb4c', // The Vishnu Purana
   'c40c3e99-32fc-418a-b12f-4df5b06951ca', // Riḍván 1992
+  '9382e12a-96de-43d9-9212-1c05e6bf7f55', // Bahá'í Administration (Parts → dated letters)
+  'd3be5d55-69cb-4c7d-af72-189674d35fbb', // Selections from the Writings of ‘Abdu’l‑Bahá (→ numbered passages)
+  '119cf1f9-f486-48b0-95e2-674b6b2ca64b', // Citadel of Faith (→ titled cables)
+  '005a7be7-043c-478c-aa58-aecb0f14c402', // Some Answered Questions (chapters → numbered/titled questions)
+  '9212427c-7459-45d9-a28a-314bf4172b6b', // The Promulgation of Universal Peace (date ranges → individual talks)
+  'a3bef0da-1ed5-41d6-9a70-d7a2fbac6ee0', // God Passes By (Periods → numbered chapters)
 ]);
 
 // Books rendered in the centered "prayer book" style: a comma-joined chapter_label
@@ -95,6 +101,12 @@ const PRAYER_LAYOUT_BOOKS = new Set<string>([
   '560e3d01-91f7-4cb6-9d88-5d9689ec353e', // The World Order of Bahá'u'lláh
   '94f79149-ac9f-43b1-b004-20224eb7cb4c', // The Vishnu Purana
   'c40c3e99-32fc-418a-b12f-4df5b06951ca', // Riḍván 1992
+  '9382e12a-96de-43d9-9212-1c05e6bf7f55', // Bahá'í Administration
+  'd3be5d55-69cb-4c7d-af72-189674d35fbb', // Selections from the Writings of ‘Abdu’l‑Bahá
+  '119cf1f9-f486-48b0-95e2-674b6b2ca64b', // Citadel of Faith
+  '005a7be7-043c-478c-aa58-aecb0f14c402', // Some Answered Questions
+  '9212427c-7459-45d9-a28a-314bf4172b6b', // The Promulgation of Universal Peace
+  'a3bef0da-1ed5-41d6-9a70-d7a2fbac6ee0', // God Passes By
 ]);
 
 // Books whose chapters hold several tablets/selections running together with no

@@ -49,10 +49,21 @@ export function buildCitation(
     return `${book?.title ?? "The Qur'an"}${loc ? ` ${loc}` : ''}`;
   }
 
+  // chapter_label and section_title are independent fields (chapter vs.
+  // subchapter, e.g. "Part Two: Letters from Shoghi Effendi" + "January 29th,
+  // 1925") — include both when present rather than picking one. Bahá'í
+  // Prayers is the one book whose chapter_label already bakes in the
+  // subchapter as a comma-joined string ("General Prayers, Teaching") — for
+  // the handful of its rows that also carry a redundant section_title, skip
+  // it rather than double-print the same subchapter.
+  const subLabel = passage?.section_title && !passage?.chapter_label?.includes(passage.section_title)
+    ? passage.section_title
+    : null;
   return [
     authorName,
     book?.title,
-    passage?.chapter_label || passage?.section_title,
+    passage?.chapter_label,
+    subLabel,
     passage?.paragraph_number ? `p.${passage.paragraph_number}` : null,
   ].filter(Boolean).join(', ');
 }
