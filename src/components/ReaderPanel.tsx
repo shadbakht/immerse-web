@@ -440,13 +440,34 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // Reading progress tracking
   const progressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedPidRef   = useRef<string | null>(null);
+  // Tracks which book loadBook() has actually fetched, distinct from
+  // target?.bookId itself — lets the effect below tell "book changed" apart
+  // from "same book, new passage/search target" without a second effect.
+  const loadedBookIdRef   = useRef<string | null>(null);
 
   useEffect(() => {
     if (!target?.bookId) return;
-    setTocOpen(false);
-    setSelectionBar(null);
-    loadBook(target.bookId, target.passageId);
-  }, [target?.bookId]);
+    if (target.bookId !== loadedBookIdRef.current) {
+      // A genuinely different book: loadBook() does the full fetch and, once
+      // passages are in the DOM, its own scroll-to-passageId + highlight-flash.
+      loadedBookIdRef.current = target.bookId;
+      setTocOpen(false);
+      setSelectionBar(null);
+      loadBook(target.bookId, target.passageId);
+      return;
+    }
+    // Same book already open — e.g. a search hit inside the book you're
+    // currently reading. bookId hasn't changed, so the branch above never
+    // fires, but the reader still needs to jump to the new match: this used
+    // to just leave the reader sitting wherever it already was.
+    if (!target.passageId) return;
+    lastSavedPidRef.current = target.passageId;
+    document.getElementById(`p-${target.passageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (target.highlightQuery) {
+      setSearchHighlight({ passageId: target.passageId, query: target.highlightQuery });
+      setTimeout(() => setSearchHighlight(null), 5000);
+    }
+  }, [target?.bookId, target?.passageId, target?.highlightQuery]);
 
   useEffect(() => {
     if (!userId) return;
@@ -753,6 +774,24 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       }
     }
     try {
+      // A tab that sat backgrounded for a while can wake up with an access token
+      // that expired while its refresh timer was throttled — the very next query
+      // fails once, silently (supabase-js returns { error }, it doesn't throw),
+      // and previously that meant an empty book with no error and no retry: the
+      // reader just rendered blank until a full page reload created a fresh
+      // client. One retry after nudging a session refresh clears the transient
+      // case invisibly; a second failure is treated as real and thrown so the
+      // catch below can show contentLoadFailed instead of a silent blank page.
+      async function withSessionRetry<T>(run: () => PromiseLike<{ data: T; error: any }>): Promise<T> {
+        let { data, error } = await run();
+        if (error) {
+          await supabase.auth.getSession();
+          ({ data, error } = await run());
+        }
+        if (error) throw error;
+        return data;
+      }
+
       // Fetch book metadata and all passages in parallel.
       // Passages are fetched in batches of 1000 to bypass the PostgREST server-side
       // row cap (default 1000). We keep fetching until a batch returns fewer than 1000 rows.
@@ -761,13 +800,13 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         const all: any[] = [];
         let from = 0;
         while (true) {
-          const { data: batch, error } = await supabase
+          const batch = await withSessionRetry(() => supabase
             .from('passages')
             .select('id, content, chapter_label, section_title, paragraph_number, sort_order')
             .eq('book_id', bookId)
             .order('sort_order')
-            .range(from, from + BATCH - 1);
-          if (error || !batch || batch.length === 0) break;
+            .range(from, from + BATCH - 1));
+          if (!batch || batch.length === 0) break;
           all.push(...batch);
           if (batch.length < BATCH) break; // last page
           from += BATCH;
@@ -775,8 +814,8 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         return all;
       };
 
-      const [{ data: bookData }, passageData] = await Promise.all([
-        supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single(),
+      const [bookData, passageData] = await Promise.all([
+        withSessionRetry(() => supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single()),
         fetchAllPassages(),
       ]);
 
@@ -899,6 +938,10 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
           { onConflict: 'user_id,book_id' },
         );
       }
+    } catch (err) {
+      console.error('[ReaderPanel] cloud book load error:', err);
+      setPassages([]);
+      setBook({ title: t('reader.contentLoadFailed'), authorName: '', citationFormat: 'author_book_paragraph' });
     } finally {
       setLoading(false);
     }
@@ -1567,7 +1610,7 @@ async function handleCopy() {
         <button
           onClick={() => setTocOpen(o => !o)}
           className="absolute top-4 end-4 z-20 p-2 bg-white dark:bg-[#1B2A38] border border-gray-200 dark:border-[#2D4050] rounded-lg hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors shadow-sm"
-          title={t('reader.tableOfContents')}
+          title="Jump to a section in this book"
         >
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
             <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-[#8FA4B8]" />
@@ -1622,21 +1665,22 @@ async function handleCopy() {
           style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
           {(editingSel
-            ? [{ label: savingEdit ? t('reader.updating') : t('reader.updateSelection'), onClick: confirmEditSelection }]
+            ? [{ label: savingEdit ? t('reader.updating') : t('reader.updateSelection'), onClick: confirmEditSelection, hint: undefined as string | undefined }]
             : xrefPickFrom
-            ? [{ label: t('reader.pickAsXref'), onClick: handlePickFromSelection }]
+            ? [{ label: t('reader.pickAsXref'), onClick: handlePickFromSelection, hint: undefined as string | undefined }]
             : [
-                { label: t('reader.actionTag'),  onClick: () => openPanel('tag') },
-                { label: t('reader.actionNote'), onClick: () => openPanel('note') },
-                { label: t('reader.actionXref'), onClick: handleXrefStart },
-                { label: t('reader.actionAi'),   onClick: () => openPanel('ai') },
-                { label: t('reader.actionCopy'), onClick: handleCopy },
+                { label: t('reader.actionTag'),  onClick: () => openPanel('tag'), hint: 'Add this selection to a compilation' },
+                { label: t('reader.actionNote'), onClick: () => openPanel('note'), hint: 'Add a note about this selection' },
+                { label: t('reader.actionXref'), onClick: handleXrefStart, hint: 'Add a cross-reference linking this selection to another' },
+                { label: t('reader.actionAi'),   onClick: () => openPanel('ai'), hint: 'Get an AI-generated summary of this selection' },
+                { label: t('reader.actionCopy'), onClick: handleCopy, hint: 'Copy this selection to your clipboard' },
               ]
-          ).map(({ label, onClick }, i, arr) => (
+          ).map(({ label, onClick, hint }, i, arr) => (
             <div key={label} className="flex items-center">
               <button
                 onClick={onClick}
                 disabled={savingAnnotation || pickSaving || savingEdit}
+                title={hint}
                 className="px-[15px] py-[7px] text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
               >
                 {label}
