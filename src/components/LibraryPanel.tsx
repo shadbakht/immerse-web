@@ -365,6 +365,29 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   }
 
+  // Typographic punctuation → ASCII, so a straight-quoted query still matches
+  // corpus text typeset with curly marks (and vice versa) — same rule mobile's
+  // LibraryScreen.js uses for the identical reason.
+  function foldPunctuation(s: string): string {
+    return s
+      .replace(/[‘’‚‹›]/g, "'")
+      .replace(/[“”„«»]/g, '"')
+      .replace(/[–—]/g, '-');
+  }
+
+  // A query wrapped start-to-end in a quote pair is an exact-phrase request.
+  // Checked on both ends so a mid-word apostrophe (Bahá'í, Bahá'u'lláh) is
+  // left alone — it only ever shows up on one side, never both.
+  const OPENING_QUOTES = `"'`;
+  const CLOSING_QUOTES = `"'`;
+  function extractExactPhrase(q: string): string | null {
+    const t = foldPunctuation(q).trim();
+    if (t.length < 3) return null;
+    if (!OPENING_QUOTES.includes(t[0]) || !CLOSING_QUOTES.includes(t[t.length - 1])) return null;
+    const inner = t.slice(1, -1).trim();
+    return inner || null;
+  }
+
   function expandSynonyms(q: string): string {
     if (/\b(AND|OR|NOT)\b/.test(q) || q.includes('"') || q.includes('*')) return q;
     return q.trim().split(/\s+/).map(token => {
@@ -397,6 +420,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   async function doSearch(q: string) {
     setSearchLoading(true);
     try {
+      const exactPhrase = extractExactPhrase(q);
       const importedSelected = [...selectedSlugs].filter(s => s.startsWith('imported:'));
       const regularSlugs     = [...selectedSlugs].filter(s => !s.startsWith('imported:'));
       // Resolve the scope against a freshly-loaded slug map rather than the
@@ -415,8 +439,12 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       let remoteResults: SearchResult[] = [];
       const onlyImportedSelected = selectedSlugs.size > 0 && importedSelected.length === selectedSlugs.size;
       if (!onlyImportedSelected) {
-        remoteResults = await runFtsSearch(q, regularUUIDs);
-        if (remoteResults.length === 0) remoteResults = await runFuzzySearch(q, regularUUIDs);
+        if (exactPhrase) {
+          remoteResults = await runExactPhraseSearch(exactPhrase, regularUUIDs);
+        } else {
+          remoteResults = await runFtsSearch(q, regularUUIDs);
+          if (remoteResults.length === 0) remoteResults = await runFuzzySearch(q, regularUUIDs);
+        }
       }
 
       // Local (IndexedDB) search: run when no filter (search all local books),
@@ -424,15 +452,17 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       const localBookIds = selectedSlugs.size === 0
         ? importedBooks.map(b => b.id)
         : importedSelected;
-      const localResults = await searchLocalBooks(q, localBookIds);
+      const localResults = await searchLocalBooks(q, localBookIds, exactPhrase);
 
       const keyword = [...localResults, ...remoteResults];
       setSearchResults(keyword);
       setSearchLoading(false);
 
       // Semantic search is opt-in (the "Related" toggle) and whole-library only,
-      // so keyword search stays fast/local by default.
-      if (!SEMANTIC_SEARCH_ENABLED || !semanticOn || selectedSlugs.size > 0) return;
+      // so keyword search stays fast/local by default. Also skipped in
+      // exact-phrase mode — embedding similarity is the opposite of what a
+      // literal quoted phrase asked for.
+      if (!SEMANTIC_SEARCH_ENABLED || !semanticOn || selectedSlugs.size > 0 || exactPhrase) return;
       const hits = await semanticSearch(supabase, q, undefined, 40);
       if (hits.length === 0) return;
       const semItems: SearchResult[] = hits.map(h => ({
@@ -451,10 +481,11 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }
   }
 
-  async function searchLocalBooks(q: string, bookIds: string[]): Promise<SearchResult[]> {
+  async function searchLocalBooks(q: string, bookIds: string[], exactPhrase: string | null): Promise<SearchResult[]> {
     if (bookIds.length === 0) return [];
-    const words = q.trim().split(/\s+/).filter(w => w.length >= 2);
-    if (words.length === 0) return [];
+    const words = exactPhrase ? [] : q.trim().split(/\s+/).filter(w => w.length >= 2);
+    const foldedPhrase = exactPhrase ? foldPunctuation(exactPhrase).toLowerCase() : null;
+    if (!foldedPhrase && words.length === 0) return [];
 
     const results: SearchResult[] = [];
     await Promise.all(bookIds.map(async bookId => {
@@ -463,7 +494,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       if (!record || record.paragraphs.length === 0) return;
       for (let i = 0; i < record.paragraphs.length; i++) {
         const para = record.paragraphs[i];
-        if (words.every(w => normalize(para).includes(normalize(w)))) {
+        const matches = foldedPhrase
+          ? foldPunctuation(para).toLowerCase().includes(foldedPhrase)
+          : words.every(w => normalize(para).includes(normalize(w)));
+        if (matches) {
           results.push({
             passageId:    `local-${localId}-${i}`,
             bookId:       `imported:${localId}`,
@@ -502,6 +536,33 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     // mapResults handles the array. Cast keeps `next build` type-checking (the
     // union broke it since the search_passages rewiring).
     return mapResults((data as any[]) ?? []);
+  }
+
+  // Quotes mean "match these words, in this order, literally" — but Postgres's
+  // 'english' text-search config stems words and drops stopwords, so even
+  // websearch_to_tsquery's own phrase operator can't tell "pending its
+  // establishment" from "pending the establishment" (confirmed directly
+  // against the DB: both return the identical row set). A raw ILIKE scan for
+  // the literal phrase would give the real guarantee, but skips the GIN
+  // index entirely — the same seq-scan-timeout risk runFtsSearch's own
+  // comment above already flags for this corpus's size. So: reuse the fast
+  // indexed bag-of-words search to fetch candidates, then verify the exact
+  // phrase actually appears, client-side, before returning a row.
+  async function runExactPhraseSearch(phrase: string, scope: string[] | null): Promise<SearchResult[]> {
+    if (scope !== null && scope.length === 0) return [];
+    const words = phrase.split(/\s+/).filter(w => w.length >= 2);
+    const bagQuery = words.length > 0 ? words.join(' ') : phrase;
+    const { data } = await supabase
+      .rpc('search_passages', {
+        search_query: bagQuery,
+        book_scope: scope && scope.length > 0 ? scope : null,
+      })
+      .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
+    const foldedPhrase = foldPunctuation(phrase).toLowerCase();
+    const matches = ((data as any[]) ?? []).filter(p =>
+      foldPunctuation(String(p.content ?? '')).toLowerCase().includes(foldedPhrase)
+    );
+    return mapResults(matches);
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
@@ -791,7 +852,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         </p>
                         {isExpanded && (
                           <button
-                            onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, searchQuery.trim()); }}
+                            onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, extractExactPhrase(searchQuery) ?? searchQuery.trim()); }}
                             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                           >
                             {t('common.openInReader')} →
