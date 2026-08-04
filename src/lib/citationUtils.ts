@@ -49,6 +49,14 @@ export function buildCitation(
     return `${book?.title ?? "The Qur'an"}${loc ? ` ${loc}` : ''}`;
   }
 
+  // Nahj al-Balagha (fa): cite by item label (خطبه/نامه/حکمت N), not by a
+  // category-name author — mirrors mobile's citation.ts.
+  if (fmt === 'nahj_albalagha_fa') {
+    const parts = ['نهج البلاغه', passage?.chapter_label,
+      passage?.paragraph_number ? `p.${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // chapter_label and section_title are independent fields (chapter vs.
   // subchapter, e.g. "Part Two: Letters from Shoghi Effendi" + "January 29th,
   // 1925") — include both when present rather than picking one. Bahá'í
