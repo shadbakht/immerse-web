@@ -75,6 +75,21 @@ export interface TypefaceDef {
   /** Variable weight range, or null for the static 4-cut family. */
   weightAxis: [number, number] | null;
   stack: string;
+  /**
+   * Applied to the user's chosen px size before it reaches the page. `1` (the
+   * default, so most faces omit this) means "this face's x-height at size N
+   * reads like the others' at size N" — that's true of Literata and Charis
+   * SIL, but NOT of an old-style Garamond. Measured directly from each
+   * bundled font's own OS/2 table (fontTools, `sxHeight / unitsPerEm`), not
+   * eyeballed: Literata 0.507, Charis SIL 0.482, EB Garamond 0.400 — EB
+   * Garamond's lowercase letters are ~21% shorter than Literata's at an
+   * identical nominal size, which is what "the largest size still reads like
+   * everyone else's medium" actually was.
+   *
+   * Mirror of src/config/readerTypography.ts on the mobile repo — keep the
+   * value in step there too.
+   */
+  sizeMultiplier?: number;
 }
 
 export const TYPEFACES: TypefaceDef[] = [
@@ -109,6 +124,10 @@ export const TYPEFACES: TypefaceDef[] = [
     files: { roman: 'ebgaramond-roman.woff2', italic: 'ebgaramond-italic.woff2' },
     weightAxis: [400, 800],
     stack: `'EB Garamond', Garamond, Georgia, serif`,
+    // 0.507 / 0.400 — see sizeMultiplier's own doc comment for how this was
+    // measured. Brings EB Garamond's x-height at any given size step up to
+    // what Literata's already looks like at that same step.
+    sizeMultiplier: 1.27,
   },
   {
     key: 'system',
@@ -259,7 +278,7 @@ export function buildThemePayload(
 
   return {
     fontFamily: face.stack,
-    fontSize: fontSizePx,
+    fontSize: Math.round(fontSizePx * (face.sizeMultiplier ?? 1)),
     lineHeight: LINE_SPACING[prefs.lineSpacing],
     background: palette.bg,
     text: palette.fg,
