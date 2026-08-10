@@ -22,6 +22,7 @@ export interface CatalogBook {
   categoryId: string;
   title: string;
   language?: string;   // BCP-47; absent on legacy entries, treated as 'en'
+  sortOrder?: number;  // absent on legacy entries (raw array order stands in)
 }
 
 export interface Catalog {

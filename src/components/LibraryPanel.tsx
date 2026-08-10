@@ -219,6 +219,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         return ak < bk ? -1 : ak > bk ? 1 : 0;
       });
     }
+    // Everything else sorts by the catalog's own sortOrder when present —
+    // for scripture shelves this is canonical (chapter/sura order, already
+    // matching raw array order today, so this is a no-op there) and for
+    // categories a pinyin/normalized-title pass has renumbered (e.g. zh's
+    // Bahá'í "Other" shelf) this is what actually surfaces that ordering.
+    // Legacy entries with no sortOrder fall back to raw array order exactly
+    // as before, so languages/categories not yet rebuilt through the
+    // sortOrder-emitting catalog pipeline are unaffected.
+    if (books.some(b => typeof b.sortOrder === 'number')) {
+      return [...books].sort((a, b) =>
+        (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || titleSortKey(a.title).localeCompare(titleSortKey(b.title)));
+    }
     return books;
   }, [catalog, contentLang]);
 
