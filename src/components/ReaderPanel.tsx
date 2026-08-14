@@ -26,6 +26,11 @@ interface Passage {
   section_title: string | null;
   paragraph_number: number | null;
   sort_order: number;
+  // True when bahai.org marks this passage as the start of a new
+  // excerpt/tablet with no heading of its own (an enlarged first letter
+  // there — baked as a "kf" span in the mobile corpus HTML). Backfilled by
+  // scripts/markExcerptDividersWeb.mjs; absent on every other passage.
+  opens_excerpt?: boolean;
 }
 
 interface BookMeta {
@@ -814,7 +819,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         while (true) {
           const batch = await withSessionRetry(() => supabase
             .from('passages')
-            .select('id, content, chapter_label, section_title, paragraph_number, sort_order')
+            .select('id, content, chapter_label, section_title, paragraph_number, sort_order, opens_excerpt')
             .eq('book_id', bookId)
             .order('sort_order')
             .range(from, from + BATCH - 1));
@@ -1837,6 +1842,15 @@ async function handleCopy() {
               prevTdNum = tdNum;
             }
 
+            // Same hairline, driven by passages.opens_excerpt (backfilled by
+            // scripts/markExcerptDividersWeb.mjs from the mobile reader's own
+            // markKfBreaks — see src/reader/readerHtml.ts there). Suppressed
+            // wherever a heading/divider is already opening this passage's
+            // section, mirroring mobile's "no previous sibling" guard.
+            const showExcerptDivider =
+              !!passage.opens_excerpt && !showChapter && !showSection &&
+              !showPrayerDivider && !showTabletDivider;
+
             // Glued per-tablet number → out of the body text, into the margin
             // (mirrors mobile, which hides the inline number and shows it there).
             let tdMargin: string | null = null;
@@ -1856,7 +1870,7 @@ async function handleCopy() {
             // sibling or `section > :first-child` relationship for a selector
             // to find.
             const opensSection =
-              showChapter || showSection || showPrayerDivider || showTabletDivider;
+              showChapter || showSection || showPrayerDivider || showTabletDivider || showExcerptDivider;
 
             return (
               <div
@@ -1867,6 +1881,9 @@ async function handleCopy() {
               >
                 {isPrayerStyle ? (
                   <>
+                    {showExcerptDivider && (
+                      <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
+                    )}
                     {showPrayerDivider && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
@@ -1887,6 +1904,9 @@ async function handleCopy() {
                   </>
                 ) : isLayoutStyle ? (
                   <>
+                    {showExcerptDivider && (
+                      <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
+                    )}
                     {showChapter && passage.chapter_label && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
@@ -1909,7 +1929,7 @@ async function handleCopy() {
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
-                    {showTabletDivider && (
+                    {(showTabletDivider || showExcerptDivider) && (
                       <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
                     )}
                     {showSection && (
