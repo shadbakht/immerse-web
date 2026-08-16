@@ -15,6 +15,13 @@ export interface LocalBook {
   title:      string;
   format:     string;          // 'txt' | 'epub' | 'docx' | 'rtf' | 'pdf'
   paragraphs: string[];        // empty for PDFs
+  /**
+   * Chapter boundaries within `paragraphs` — index N means paragraphs[N] is
+   * the first paragraph of that chapter. Optional so pre-existing imported
+   * books (saved before chapter detection existed) load exactly as before:
+   * undefined/empty reads as "one unlabeled chapter", the old behavior.
+   */
+  chapterStarts?: { index: number; label: string }[];
   pdfBlob:    Blob | null;     // populated only for PDFs
   createdAt:  number;          // Date.now()
 }

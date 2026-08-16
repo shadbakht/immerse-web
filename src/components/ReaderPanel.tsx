@@ -754,6 +754,12 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     setIsImported(false);
     setTaggedPassageIds(new Set());
     setNotedPassageIds(new Set());
+    // Cleared unconditionally: the cloud-book path below only re-populates
+    // this when it has entries, so without a reset here a chaptered book's
+    // stale TOC (and its now-invalid passage-id targets) would carry over
+    // into whatever loads next — including an import, which used to never
+    // set toc at all and so never hit this.
+    setToc([]);
     lastSavedPidRef.current = null;
 
     // ── Local (IndexedDB) imported book ──────────────────────────────────────
@@ -774,16 +780,33 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
           pdfUrlRef.current = url;
           setPdfUrl(url);
         } else {
-          // Convert paragraphs to fake Passage objects
+          // Convert paragraphs to fake Passage objects. chapterStarts (absent
+          // on books imported before chapter detection existed) marks which
+          // paragraph indices open a new chapter; paragraph_number: 0 on that
+          // one paragraph is the same "heading echo" sentinel real corpus
+          // books use, so the divider renders once and the body <p> for it is
+          // suppressed (see the `isHeadingEcho` render logic below).
+          const starts = [...(record.chapterStarts ?? [])].sort((a, b) => a.index - b.index);
+          const labelForIndex: (string | null)[] = new Array(record.paragraphs.length).fill(null);
+          const startIndexSet = new Set(starts.map(s => s.index));
+          let si = 0;
+          let curLabel: string | null = null;
+          for (let i = 0; i < record.paragraphs.length; i++) {
+            while (si < starts.length && starts[si].index === i) { curLabel = starts[si].label; si++; }
+            labelForIndex[i] = curLabel;
+          }
           const ps: Passage[] = record.paragraphs.map((content, i) => ({
             id:               `local-${localId}-${i}`,
             content,
-            chapter_label:    null,
+            chapter_label:    labelForIndex[i],
             section_title:    null,
-            paragraph_number: null,
+            paragraph_number: startIndexSet.has(i) ? 0 : null,
             sort_order:       i,
           }));
           setPassages(ps);
+          if (starts.length > 0) {
+            setToc(starts.map(s => ({ label: s.label, passageId: `local-${localId}-${s.index}`, depth: 0 })));
+          }
           if (scrollToId) {
             setTimeout(() => {
               document.getElementById(`p-${scrollToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });

@@ -39,7 +39,13 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Exempt static public assets (incl. catalog.json / slug-map.json) so they
-  // serve directly without an auth check or a redirect-to-login for guests.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|txt|ico|woff2?|map)$).*)'],
+  // Exempt static public assets (incl. catalog.json / slug-map.json, and
+  // pdf.worker.min.mjs — pdf.js's Worker script for imported-PDF text
+  // extraction, fetched by guests same as anyone) so they serve directly
+  // without an auth check or a redirect-to-login. Without `mjs` here, a
+  // guest's PDF import silently loses text extraction: the worker fetch gets
+  // this proxy's login-redirect HTML instead of the script, pdf.js throws,
+  // and extractPdfText's catch just falls back to the view-only PDF path —
+  // no crash, just a quiet regression to pre-extraction behavior.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|txt|ico|woff2?|map|mjs)$).*)'],
 };
