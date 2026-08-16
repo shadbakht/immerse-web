@@ -23,7 +23,7 @@ interface XRefRow {
 
 interface XRefsScreenProps {
   userId: string;
-  onOpenBook: (bookId: string, passageId?: string) => void;
+  onOpenBook: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
 }
 
 function Highlight({ text, q }: { text: string; q: string }) {
@@ -52,7 +52,7 @@ function XRefCard({
 }: {
   row: XRefRow;
   searchQuery: string;
-  onOpenBook: (b: string, p?: string) => void;
+  onOpenBook: (b: string, p?: string, s?: string) => void;
   onDelete: (id: string) => void;
   onLabelSave: (id: string, label: string | null) => void;
 }) {
@@ -131,7 +131,7 @@ function XRefCard({
             </p>
             {expanded && side.bookId && (
               <button
-                onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId); }}
+                onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId, side.snapshot); }}
                 className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline text-start"
               >
                 {t('common.openInReader')} →

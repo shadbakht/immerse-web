@@ -33,6 +33,41 @@ interface Passage {
   opens_excerpt?: boolean;
 }
 
+/**
+ * Re-anchor fallback: when an annotation's target passage no longer exists in
+ * this book (content moved during a re-ingest, or was edited away), find the
+ * nearest still-valid passage by matching the quoted snapshot text instead of
+ * defaulting straight to the book's top. `passages` is the book's full,
+ * already-fetched passage list — no extra round-trip needed. Scores every
+ * passage by how many of the snapshot's first ~12 significant words it
+ * contains and returns the best match, requiring a healthy majority so a
+ * false positive (landing somewhere unrelated) is very unlikely; a genuine
+ * miss (content truly gone) returns null and the caller falls through to its
+ * existing saved-progress/top default, same as before this existed.
+ */
+function findNearestPassageId(snapshotText: string, passages: Passage[]): string | null {
+  const words = snapshotText
+    .replace(/[“”‘’]/g, '"')
+    .replace(/\[\d+\]/g, '') // footnote markers, if present in the snapshot
+    .split(/\s+/)
+    .map(w => w.toLowerCase().replace(/[.,;:!?"'()]/g, ''))
+    .filter(w => w.length >= 3)
+    .slice(0, 12);
+  if (words.length === 0) return null;
+  const minMatches = Math.max(3, Math.ceil(words.length * 0.6));
+  let bestId: string | null = null;
+  let bestScore = 0;
+  for (const p of passages) {
+    const content = (p.content || '').toLowerCase();
+    const score = words.reduce((n, w) => n + (content.includes(w) ? 1 : 0), 0);
+    if (score >= minMatches && score > bestScore) {
+      bestId = p.id;
+      bestScore = score;
+    }
+  }
+  return bestId;
+}
+
 interface BookMeta {
   title: string;
   authorName: string;
@@ -195,7 +230,7 @@ interface SelectionBar {
 interface ReaderPanelProps {
   target: ReaderTarget;
   userId: string;
-  onOpenBook?: (bookId: string, passageId?: string) => void;
+  onOpenBook?: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
   xrefPickFrom?: XRefPickFrom | null;
   onStartXrefPick?: (from: XRefPickFrom) => void;
   onXrefPickDone?: () => void;
@@ -297,7 +332,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
   allTags: Array<{ id: string; name: string; parent_id: string | null }>;
   depth: number;
   fetchQuotes: (tagId: string) => Promise<TagQuote[]>;
-  onOpenBook?: (bookId: string, passageId: string) => void;
+  onOpenBook?: (bookId: string, passageId: string, passageSnapshot?: string) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -345,7 +380,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
   );
 }
 
-function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (bookId: string, passageId: string) => void }) {
+function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (bookId: string, passageId: string, passageSnapshot?: string) => void }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   return (
@@ -360,7 +395,7 @@ function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (boo
           {quote.citation && <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mt-1.5">{quote.citation}</p>}
           {quote.bookId && onOpenBook && (
             <button
-              onClick={() => onOpenBook(quote.bookId!, quote.passageId)}
+              onClick={() => onOpenBook(quote.bookId!, quote.passageId, quote.text)}
               className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
               {t('common.openInReader')} →
@@ -374,7 +409,7 @@ function TagQuoteRow({ quote, onOpenBook }: { quote: TagQuote; onOpenBook?: (boo
 
 function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
   entry: XrefViewEntry;
-  onOpenBook?: (bookId: string, passageId: string) => void;
+  onOpenBook?: (bookId: string, passageId: string, passageSnapshot?: string) => void;
   onDelete: () => void;
 }) {
   const { t } = useTranslation();
@@ -393,7 +428,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
           </div>
           {expanded && entry.otherBookId && onOpenBook && (
             <button
-              onClick={() => onOpenBook(entry.otherBookId!, entry.otherPassageId)}
+              onClick={() => onOpenBook(entry.otherBookId!, entry.otherPassageId, entry.otherSnapshotText)}
               className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
             >
               {t('common.openInReader')} →
@@ -470,7 +505,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       loadedBookIdRef.current = target.bookId;
       setTocOpen(false);
       setSelectionBar(null);
-      loadBook(target.bookId, target.passageId);
+      loadBook(target.bookId, target.passageId, target.passageSnapshot);
       return;
     }
     // Same book already open — e.g. a search hit inside the book you're
@@ -484,7 +519,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       setSearchHighlight({ passageId: target.passageId, query: target.highlightQuery });
       setTimeout(() => setSearchHighlight(null), 5000);
     }
-  }, [target?.bookId, target?.passageId, target?.highlightQuery]);
+  }, [target?.bookId, target?.passageId, target?.highlightQuery, target?.passageSnapshot]);
 
   useEffect(() => {
     if (!userId) return;
@@ -705,7 +740,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [selectionBar]);
 
-  async function loadBook(bookId: string, scrollToId?: string) {
+  async function loadBook(bookId: string, scrollToId?: string, snapshotText?: string) {
     // Revoke any previous blob URL to avoid memory leaks
     if (pdfUrlRef.current) {
       URL.revokeObjectURL(pdfUrlRef.current);
@@ -911,6 +946,18 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
       // Resolve scroll target: explicit passageId > saved cloud progress > top
       let resolvedScrollId = scrollToId;
+      if (resolvedScrollId && !ps.some(p => p.id === resolvedScrollId)) {
+        // Graceful degradation: an annotation's target passage no longer
+        // exists in this book (content moved or was edited during a
+        // re-ingest). Match the annotation's own quoted text against the
+        // book's own passages (already fully fetched into `ps`) instead of
+        // silently falling through to the book's top.
+        const nearest = snapshotText ? findNearestPassageId(snapshotText, ps) : null;
+        if (nearest) {
+          console.warn(`[ReaderPanel] passageId ${resolvedScrollId} not found in ${bookId}; degraded to nearest passage ${nearest} via snapshot text match`);
+        }
+        resolvedScrollId = nearest ?? undefined;
+      }
       if (!resolvedScrollId && userId) {
         const { data: saved } = await supabase
           .from('reading_progress')
@@ -2125,7 +2172,7 @@ async function handleCopy() {
                         allTags={allTags}
                         depth={0}
                         fetchQuotes={fetchTagQuotes}
-                        onOpenBook={onOpenBook ? (bookId, passageId) => { onOpenBook(bookId, passageId); closeAnnotationPanel(); } : undefined}
+                        onOpenBook={onOpenBook ? (bookId, passageId, passageSnapshot) => { onOpenBook(bookId, passageId, passageSnapshot); closeAnnotationPanel(); } : undefined}
                       />
                     ))}
                   </div>
@@ -2230,7 +2277,7 @@ async function handleCopy() {
                     <XrefEntryBlock
                       key={entry.xrefId}
                       entry={entry}
-                      onOpenBook={onOpenBook ? (bookId, passageId) => { onOpenBook(bookId, passageId); closeAnnotationPanel(); } : undefined}
+                      onOpenBook={onOpenBook ? (bookId, passageId, passageSnapshot) => { onOpenBook(bookId, passageId, passageSnapshot); closeAnnotationPanel(); } : undefined}
                       onDelete={() => handleDeleteXref(annotationPanel!.passageId, entry.xrefId)}
                     />
                   ))}

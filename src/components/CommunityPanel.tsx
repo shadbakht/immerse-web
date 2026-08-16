@@ -54,18 +54,20 @@ interface ProfileUser {
 
 interface CommunityPanelProps {
   user: import('@supabase/supabase-js').User | null;
-  onOpenBook?: (bookId: string, passageId?: string) => void;
+  onOpenBook?: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
 }
 
-type OpenBookFn = (bookId: string, passageId?: string) => void;
+type OpenBookFn = (bookId: string, passageId?: string, passageSnapshot?: string) => void;
 
 const PAGE_SIZE = 20;
 
 /**
  * Open a community-payload selection in the reader. The payload carries mobile
  * slugs (`bookId`) and text pids (`startPid`), so resolve them to the web's
- * book/passage UUIDs via book_slug_map + passage_pid_map. Falls back to opening
- * the book at the top if the pid isn't mapped.
+ * book/passage UUIDs via book_slug_map + passage_pid_map. Passes the payload's
+ * own snapshot text through too — if the pid isn't mapped (or maps to a
+ * passage that no longer exists), ReaderPanel's loadBook falls back to a
+ * snapshot-text content match instead of silently opening at the book's top.
  */
 async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
   const slug = sel?.bookId as string | undefined;
@@ -90,7 +92,7 @@ async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
       .maybeSingle();
     passageUuid = (pidRow as { passage_id?: string } | null)?.passage_id;
   }
-  onOpenBook(bookUuid, passageUuid);
+  onOpenBook(bookUuid, passageUuid, sel?.snapshotText);
 }
 
 // ── One expandable quote (feed + profile) ────────────────────────────────────

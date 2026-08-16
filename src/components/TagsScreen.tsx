@@ -130,7 +130,7 @@ function SortableQuoteRow({ sel, depth }: { sel: SelRow; depth: number }) {
 
 interface TagsScreenProps {
   userId: string;
-  onOpenBook: (bookId: string, passageId?: string) => void;
+  onOpenBook: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
 }
 
 type CheckState = 'checked' | 'indeterminate' | 'unchecked';
@@ -169,7 +169,7 @@ function GlobeIcon({ className }: { className?: string }) {
   );
 }
 
-function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string) => void; onRemove: () => void; depth: number }) {
+function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: SelRow; searchQuery: string; onOpenBook: (b: string, p?: string, s?: string) => void; onRemove: () => void; depth: number }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
@@ -194,7 +194,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: Se
         action={<ContextMenu options={menuOptions} />}
         footer={expanded && sel.book_id ? (
           <button
-            onClick={e => { e.stopPropagation(); onOpenBook(sel.book_id, sel.passage_id); }}
+            onClick={e => { e.stopPropagation(); onOpenBook(sel.book_id, sel.passage_id, sel.snapshot_text); }}
             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
           >
             {t('common.openInReader')} →
@@ -211,7 +211,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
   selectState: CheckState;
   onToggleSelect: () => void;
   searchQuery: string;
-  onOpenBook: (b: string, p?: string) => void;
+  onOpenBook: (b: string, p?: string, s?: string) => void;
   depth?: number;
   hasChildren?: boolean;
   isOpen?: boolean;

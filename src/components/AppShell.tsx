@@ -33,7 +33,12 @@ async function resolveBookId(bookId: string): Promise<string> {
   } catch { return bookId; }
 }
 
-export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string } | null;
+// passageSnapshot: the quoted text an annotation was made against. Used only
+// as a fallback — if passageId no longer resolves (the book was re-ingested
+// and this paragraph moved or was edited), ReaderPanel matches it against
+// the book's own content to land on the nearest still-valid passage instead
+// of silently opening at the book's very top.
+export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string; passageSnapshot?: string } | null;
 
 export interface XRefPickFrom {
   text: string;
@@ -89,14 +94,14 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     syncFollowedUsers(userId).catch(e => console.warn('[AppShell] syncFollowed error:', e));
   }, [userId]);
 
-  function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false) {
+  function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false, passageSnapshot?: string) {
     // Switch to the reader IMMEDIATELY — never block the tab change on slug
     // resolution. The reader (loadBook) resolves a slug→uuid itself for
     // rendering; we also resolve in the background so reading_progress writes
     // use the uuid.
     setActiveTab('library');
     setLibraryCollapsed(collapseLibrary);
-    setReaderTarget({ bookId, passageId, highlightQuery });
+    setReaderTarget({ bookId, passageId, highlightQuery, passageSnapshot });
     history.replaceState(null, '', `/read/${bookId}`);
     if (!UUID_RE.test(bookId) && !bookId.startsWith('imported:')) {
       resolveBookId(bookId).then(id => {
@@ -110,6 +115,15 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
 
   function openBookFromHome(bookId: string, passageId?: string, highlightQuery?: string) {
     openBook(bookId, passageId, highlightQuery, true);
+  }
+
+  // Annotation screens (Notes/Tags/XRefs/Community) only ever have a
+  // passageId + the quote it was made against, never a highlightQuery or a
+  // reason to collapse the library — a dedicated wrapper keeps their 3rd
+  // positional argument from colliding with openBook's highlightQuery slot
+  // (which LibraryPanel's search results already use).
+  function openBookFromAnnotation(bookId: string, passageId?: string, passageSnapshot?: string) {
+    openBook(bookId, passageId, undefined, false, passageSnapshot);
   }
 
   function handleStartXrefPick(from: XRefPickFrom) {
@@ -142,13 +156,13 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
         <div className="flex-1 overflow-hidden">
           {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBookFromHome} onTabChange={tab => setActiveTab(tab as NavTab)} />}
           {activeTab === 'settings'  && <SettingsPanel user={user} />}
-          {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBook} />}
+          {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBookFromAnnotation} />}
           {activeTab === 'tags'      && !user && <SignInPrompt message={t('tags.signInBody')} />}
-          {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBook} />}
+          {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBookFromAnnotation} />}
           {activeTab === 'notes'     && !user && <SignInPrompt message={t('notes.signInBody')} />}
-          {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBook} />}
+          {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBookFromAnnotation} />}
           {activeTab === 'xrefs'     && !user && <SignInPrompt message={t('xrefs.signInBody')} />}
-          {activeTab === 'community' && <CommunityPanel user={user} onOpenBook={openBook} />}
+          {activeTab === 'community' && <CommunityPanel user={user} onOpenBook={openBookFromAnnotation} />}
         </div>
       ) : (
         <>
@@ -171,7 +185,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
             <ReaderPanel
               target={readerTarget}
               userId={userId}
-              onOpenBook={openBook}
+              onOpenBook={openBookFromAnnotation}
               xrefPickFrom={xrefPickFrom}
               onStartXrefPick={handleStartXrefPick}
               onXrefPickDone={handleXrefPickDone}

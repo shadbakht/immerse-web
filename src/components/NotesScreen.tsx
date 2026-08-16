@@ -29,7 +29,7 @@ interface NoteRow {
 
 interface NotesScreenProps {
   userId: string;
-  onOpenBook: (bookId: string, passageId?: string) => void;
+  onOpenBook: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
 }
 
 // Module-level, so the locale has to be handed in rather than hooked for.
@@ -63,7 +63,7 @@ function NoteItem({
 }: {
   note: NoteRow;
   searchQuery: string;
-  onOpenBook: (b: string, p?: string) => void;
+  onOpenBook: (b: string, p?: string, s?: string) => void;
   onDelete: (id: string) => void;
   onSave:   (id: string, content: string) => void;
   dateIso?: string;
@@ -101,7 +101,7 @@ function NoteItem({
         action={<ContextMenu options={menuOptions} />}
         belowQuote={note.bookId ? (
           <button
-            onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId); }}
+            onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId, note.snapshotText); }}
             className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
           >
             {t('common.openInReader')} →
