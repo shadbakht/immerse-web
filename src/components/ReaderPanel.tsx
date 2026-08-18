@@ -1697,7 +1697,7 @@ async function handleCopy() {
         <button
           onClick={() => setTocOpen(o => !o)}
           className="absolute top-4 end-4 z-20 p-2 bg-white dark:bg-[#1B2A38] border border-gray-200 dark:border-[#2D4050] rounded-lg hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors shadow-sm"
-          title="Jump to a section in this book"
+          title={t('reader.tocButtonHint')}
         >
           <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
             <circle cx="3" cy="4"  r="1.5" fill="currentColor" className="text-gray-600 dark:text-[#8FA4B8]" />
