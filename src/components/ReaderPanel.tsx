@@ -275,9 +275,32 @@ function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp:
   });
 }
 
-function PassageContent({ text, onFootnoteClick, highlight, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string; prayerBreaks?: boolean }) {
+function PassageContent({ text, onFootnoteClick, highlight, highlightExact, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string; highlightExact?: boolean; prayerBreaks?: boolean }) {
   const clean = text.replace(/\/\*[^*]*\*\//g, '');
-  if (highlight) {
+  if (highlight && highlightExact) {
+    // A tap-and-hold quote (Compilations/Notes/XRef/Discover) or a daily-verse
+    // notification carries its own verbatim text, so highlight it as ONE
+    // contiguous run — never the word-scatter match below, which would tint
+    // every recurrence of each individual word in the quote instead of just
+    // the quote itself. If the literal text can't be found (content moved or
+    // was edited since the quote was made), fall through to normal rendering
+    // rather than guess at a partial/word-level match.
+    const plain = clean.replace(/<\/?em>/g, '');
+    const idx = plain.indexOf(highlight.trim());
+    if (idx !== -1) {
+      const q = highlight.trim();
+      const before = plain.slice(0, idx);
+      const match  = plain.slice(idx, idx + q.length);
+      const after  = plain.slice(idx + q.length);
+      return (
+        <>
+          {prayerBreaks ? renderPrayerText(before, 'eb') : <span>{before}</span>}
+          <mark className="search-highlight rounded px-0.5">{match}</mark>
+          {prayerBreaks ? renderPrayerText(after, 'ea') : <span>{after}</span>}
+        </>
+      );
+    }
+  } else if (highlight) {
     const plain = clean.replace(/<\/?em>/g, '');
     const words = highlight.trim().split(/\s+/).filter(Boolean);
     const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
@@ -467,7 +490,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'ai' | 'signin' | null>(null);
   const [pickSaving, setPickSaving] = useState(false);
   const [isPro, setIsPro] = useState(false);
-  const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string } | null>(null);
+  const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string; exact?: boolean } | null>(null);
   const [taggedPassageIds, setTaggedPassageIds]   = useState<Set<string>>(new Set());
   const [notedPassageIds, setNotedPassageIds]     = useState<Set<string>>(new Set());
   const [xrefPassageIds, setXrefPassageIds]       = useState<Set<string>>(new Set());
@@ -517,6 +540,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     document.getElementById(`p-${target.passageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (target.highlightQuery) {
       setSearchHighlight({ passageId: target.passageId, query: target.highlightQuery });
+      setTimeout(() => setSearchHighlight(null), 5000);
+    } else if (target.passageSnapshot) {
+      // A tap-and-hold quote (Compilations/Notes/XRef/Discover), already open
+      // to the same book: flash the exact quoted text, not word-scattered.
+      setSearchHighlight({ passageId: target.passageId, query: target.passageSnapshot, exact: true });
       setTimeout(() => setSearchHighlight(null), 5000);
     }
   }, [target?.bookId, target?.passageId, target?.highlightQuery, target?.passageSnapshot]);
@@ -1001,6 +1029,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         }, 100);
         if (target?.highlightQuery) {
           setSearchHighlight({ passageId: resolvedScrollId, query: target.highlightQuery });
+          setTimeout(() => setSearchHighlight(null), 5000);
+        } else if (target?.passageSnapshot) {
+          // Same tap-and-hold-quote case as above, but for a book that wasn't
+          // already open (a fresh loadBook rather than the same-book branch).
+          setSearchHighlight({ passageId: resolvedScrollId, query: target.passageSnapshot, exact: true });
           setTimeout(() => setSearchHighlight(null), 5000);
         }
       } else {
@@ -2083,6 +2116,7 @@ async function handleCopy() {
                         setActiveFootnote({ num: n, text: footnoteMap[n] ?? '' });
                       }}
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
+                      highlightExact={searchHighlight?.passageId === passage.id ? searchHighlight.exact : undefined}
                       prayerBreaks={hasParagraphBreaks}
                     />
                     {attribution && (
