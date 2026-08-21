@@ -22,9 +22,12 @@ export async function POST() {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerseresearch.app';
 
+  // There is no /settings route — Settings is a client-side tab inside
+  // AppShell — so land back on the root with ?tab=settings, which AppShell
+  // reads on mount to switch to that tab. Plain `/settings` 404s.
   const session = await stripe.billingPortal.sessions.create({
     customer:   profile.stripe_customer_id,
-    return_url: `${origin}/settings`,
+    return_url: `${origin}/?tab=settings`,
   });
 
   return NextResponse.json({ url: session.url });

@@ -75,6 +75,18 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   // Apply the saved light/dark/system color mode on load.
   useEffect(() => { initColorMode(); }, []);
 
+  // Landing back from the Stripe billing portal: honor ?tab=settings (see
+  // /api/stripe/portal's return_url). There's no dedicated /settings route —
+  // Settings is a tab inside this same shell — so this is how the redirect
+  // actually lands the user back where they started instead of just the home
+  // tab.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'settings') {
+      setActiveTab('settings');
+      history.replaceState(null, '', '/');
+    }
+  }, []);
+
   // If the page was opened at /read/<slug> (slug, not uuid), resolve it to a
   // uuid so the reader and reading_progress writes don't choke on the slug.
   useEffect(() => {
