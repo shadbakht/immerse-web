@@ -9,7 +9,7 @@ import { resolveIsPro } from '@/lib/proStatus';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
-import { semanticSearch, reciprocalRankFusion, SEMANTIC_SEARCH_ENABLED } from '@/lib/semanticSearch';
+import { looksLikeQuestion, planAiSearch, weightedRankFusion, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
 
@@ -41,6 +41,7 @@ interface SearchResult {
   sectionTitle: string | null;
   content:      string;
   semantic?:    boolean;  // meaning-based ("Related") hit
+  matchPhrase?: string;   // the AI phrase that found it, if any
 }
 
 interface LibraryPanelProps {
@@ -60,7 +61,7 @@ interface ImportedBook {
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
-  const { contentLanguage, setContentLanguage } = useLanguage();
+  const { contentLanguage, setContentLanguage, uiLanguage } = useLanguage();
 
   const [catalog, setCatalog]   = useState<Catalog | null>(null);
   const [slugMap, setSlugMap]   = useState<Map<string, string>>(new Map());
@@ -89,8 +90,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   // Search
   const [searchQuery,       setSearchQuery]       = useState('');
   const [searchResults,     setSearchResults]     = useState<SearchResult[]>([]);
-  const [semanticOn,        setSemanticOn]        = useState(false); // opt-in "Related" (semantic) search
   const [searchLoading,     setSearchLoading]     = useState(false);
+  const [aiLoading,         setAiLoading]         = useState(false);
+  // Guards against an overtaken search writing its results over a newer one.
+  // Keyword search alone returned fast enough for this never to bite; the AI
+  // leg adds a second or two, which makes it a real race rather than a
+  // theoretical one — type, pause, type again and the first run can land last.
+  const searchRunRef = useRef(0);
   const [expandedResults,   setExpandedResults]   = useState<Set<string>>(new Set());
   const [checkedResultIds,  setCheckedResultIds]  = useState<Set<string>>(new Set());
   const [tagPanelVisible,   setTagPanelVisible]   = useState(false);
@@ -408,28 +414,21 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).join(' & ');
   }
 
-  // Remember the "Related" toggle across sessions.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.localStorage.getItem('search.semanticOn.v1') === '1') {
-      setSemanticOn(true);
-    }
-  }, []);
-  function toggleSemantic() {
-    setSemanticOn(prev => {
-      const next = !prev;
-      try { window.localStorage.setItem('search.semanticOn.v1', next ? '1' : '0'); } catch {}
-      return next;
-    });
-  }
-
   useEffect(() => {
     const q = searchQuery.trim();
+    // Reset the AI state on every keystroke, not just on an empty field: a run
+    // that gets superseded mid-flight can't clear its own spinner, and the next
+    // query is only guaranteed to set it if that query is also a question. Miss
+    // this and the "finding related passages" line sticks under a plain search.
+    setAiLoading(false);
     if (!q) { setSearchResults([]); return; }
     const timer = setTimeout(() => doSearch(q), 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedSlugs, semanticOn]);
+  }, [searchQuery, selectedSlugs]);
 
   async function doSearch(q: string) {
+    const runId = ++searchRunRef.current;
+    const isStale = () => searchRunRef.current !== runId;
     setSearchLoading(true);
     try {
       const exactPhrase = extractExactPhrase(q);
@@ -467,27 +466,81 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       const localResults = await searchLocalBooks(q, localBookIds, exactPhrase);
 
       const keyword = [...localResults, ...remoteResults];
+      if (isStale()) return;
       setSearchResults(keyword);
       setSearchLoading(false);
 
-      // Semantic search is opt-in (the "Related" toggle) and whole-library only,
-      // so keyword search stays fast/local by default. Also skipped in
-      // exact-phrase mode — embedding similarity is the opposite of what a
-      // literal quoted phrase asked for.
-      if (!SEMANTIC_SEARCH_ENABLED || !semanticOn || selectedSlugs.size > 0 || exactPhrase) return;
-      const hits = await semanticSearch(supabase, q, undefined, 40);
-      if (hits.length === 0) return;
-      const semItems: SearchResult[] = hits.map(h => ({
-        passageId:    h.passageId,
-        bookId:       h.bookId,
-        bookTitle:    h.bookTitle,
-        authorName:   '',
-        chapterLabel: null,
-        sectionTitle: null,
-        content:      h.snippet,
-        semantic:     true,
-      }));
-      setSearchResults(reciprocalRankFusion([keyword, semItems], r => r.passageId));
+      // AI search — only when what was typed reads as a QUESTION. There is no
+      // toggle: the keyword results above are already rendered and stay exactly
+      // as they were, and this folds extra passages in when it returns.
+      //
+      // Claude never searches the corpus. It returns the WORDING a relevant
+      // passage probably uses; retrieval is still the same Postgres search over
+      // the same scope. So a phrase Claude invented finds nothing and
+      // disappears, and results can never point outside what the reader can see.
+      if (!AI_SEARCH_ENABLED || !looksLikeQuestion(q, [uiLanguage, contentLanguage])) return;
+      // An empty (not null) scope is how the remote helpers are told "skip the
+      // server" — the same rule the keyword path applies via onlyImportedSelected.
+      // Passing regularUUIDs straight through would be null here, i.e. the whole
+      // library, silently escaping the reader's filter.
+      const remoteScope: string[] | null = onlyImportedSelected ? [] : regularUUIDs;
+      setAiLoading(true);
+      const outcome = await planAiSearch(supabase, q, contentLanguage);
+      if (isStale()) return;
+
+      if (outcome.status !== 'ok') {
+        // Silent by design: rate limit, budget, an unparseable reply — none of
+        // them are the reader's problem, and the keyword results are already on
+        // screen. (Mobile additionally reports being offline; web can't be.)
+        setAiLoading(false);
+        return;
+      }
+
+      const perPhrase = await Promise.all(
+        outcome.plan.phrases.map(phrase =>
+          runAiPhraseSearch(phrase, remoteScope, localBookIds)
+            // Carry the phrase that found each hit. It, not the reader's
+            // question, is what actually matched — so it is what the snippet
+            // centres on and what gets highlighted. Highlighting the question
+            // instead lights up every "to", "the" and "of" in the passage.
+            .then(hits => hits.map(h => ({ ...h, matchPhrase: phrase })))
+            .catch(() => [] as SearchResult[])),
+      );
+      // Each phrase stays its OWN ranked list, overlaps and all — that overlap is
+      // the signal. Rank fusion sums a passage's contribution from every list it
+      // appears in, so a passage that several independent phrasings all reach
+      // outranks one that only a single phrasing found. Deduplicating here
+      // would throw that agreement away; the fusion dedups the output itself.
+      const aiLists = perPhrase
+        .filter(hits => hits.length > 0)
+        .map(hits => hits.map(h => ({ ...h, semantic: true })));
+
+      if (aiLists.length === 0 && outcome.plan.terms.length > 0) {
+        // No phrase landed: fall back to the distinctive single words. Joined
+        // with " or " because websearch_to_tsquery reads that as a real OR —
+        // requiring all of them (its default) would be stricter than the
+        // phrases that already failed.
+        const hits = await runFtsSearch(outcome.plan.terms.join(' or '), remoteScope)
+          .catch(() => [] as SearchResult[]);
+        if (hits.length) {
+          aiLists.push(hits.map(h => ({ ...h, semantic: true, matchPhrase: outcome.plan.terms[0] })));
+        }
+      }
+
+      if (isStale()) return;
+
+      if (aiLists.length > 0) {
+        // Weighted fusion, AI-heavy on purpose: for a real question the keyword
+        // list mostly matched incidental words ("God", "oppression") across the
+        // whole library, so it must not outrank passages that actually answer
+        // it. A passage both agree on rises above either. Keyword hits are kept
+        // rather than dropped so a misread question still shows a real search.
+        setSearchResults(weightedRankFusion(
+          [{ items: keyword, weight: 1 }, ...aiLists.map(items => ({ items, weight: 3 }))],
+          r => r.passageId,
+        ));
+      }
+      setAiLoading(false);
     } finally {
       setSearchLoading(false);
     }
@@ -575,6 +628,67 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       foldPunctuation(String(p.content ?? '')).toLowerCase().includes(foldedPhrase)
     );
     return mapResults(matches);
+  }
+
+  // One of AI search's guessed phrases, looked up in two tiers.
+  //
+  // Tier 1 is the literal phrase, reusing runExactPhraseSearch's fetch-then-
+  // verify approach — when Claude guesses the translation's actual words that is
+  // the most precise thing available.
+  //
+  // Tier 2 is the same words as a plain bag, which is this platform's answer to
+  // the problem mobile solves with FTS5 NEAR(): measured against the corpus,
+  // exact-phrase matching alone loses about half of Claude's good guesses to a
+  // single inserted word ("Seek YE the LORD while he may be found"). Web needs
+  // no proximity operator to recover them, for two reasons that don't hold on
+  // mobile — a passage row is a PARAGRAPH (~250 characters), not a chapter-sized
+  // chunk, so requiring the words merely to co-occur in one row is already a
+  // tight proximity constraint; and Postgres stems and drops stopwords, so the
+  // inserted "ye" never mattered here in the first place.
+  async function runAiPhraseSearch(
+    phrase: string,
+    scope: string[] | null,
+    localIds: string[],
+  ): Promise<SearchResult[]> {
+    const local = await searchLocalBooks(phrase, localIds, phrase);
+    const exact = await runExactPhraseSearch(phrase, scope);
+    if (exact.length > 0 || local.length > 0) return [...local, ...exact];
+
+    if (scope !== null && scope.length === 0) return local; // remote skipped
+
+    // Content words only. Postgres drops its own stopwords anyway, so keeping
+    // "and"/"not"/"the" here would just be noise in the client-side check below.
+    const content = phrase.split(/\s+/).map(w => foldPunctuation(w).toLowerCase())
+      .filter(w => w.length >= 4);
+    if (content.length < 2) return local;
+
+    const { data } = await supabase
+      .rpc('search_passages', {
+        search_query: content.join(' '),
+        book_scope: scope && scope.length > 0 ? scope : null,
+      })
+      .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
+
+    // ⚠️ search_passages has NO ORDER BY — it is `limit 40` over an unranked
+    // index scan, unlike mobile's chunks.search which orders by BM25. A loose
+    // bag query therefore returns 40 ARBITRARY rows out of however many match,
+    // which is exactly how "seek … find" (83 matching rows) put 2 Kings at the
+    // top of a search about seeking God. Measured, not theorised.
+    //
+    // So do the ranking here, where the rows are already in hand and a passage
+    // is short: require every content word to actually be present, then order by
+    // the tightest span between the first and last of them. That reconstructs
+    // what mobile gets from FTS5's NEAR(…, 10) without touching the shared RPC
+    // that ordinary keyword search also depends on.
+    const scored = ((data as any[]) ?? []).map(row => {
+      const text = foldPunctuation(String(row.content ?? '')).toLowerCase();
+      const positions = content.map(w => text.indexOf(w));
+      if (positions.some(i => i < 0)) return null;
+      return { row, span: Math.max(...positions) - Math.min(...positions) };
+    }).filter(Boolean) as Array<{ row: any; span: number }>;
+
+    scored.sort((a, b) => a.span - b.span);
+    return [...local, ...mapResults(scored.map(s => s.row))];
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
@@ -715,6 +829,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     return <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={inset > 0 ? { marginLeft: inset } : undefined} />;
   };
 
+  // The AI leg still working. Every failure is deliberately silent — the keyword
+  // results above are already there and still correct — so this is the only
+  // extra thing the search results ever show.
+  const aiFooter = aiLoading ? (
+    <div className="flex items-center justify-center gap-2 py-4 text-sm italic text-gray-400 dark:text-[#5C7A8E]">
+      <div className="w-4 h-4 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
+      {t('library.findingRelated')}
+    </div>
+  ) : null;
+
   return (
     <div className="flex flex-col h-full">
       {/* Hidden file input */}
@@ -805,21 +929,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             >{t('common.clear')}</button>
           )}
         </div>
-        {SEMANTIC_SEARCH_ENABLED && searchQuery.trim() && selectedSlugs.size === 0 && (
-          <button
-            onClick={toggleSemantic}
-            className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border transition-colors ${
-              semanticOn
-                ? 'border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/10'
-                : 'border-gray-200 dark:border-[#2D4050] text-gray-400 dark:text-[#5C7A8E]'
-            }`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
-            {t('library.relatedPassages')}{semanticOn ? ` · ${t('library.relatedOn')}` : ''}
-          </button>
-        )}
       </div>
 
       {/* Body */}
@@ -835,14 +944,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               <div className="w-5 h-5 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : searchResults.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-10">{t('library.noResultsFor', { query: searchQuery })}</p>
+            <>
+              <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-10">{t('library.noResultsFor', { query: searchQuery })}</p>
+              {aiFooter}
+            </>
           ) : (
             <div>
               <p className="text-xs text-gray-400 dark:text-[#5C7A8E] px-4 py-2">{t('library.result', { count: searchResults.length })}</p>
               {searchResults.map(result => {
                 const isExpanded = expandedResults.has(result.passageId);
                 const isChecked  = checkedResultIds.has(result.passageId);
-                const snippet    = getSnippet(result.content, searchQuery);
+                const matchQuery = result.matchPhrase ?? searchQuery;
+                const snippet    = getSnippet(result.content, matchQuery);
                 const location   = result.chapterLabel || result.sectionTitle;
                 return (
                   <div key={result.passageId} className={`border-b border-gray-100 dark:border-[#2D4050] ${isChecked ? 'bg-[#1B6B7B]/5 dark:bg-[#2D9DB3]/5' : ''}`}>
@@ -860,11 +973,11 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                           {result.semantic ? `${t('library.relatedPrefix')} · ` : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
-                          {isExpanded ? highlightQuery(result.content, searchQuery) : highlightQuery(snippet, searchQuery)}
+                          {isExpanded ? highlightQuery(result.content, matchQuery) : highlightQuery(snippet, matchQuery)}
                         </p>
                         {isExpanded && (
                           <button
-                            onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, extractExactPhrase(searchQuery) ?? searchQuery.trim()); }}
+                            onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, result.matchPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim()); }}
                             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                           >
                             {t('common.openInReader')} →
@@ -875,6 +988,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   </div>
                 );
               })}
+              {aiFooter}
             </div>
           )}
         </div>
