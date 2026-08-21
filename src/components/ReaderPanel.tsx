@@ -13,6 +13,7 @@ import { ContextMenu, type MenuOption } from './ContextMenu';
 import { TagIcon, NoteIcon, XRefIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
+import { logEvent } from '@/lib/analytics';
 import { loadSlugMaps } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { directionOf } from '@immerse/i18n';
@@ -1105,7 +1106,8 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       startOffset: range.startOffset,
       endOffset: range.endOffset,
     });
-  }, []);
+    logEvent('selection_made', { bookId: target?.bookId ?? null }, userId || null);
+  }, [target?.bookId, userId]);
 
 async function handleCopy() {
     if (!selectionBar) return;
@@ -2196,6 +2198,7 @@ async function handleCopy() {
         bookTitle={book?.title ?? ''}
         authorName={book?.authorName ?? ''}
         isPro={isPro}
+        userId={userId || null}
       />
 
       {/* Tags view panel — opened by tapping the 🏷 margin icon */}

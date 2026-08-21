@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import PanelSheet from './PanelSheet';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { logEvent } from '@/lib/analytics';
 
 interface AiResult {
   title:       string;
@@ -17,9 +18,10 @@ interface AiPanelProps {
   bookTitle:     string;
   authorName:    string;
   isPro:         boolean;
+  userId?:       string | null;
 }
 
-export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, isPro }: AiPanelProps) {
+export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, isPro, userId }: AiPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [result, setResult] = useState<AiResult | null>(null);
@@ -30,6 +32,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
   useEffect(() => {
     if (!visible) { setResult(null); setError(''); return; }
     if (isPro && selectionText) fetchSummary();
+    else if (!isPro) logEvent('paywall_seen', { source: 'ai_summary' }, userId ?? null);
   }, [visible]);
 
   async function fetchSummary() {

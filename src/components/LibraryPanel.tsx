@@ -6,6 +6,7 @@ import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
 import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
 import { resolveIsPro } from '@/lib/proStatus';
+import { logEvent } from '@/lib/analytics';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
@@ -143,6 +144,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     if (!isPro) {
       setImportMsg({ text: t('library.importProFeature'), isError: false });
       setTimeout(() => setImportMsg(null), 4000);
+      logEvent('paywall_seen', { source: 'book_import' }, userId);
       return;
     }
     setImportMsg(null);
@@ -469,6 +471,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       if (isStale()) return;
       setSearchResults(keyword);
       setSearchLoading(false);
+      // Logged with the keyword count only — AI enrichment (below) can still
+      // grow/reorder the list, and by the time it lands this search has
+      // already resolved as far as the funnel cares.
+      logEvent('search_run', { query: q, resultCount: keyword.length }, userId || null);
 
       // AI search — only when what was typed reads as a QUESTION. There is no
       // toggle: the keyword results above are already rendered and stay exactly

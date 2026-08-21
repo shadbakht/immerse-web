@@ -6,6 +6,7 @@ import { syncSubscribedTags, syncFollowedUsers } from '@/lib/communitySync';
 import { initFontSize } from '@/lib/fontSize';
 import { initColorMode } from '@/lib/colorMode';
 import { loadSlugMaps } from '@/lib/catalog';
+import { logEvent } from '@/lib/analytics';
 import type { User } from '@supabase/supabase-js';
 import Sidebar from './Sidebar';
 import LibraryPanel from './LibraryPanel';
@@ -106,6 +107,17 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     syncFollowedUsers(userId).catch(e => console.warn('[AppShell] syncFollowed error:', e));
   }, [userId]);
 
+  // book_opened covers both paths a reader arrives on a book: landing
+  // straight on /read/<id> (a shared link, or — since queue item #1 — a
+  // search result) fires once here; navigating there from inside the app
+  // (Library, Home, an annotation) fires from openBook() below instead. Only
+  // the direct-landing case needs its own effect — openBook already runs on
+  // every in-app navigation.
+  useEffect(() => {
+    if (initialBookId) logEvent('book_opened', { bookId: initialBookId, source: 'direct' }, userId || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once for the id this page loaded with, not on every userId change
+  }, []);
+
   function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false, passageSnapshot?: string) {
     // Switch to the reader IMMEDIATELY — never block the tab change on slug
     // resolution. The reader (loadBook) resolves a slug→uuid itself for
@@ -114,6 +126,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     setActiveTab('library');
     setLibraryCollapsed(collapseLibrary);
     setReaderTarget({ bookId, passageId, highlightQuery, passageSnapshot });
+    logEvent('book_opened', { bookId, source: 'in_app' }, userId || null);
     history.replaceState(null, '', `/read/${bookId}`);
     if (!UUID_RE.test(bookId) && !bookId.startsWith('imported:')) {
       resolveBookId(bookId).then(id => {
