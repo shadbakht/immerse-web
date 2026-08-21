@@ -47,5 +47,10 @@ export const config = {
   // this proxy's login-redirect HTML instead of the script, pdf.js throws,
   // and extractPdfText's catch just falls back to the view-only PDF path —
   // no crash, just a quiet regression to pre-extraction behavior.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|txt|ico|woff2?|map|mjs)$).*)'],
+  // `xml` exempts /sitemap.xml (app/sitemap.ts) the same way `txt` already
+  // exempts /robots.txt (app/robots.ts) — both are generated static files a
+  // crawler fetches unauthenticated, and without this the proxy 302'd
+  // /sitemap.xml to /login instead of serving it (caught 2026-08-21 while
+  // verifying queue item #2's SEO surface in a local preview).
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|txt|xml|ico|woff2?|map|mjs)$).*)'],
 };
