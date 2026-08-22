@@ -10,7 +10,7 @@ import { logEvent } from '@/lib/analytics';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
-import { looksLikeQuestion, planAiSearch, weightedRankFusion, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
+import { planAiSearch, weightedRankFusion, fusionWeights, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
 
@@ -62,7 +62,7 @@ interface ImportedBook {
 export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse }: LibraryPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
-  const { contentLanguage, setContentLanguage, uiLanguage } = useLanguage();
+  const { contentLanguage, setContentLanguage } = useLanguage();
 
   const [catalog, setCatalog]   = useState<Catalog | null>(null);
   const [slugMap, setSlugMap]   = useState<Map<string, string>>(new Map());
@@ -484,20 +484,30 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       // passage probably uses; retrieval is still the same Postgres search over
       // the same scope. So a phrase Claude invented finds nothing and
       // disappears, and results can never point outside what the reader can see.
-      if (!AI_SEARCH_ENABLED || !looksLikeQuestion(q, [uiLanguage, contentLanguage])) return;
+      // A quoted phrase is the one exception, and the only one: quoting is the
+      // reader explicitly asking for a literal match, so it is never
+      // reinterpreted. Otherwise every search comes through here.
+      if (!AI_SEARCH_ENABLED || exactPhrase) return;
       // An empty (not null) scope is how the remote helpers are told "skip the
       // server" — the same rule the keyword path applies via onlyImportedSelected.
       // Passing regularUUIDs straight through would be null here, i.e. the whole
       // library, silently escaping the reader's filter.
       const remoteScope: string[] | null = onlyImportedSelected ? [] : regularUUIDs;
+
+      // A second, longer settle before spending a network round trip. The
+      // keyword leg fires at 300ms so results stay fast; pausing mid-word
+      // shouldn't also fire an AI call for a half-typed query.
       setAiLoading(true);
+      await new Promise(r => setTimeout(r, 500));
+      if (isStale()) { setAiLoading(false); return; }
+
       const outcome = await planAiSearch(supabase, q, contentLanguage);
       if (isStale()) return;
 
       if (outcome.status !== 'ok') {
-        // Silent by design: rate limit, budget, an unparseable reply — none of
-        // them are the reader's problem, and the keyword results are already on
-        // screen. (Mobile additionally reports being offline; web can't be.)
+        // Silent by design: offline, rate limit, budget, an unparseable reply —
+        // none of them are the reader's problem, and the keyword results are
+        // already on screen and still correct.
         setAiLoading(false);
         return;
       }
@@ -536,13 +546,15 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       if (isStale()) return;
 
       if (aiLists.length > 0) {
-        // Weighted fusion, AI-heavy on purpose: for a real question the keyword
-        // list mostly matched incidental words ("God", "oppression") across the
-        // whole library, so it must not outrank passages that actually answer
-        // it. A passage both agree on rises above either. Keyword hits are kept
-        // rather than dropped so a misread question still shows a real search.
+        // Which list to trust is Claude's own call, not a local heuristic. For a
+        // QUESTION the keyword list mostly matched incidental words ("God",
+        // "oppression") across the whole library and must not outrank the
+        // passages that answer it; for a LOOKUP the reader typed a word and
+        // expects the passages containing it first, with the AI phrases merely
+        // widening the net. A passage both lists agree on rises above either.
+        const w = fusionWeights(outcome.plan.isQuestion);
         setSearchResults(weightedRankFusion(
-          [{ items: keyword, weight: 1 }, ...aiLists.map(items => ({ items, weight: 3 }))],
+          [{ items: keyword, weight: w.keyword }, ...aiLists.map(items => ({ items, weight: w.ai }))],
           r => r.passageId,
         ));
       }
