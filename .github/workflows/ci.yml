@@ -4,7 +4,7 @@ name: CI
 on: push
 
 jobs:
-  lint:
+  test-and-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,11 +16,10 @@ jobs:
 
       - run: npm ci
 
+      - run: npm test
+
       # Non-blocking: 212 pre-existing errors (mostly no-explicit-any) as of
       # this workflow's introduction. Still runs and reports on every push;
       # flip to blocking once that backlog is cleared.
       - run: npm run lint
         continue-on-error: true
-
-      # No `npm test` step yet — immerse-web has no test suite. Add one here
-      # once that exists (tracked separately).

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // jest.config.js is loaded directly by Node, outside any bundler —
+    // it has to be CommonJS/require().
+    "jest.config.js",
   ]),
 ]);
 
