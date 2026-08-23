@@ -1,0 +1,26 @@
+name: CI
+
+# Every push, on every branch — see the same workflow in the mobile repo for why.
+on: push
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # Non-blocking: 212 pre-existing errors (mostly no-explicit-any) as of
+      # this workflow's introduction. Still runs and reports on every push;
+      # flip to blocking once that backlog is cleared.
+      - run: npm run lint
+        continue-on-error: true
+
+      # No `npm test` step yet — immerse-web has no test suite. Add one here
+      # once that exists (tracked separately).
