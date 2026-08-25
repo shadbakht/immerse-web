@@ -34,6 +34,18 @@ const FONT_OPTIONS: { key: FontSize; size: number }[] = [
   { key: 'XL',     size: 24 },
 ];
 
+// "Shahrooz Shadbakht" → SS · "Shahrooz" → S · falls back to the username.
+// Mirrors mobile's initialsFor() in src/components/AvatarButton.tsx — same
+// algorithm, kept as a small local copy since it's plain logic with no RN
+// dependency worth sharing across a package boundary for two lines.
+function initialsFor(fullName?: string | null, username?: string | null) {
+  const words = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  if (words.length === 1) return words[0][0].toUpperCase();
+  const u = (username ?? '').trim();
+  return u ? u[0].toUpperCase() : '';
+}
+
 interface SettingsPanelProps {
   user: User | null;
 }
@@ -148,6 +160,53 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       <div className="max-w-lg mx-auto px-8 py-10">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">{t('nav.settings')}</h1>
 
+        {/* Profile header — mirrors mobile's avatar + name/Edit atop Settings
+            (src/screens/SettingsScreen.js). There is no avatar image anywhere
+            in this app, mobile or web: profiles carries full_name/username but
+            no avatar_url, so initials are the whole identity, same as mobile's
+            AvatarButton. Full Name's row (and Edit) and the Username row both
+            moved up here from the Account section below, since the name would
+            otherwise show twice on the page. */}
+        {!loading && (
+          <div className="flex flex-col items-center gap-1.5 mb-8">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/15 border border-[#1B6B7B]/20 dark:border-[#2D9DB3]/25">
+              {isGuest ? (
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#1B6B7B] dark:text-[#2D9DB3]" aria-hidden="true">
+                  <path d="M20 21a8 8 0 0 0-16 0" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              ) : (
+                <span className="text-xl font-semibold text-[#1B6B7B] dark:text-[#2D9DB3]">{initialsFor(fullName, username)}</span>
+              )}
+            </div>
+            {isGuest ? (
+              <span className="text-sm font-semibold text-gray-900 dark:text-[#E2EAF2] mt-1">{t('nav.browsingAsGuest')}</span>
+            ) : editingName ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  autoFocus
+                  value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setNameInput(fullName); } }}
+                  className="text-sm text-center text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3]"
+                />
+                <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold hover:underline disabled:opacity-50">
+                  {nameSaving ? t('common.saving') : t('common.save')}
+                </button>
+                <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8]">{t('common.cancel')}</button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-[#E2EAF2]">{fullName || '—'}</span>
+                  <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{t('settings.edit')}</button>
+                </div>
+                {!!username && <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">@{username}</span>}
+              </>
+            )}
+          </div>
+        )}
+
         {justUpgraded && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-800 text-sm rounded-2xl px-5 py-4 flex items-center gap-3">
             <span className="text-xl">🎉</span>
@@ -168,43 +227,8 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.account')}</span>
               </div>
 
-              {!isGuest && (
-                <>
-                  {/* Full Name */}
-                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.fullName')}</span>
-                    {editingName ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          autoFocus
-                          value={nameInput}
-                          onChange={e => setNameInput(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setNameInput(fullName); } }}
-                          className="flex-1 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3]"
-                        />
-                        <button onClick={handleSaveName} disabled={nameSaving} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold hover:underline disabled:opacity-50">
-                          {nameSaving ? t('common.saving') : t('common.save')}
-                        </button>
-                        <button onClick={() => { setEditingName(false); setNameInput(fullName); }} className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8]">{t('common.cancel')}</button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 flex-1 justify-end">
-                        <span className="text-sm text-gray-700 dark:text-[#B8C7D6]">{fullName || '—'}</span>
-                        <button onClick={() => { setEditingName(true); setNameInput(fullName); }} className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{t('settings.edit')}</button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Username */}
-                  <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.username')}</span>
-                    <span className="text-sm text-gray-700 dark:text-[#B8C7D6]">@{username || '—'}</span>
-                  </div>
-                </>
-              )}
-
               {/* Plan */}
-              <div className="px-5 py-4 flex items-center justify-between">
+              <div className={`px-5 py-4 flex items-center justify-between ${!isGuest && !isPro ? 'border-b border-gray-50 dark:border-[#2D4050]/60' : ''}`}>
                 <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.plan')}</span>
                 <div className="flex items-center gap-3">
                   <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B] dark:text-[#2D9DB3]' : 'text-gray-500 dark:text-[#8FA4B8]'}`}>
@@ -213,7 +237,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                       : isPro ? t('settings.planPro')
                       : t('settings.planStandard')}
                   </span>
-                  {!isGuest && (isPro && !isTrial ? (
+                  {!isGuest && isPro && !isTrial && (
                     <button
                       onClick={handleManageSubscription}
                       disabled={stripeLoading}
@@ -221,15 +245,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     >
                       {stripeLoading ? t('common.loading') : t('settings.manage')}
                     </button>
-                  ) : (
-                    <button
-                      onClick={handleUpgrade}
-                      disabled={stripeLoading}
-                      className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-50"
-                    >
-                      {stripeLoading ? t('common.loading') : t('settings.upgradeCta')}
-                    </button>
-                  ))}
+                  )}
                   {isGuest && (
                     <a
                       href="/login"
@@ -240,6 +256,23 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                   )}
                 </div>
               </div>
+
+              {/* Upgrade — used to be a small pill inline in the Plan row
+                  above; now the full blurb + button, matching mobile's Account
+                  card. Guest excluded (no account to attach a purchase to,
+                  sign in first — the pill above already covers that case). */}
+              {!isGuest && !isPro && (
+                <div className="px-5 py-4">
+                  <p className="text-xs text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-3">{t('settings.upgradeBlurb')}</p>
+                  <button
+                    onClick={handleUpgrade}
+                    disabled={stripeLoading}
+                    className="w-full text-sm font-bold tracking-wide bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-50"
+                  >
+                    {stripeLoading ? t('common.loading') : t('settings.upgradeCta')}
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* App language — the INTERFACE only, which is why the heading says
