@@ -114,12 +114,15 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
             {t('home.signInCreate')}
           </button>
         )}
+        {/* Icon-only — a labeled button here was getting clipped by the
+            sidebar's fixed width once the sign-in pill grew wider than the
+            old text link. Sized to match the pill's own height. */}
         <button
           onClick={() => onTabChange('settings')}
-          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors shrink-0"
+          aria-label={t('nav.settings')}
+          className="w-9 h-9 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors shrink-0"
         >
-          <SettingsIcon size={14} color="currentColor" />
-          {t('nav.settings')}
+          <SettingsIcon size={20} color="currentColor" />
         </button>
       </div>
     </div>
