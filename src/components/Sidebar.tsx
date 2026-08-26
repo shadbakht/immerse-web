@@ -120,7 +120,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
         <button
           onClick={() => onTabChange('settings')}
           aria-label={t('nav.settings')}
-          className="w-9 h-9 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors shrink-0"
+          className="w-9 h-9 flex items-center justify-center rounded-full text-white/65 hover:text-white/90 hover:bg-white/5 transition-colors shrink-0"
         >
           <SettingsIcon size={20} color="currentColor" />
         </button>
