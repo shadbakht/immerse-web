@@ -96,16 +96,27 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
       </nav>
 
       {/* Footer */}
-      <div className="px-5 pb-6 pt-3 border-t border-white/10 flex items-center justify-between">
-        <button
-          onClick={user ? handleSignOut : () => router.push('/login')}
-          className="text-xs text-white/40 hover:text-white/70 transition-colors"
-        >
-          {user ? t('nav.signOut') : t('home.signInCreate')}
-        </button>
+      <div className="px-5 pb-6 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+        {user ? (
+          <button
+            onClick={handleSignOut}
+            className="text-xs text-white/40 hover:text-white/70 transition-colors"
+          >
+            {t('nav.signOut')}
+          </button>
+        ) : (
+          // Filled pill, not a subtle text link — a guest's route to signing
+          // in should stand out, not blend into the sign-out/settings row.
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-xs font-semibold px-4 py-2 rounded-full hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-start shrink-0"
+          >
+            {t('home.signInCreate')}
+          </button>
+        )}
         <button
           onClick={() => onTabChange('settings')}
-          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors shrink-0"
         >
           <SettingsIcon size={14} color="currentColor" />
           {t('nav.settings')}

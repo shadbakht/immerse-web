@@ -23,11 +23,13 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users to /login (except on auth pages)
-  const { pathname, searchParams } = request.nextUrl;
+  // Redirect unauthenticated users to /login (except on auth pages). '/' is
+  // public in its own right (checked by exact match, not startsWith — every
+  // path "starts with" '/') so a signed-out visitor lands straight on the
+  // guest-mode library instead of being bounced through /login first.
+  const { pathname } = request.nextUrl;
   const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support'];
-  const isPublic = publicPaths.some(p => pathname.startsWith(p))
-    || (pathname === '/' && searchParams.get('guest') === '1');
+  const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

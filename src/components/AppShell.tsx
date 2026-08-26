@@ -57,7 +57,12 @@ interface AppShellProps {
 
 export default function AppShell({ user, initialBookId }: AppShellProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<NavTab>(initialBookId ? 'library' : 'home');
+  // Signed-in visitors land on Home; a signed-out (guest) visitor lands on
+  // Library instead — skipping "Browse without an account" is the whole
+  // point of opening '/' straight into guest mode (see page.tsx).
+  const [activeTab, setActiveTab] = useState<NavTab>(
+    initialBookId ? 'library' : (user ? 'home' : 'library'),
+  );
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
     initialBookId ? { bookId: initialBookId } : null,
   );

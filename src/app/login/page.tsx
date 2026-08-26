@@ -277,7 +277,7 @@ function LoginPageInner() {
             </div>
 
             <a
-              href="/?guest=1"
+              href="/"
               className="block w-full text-center border border-white/15 text-white/70 font-medium py-3.5 rounded-xl hover:bg-white/5 hover:text-white transition"
             >
               {t('auth.browseWithout')}
