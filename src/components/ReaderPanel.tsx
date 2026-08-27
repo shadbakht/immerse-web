@@ -1996,7 +1996,7 @@ async function handleCopy() {
                 {isPrayerStyle ? (
                   <>
                     {showExcerptDivider && (
-                      <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
+                      <div className="h-px w-16 mx-auto my-10" style={{ background: 'var(--reader-rule)' }} />
                     )}
                     {showPrayerDivider && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
@@ -2019,7 +2019,7 @@ async function handleCopy() {
                 ) : isLayoutStyle ? (
                   <>
                     {showExcerptDivider && (
-                      <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
+                      <div className="h-px w-16 mx-auto my-10" style={{ background: 'var(--reader-rule)' }} />
                     )}
                     {showChapter && passage.chapter_label && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
@@ -2044,7 +2044,7 @@ async function handleCopy() {
                       </div>
                     )}
                     {(showTabletDivider || showExcerptDivider) && (
-                      <div className="h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25 my-10" />
+                      <div className="h-px w-16 mx-auto my-10" style={{ background: 'var(--reader-rule)' }} />
                     )}
                     {showSection && (
                       <h3 className="text-sm font-medium text-gray-400 dark:text-[#5C7A8E] uppercase tracking-wide text-center mt-8 mb-3">
