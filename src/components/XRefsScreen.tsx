@@ -8,6 +8,8 @@ import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
+import { groupXrefsByPair } from '@/lib/xrefGrouping';
+import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type XRefExportRow } from '@/lib/xrefExport';
 
 interface XRefRow {
   id:           string;
@@ -17,6 +19,8 @@ interface XRefRow {
   selectionBId: string;
   snapshotA:  string; citationA:  string; bookIdA:  string; passageIdA: string;
   snapshotB:  string; citationB:  string; bookIdB:  string; passageIdB: string;
+  bookTitleA: string;
+  bookTitleB: string;
   pairKey:    string;  // sorted tradId1+'↔'+tradId2
   pairName:   string;  // "Bahá'í ↔ Christianity"
 }
@@ -48,13 +52,15 @@ function formatDate(
 }
 
 function XRefCard({
-  row, searchQuery, onOpenBook, onDelete, onLabelSave,
+  row, searchQuery, onOpenBook, onDelete, onLabelSave, selected, onToggleSelected,
 }: {
   row: XRefRow;
   searchQuery: string;
   onOpenBook: (b: string, p?: string, s?: string) => void;
   onDelete: (id: string) => void;
   onLabelSave: (id: string, label: string | null) => void;
+  selected: boolean;
+  onToggleSelected: () => void;
 }) {
   const { t, uiLanguage }           = useTranslation();
   const [expanded, setExpanded]     = useState(false);
@@ -91,6 +97,14 @@ function XRefCard({
       <div className="flex-1 min-w-0">
       {/* Label row */}
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100 dark:border-[#2D4050]">
+        <button
+          onClick={e => { e.stopPropagation(); onToggleSelected(); }}
+          className="shrink-0 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors"
+          style={{ borderColor: selected ? '#1B6B7B' : '#CBD5E1', background: selected ? '#1B6B7B' : 'transparent' }}
+          aria-label={t('xrefs.exportSelected' as TranslationKey)}
+        >
+          {selected && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+        </button>
         {editing ? (
           <input
             ref={inputRef}
@@ -153,6 +167,21 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
   const [loading, setLoading]         = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [openPairKeys, setOpenPairKeys] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const h = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setShowExportMenu(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showExportMenu]);
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -200,6 +229,11 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         return { snapshot: s.snapshot_text, citation: s.citation, bookId: s.book_id, passageId: s.passage_id };
       }
 
+      const bookTitle = (bookUuid: string): string => {
+        const slug = uuidToSlug.get(bookUuid) ?? '';
+        return (slug ? bookMap.get(slug)?.title : '') ?? '';
+      };
+
       const loaded: XRefRow[] = (xrefData ?? []).map((x: any) => {
         const a    = getSel(x.selection_a_id);
         const b    = getSel(x.selection_b_id);
@@ -220,6 +254,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           selectionBId: x.selection_b_id,
           snapshotA: a.snapshot,  citationA:  a.citation,  bookIdA:  a.bookId,  passageIdA: a.passageId,
           snapshotB: b.snapshot,  citationB:  b.citation,  bookIdB:  b.bookId,  passageIdB: b.passageId,
+          bookTitleA: bookTitle(a.bookId),
+          bookTitleB: bookTitle(b.bookId),
           pairKey:  `${idFirst}↔${idSecond}`,
           pairName: nameFirst === nameSecond ? `${nameFirst} ↔ ${nameFirst}` : `${nameFirst} ↔ ${nameSecond}`,
         };
@@ -248,6 +284,29 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     }).catch(() => {});
   }
 
+  async function handleExport(format: 'pdf' | 'docx' | 'csv' | 'markdown') {
+    setShowExportMenu(false);
+    setExporting(true);
+    try {
+      const chosen: XRefExportRow[] = rows
+        .filter(r => selectedIds.has(r.id))
+        .map(r => ({
+          id: r.id, label: r.label, createdAt: r.createdAt,
+          pairKey: r.pairKey, pairName: r.pairName,
+          a: { snapshotText: r.snapshotA, bookTitle: r.bookTitleA, citation: r.citationA },
+          b: { snapshotText: r.snapshotB, bookTitle: r.bookTitleB, citation: r.citationB },
+        }));
+      if (format === 'pdf')      await exportAsPdf(chosen);
+      if (format === 'docx')     await exportAsDocx(chosen);
+      if (format === 'csv')      await exportAsCsv(chosen);
+      if (format === 'markdown') await exportAsMarkdown(chosen);
+    } catch (e) {
+      console.error('[XRefExport] failed:', e);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
@@ -258,35 +317,14 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     );
   }, [rows, searchQuery]);
 
-  const hierarchy = useMemo(() => {
-    type PairEntry = { name: string; xrefs: XRefRow[] };
-    const pairMap = new Map<string, PairEntry>();
-
-    for (const row of filtered) {
-      let pair = pairMap.get(row.pairKey);
-      if (!pair) { pair = { name: row.pairName, xrefs: [] }; pairMap.set(row.pairKey, pair); }
-      pair.xrefs.push(row);
-    }
-
-    for (const pair of pairMap.values()) {
-      pair.xrefs.sort((a, b) => {
-        const la = a.label?.trim() || null;
-        const lb = b.label?.trim() || null;
-        if (la && lb) return la.localeCompare(lb);
-        if (la)       return -1;
-        if (lb)       return  1;
-        return b.createdAt.localeCompare(a.createdAt);
-      });
-    }
-
-    return [...pairMap.entries()]
-      .sort(([, a], [, b]) =>
-        b.xrefs.length !== a.xrefs.length
-          ? b.xrefs.length - a.xrefs.length
-          : a.name.localeCompare(b.name),
-      )
-      .map(([pairKey, pair]) => ({ pairKey, ...pair }));
-  }, [filtered]);
+  const hierarchy = useMemo(() =>
+    groupXrefsByPair(filtered, {
+      getLabel:     r => r.label,
+      getCreatedAt: r => r.createdAt,
+      getPairKey:   r => r.pairKey,
+      getPairName:  r => r.pairName,
+    }).map(g => ({ pairKey: g.pairKey, name: g.pairName, xrefs: g.items })),
+  [filtered]);
 
   const togglePair = (pairKey: string) =>
     setOpenPairKeys(prev => { const next = new Set(prev); next.has(pairKey) ? next.delete(pairKey) : next.add(pairKey); return next; });
@@ -298,7 +336,46 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
     <div className="h-full flex flex-col max-w-7xl mx-auto w-full bg-white dark:bg-[#1B2A38]">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('xrefs.title')}</h1>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">{t('xrefs.title')}</h1>
+          {selectedIds.size > 0 && (
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(v => !v)}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
+                title={t('xrefs.exportSelected' as TranslationKey)}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {exporting ? t('tags.exporting') : `${t('tags.export')} (${selectedIds.size})`}
+              </button>
+              {showExportMenu && (
+                <div className="absolute end-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[160px]">
+                  <div className="py-1">
+                    {([
+                      { label: 'PDF',                 format: 'pdf'      },
+                      { label: t('export.docxShort'), format: 'docx'     },
+                      { label: 'CSV',                 format: 'csv'      },
+                      { label: 'MD',                  format: 'markdown' },
+                    ] as const).map(({ label, format }) => (
+                      <button
+                        key={format}
+                        onClick={() => handleExport(format)}
+                        className="w-full text-start px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="relative">
           <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -309,8 +386,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
             placeholder={t('xrefs.searchPlaceholder')}
             className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
+          {(searchQuery || selectedIds.size > 0) && (
+            <button onClick={() => { setSearchQuery(''); setSelectedIds(new Set()); }} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>
@@ -353,6 +430,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                           onOpenBook={onOpenBook}
                           onDelete={handleDelete}
                           onLabelSave={handleLabelSave}
+                          selected={selectedIds.has(row.id)}
+                          onToggleSelected={() => toggleSelected(row.id)}
                         />
                       ))}
                     </div>
