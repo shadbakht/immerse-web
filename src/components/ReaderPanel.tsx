@@ -120,8 +120,13 @@ export function dropCapEligible(p: {
   isPrayerStyle: boolean;
   isHeadingEcho: boolean;
   pendingAfterHeading: boolean;
+  isLetterDate: boolean;
 }): boolean {
-  if (p.isPrayerStyle || p.isHeadingEcho) return false;
+  // A letter-date line ("26 February 1932") often sits between the eyebrow and
+  // the first real paragraph (This Decisive Hour). It must not take the cap, and
+  // it must not consume the pending-after-heading flag — the next real paragraph
+  // gets the cap instead (the caller only clears the flag when applyDropCap).
+  if (p.isPrayerStyle || p.isHeadingEcho || p.isLetterDate) return false;
   return p.showChapter || p.pendingAfterHeading;
 }
 
@@ -1930,12 +1935,19 @@ async function handleCopy() {
               (passage.content === passage.chapter_label ||
                passage.content === passage.section_title);
 
+            // Letter date-lines ("19 December 1922", "[circa 30 July 1936]",
+            // "8 February [1939]") render as bold sub-headings and are skipped by
+            // the drop cap. Widened past a bare "D Month YYYY" to the bracketed /
+            // "circa" forms This Decisive Hour uses (mirrors the corpus
+            // p.letter-date class set by fix4cSectionEyebrows.mjs).
+            const isLetterDate = /^\[?\s*(?:circa\s+)?(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\[?\d{4}\]?/.test(passage.content);
+
             // A heading-echo row draws the eyebrow but renders no <p>, so the
             // drop cap belongs on the next real body paragraph.
             if (showChapter && isHeadingEcho) pendingDropCapAfterHeading = true;
             const applyDropCap = dropCapEligible({
               showChapter: !!showChapter, isPrayerStyle, isHeadingEcho,
-              pendingAfterHeading: pendingDropCapAfterHeading,
+              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate,
             });
             if (applyDropCap) pendingDropCapAfterHeading = false;
 
@@ -1959,9 +1971,6 @@ async function handleCopy() {
               const m = passage.content.match(ATTRIBUTION_RE);
               if (m) { attribution = m[1]; bodyText = passage.content.slice(0, m.index!); }
             }
-
-            // Letter date-lines ("19 December 1922 …") render as bold sub-headings.
-            const isLetterDate = /^\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/.test(passage.content);
 
             // Tablet boundary inside a chapter (divider books only): the per-tablet
             // numbering resets to 1, or an unnumbered invocation line follows a

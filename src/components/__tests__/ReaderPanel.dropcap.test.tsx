@@ -6,7 +6,7 @@ jest.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 import { dropCapEligible } from '../ReaderPanel';
 
 describe('dropCapEligible', () => {
-  const base = { showChapter: false, isPrayerStyle: false, isHeadingEcho: false, pendingAfterHeading: false };
+  const base = { showChapter: false, isPrayerStyle: false, isHeadingEcho: false, pendingAfterHeading: false, isLetterDate: false };
   it('true when a passage renders its own chapter-opening paragraph', () => {
     expect(dropCapEligible({ ...base, showChapter: true })).toBe(true);
   });
@@ -18,6 +18,9 @@ describe('dropCapEligible', () => {
   });
   it('false for prayer-style books', () => {
     expect(dropCapEligible({ ...base, showChapter: true, isPrayerStyle: true })).toBe(false);
+  });
+  it('false for a letter-date line even when a cap is pending after a heading', () => {
+    expect(dropCapEligible({ ...base, pendingAfterHeading: true, isLetterDate: true })).toBe(false);
   });
   it('false for an ordinary mid-chapter paragraph', () => {
     expect(dropCapEligible(base)).toBe(false);
