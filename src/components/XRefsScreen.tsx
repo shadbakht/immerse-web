@@ -101,7 +101,7 @@ function XRefCard({
           onClick={e => { e.stopPropagation(); onToggleSelected(); }}
           className="shrink-0 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors"
           style={{ borderColor: selected ? '#1B6B7B' : '#CBD5E1', background: selected ? '#1B6B7B' : 'transparent' }}
-          aria-label={t('xrefs.exportSelected' as TranslationKey)}
+          aria-label={t('xrefs.exportSelected')}
         >
           {selected && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
         </button>
@@ -344,7 +344,7 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
                 onClick={() => setShowExportMenu(v => !v)}
                 disabled={exporting}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
-                title={t('xrefs.exportSelected' as TranslationKey)}
+                title={t('xrefs.exportSelected')}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>

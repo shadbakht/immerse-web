@@ -81,6 +81,6 @@ describe('web xrefExport', () => {
 
   it('filename is "<title> <date>.<ext>"', async () => {
     await exportAsCsv(rows());
-    expect(capturedName).toMatch(/ \d{4}-\d{2}-\d{2}\.csv$/);
+    expect(capturedName).toMatch(/^Cross-References \d{4}-\d{2}-\d{2}\.csv$/);
   });
 });
