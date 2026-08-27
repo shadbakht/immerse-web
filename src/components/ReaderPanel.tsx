@@ -107,6 +107,15 @@ function bcp47(language: string | undefined): string {
   return raw === 'english' ? 'en' : raw;
 }
 
+// A chapter-opening paragraph in a non-prayer book gets the drop-cap hook
+// class. Prayer-style books use a centred layout where a floated initial
+// would fight the centring; section changes, excerpt/tablet dividers and
+// ordinary paragraphs are not chapter starts. RTL/CJK are filtered in CSS
+// (globals.css) off the .reader-page lang/dir, not here.
+export function dropCapEligible(p: { showChapter: boolean; isPrayerStyle: boolean }): boolean {
+  return p.showChapter && !p.isPrayerStyle;
+}
+
 // Books whose TOC is genuinely two-level (chapter_label = chapter, section_title =
 // sub-chapter). Opt-in by UUID so other books that use section_title for rubrics
 // keep their flat TOC.
@@ -2110,7 +2119,7 @@ async function handleCopy() {
                       they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${dropCapEligible({ showChapter: !!showChapter, isPrayerStyle }) ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}
