@@ -98,8 +98,11 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
           updated_at: new Date().toISOString(),
         }).catch(() => {});
       }
-    } finally {
+      // Only close on success — a failed insert leaves the creator open with
+      // the user's typed text intact so they can retry (matches mobile).
       setCreatorOpenFor(null);
+    } catch (e) {
+      console.warn('[TagPanel] create compilation failed:', e);
     }
   }
 
