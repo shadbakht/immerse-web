@@ -6,6 +6,7 @@ import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { fetchSelectionsByUser, type SelInfo } from '@/lib/fetchAnnotationSelections';
 import PanelSheet from './PanelSheet';
 import { ContextMenu, type MenuOption } from './ContextMenu';
+import { InlineCompilationCreator } from './InlineCompilationCreator';
 import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface Tag {
@@ -29,11 +30,12 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
   const { t } = useTranslation();
   const [tags, setTags] = useState<Tag[]>([]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [newTagName, setNewTagName] = useState('');
-  const [newTagParentId, setNewTagParentId] = useState<string | null>(null);
+  // Which row's inline compilation-creator is open: a tag id, 'root' for the
+  // top-level "+ New Compilation" row, or null when none is open. Only one
+  // is ever open at a time.
+  const [creatorOpenFor, setCreatorOpenFor] = useState<string | 'root' | null>(null);
   const [openNodes, setOpenNodes] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
   // Per-tag quote reveal (mobile parity): tagId → quotes (undefined = loading)
   const [tagQuotes, setTagQuotes] = useState<Record<string, { text: string; citation: string }[]>>({});
   const loadedTagIdsRef = useRef<Set<string>>(new Set());
@@ -44,6 +46,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
       loadTags();
       // Fresh quote data each time the panel opens
       setOpenNodes(new Set());
+      setCreatorOpenFor(null);
       setTagQuotes({});
       loadedTagIdsRef.current = new Set();
       selMapPromiseRef.current = null;
@@ -68,40 +71,33 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
     setChecked(prev => { const next = new Set(prev); next.delete(id); return next; });
   }
 
-  async function handleCreateTag() {
-    if (!newTagName.trim()) return;
-    setCreating(true);
-    try {
-      const parent = newTagParentId ? tags.find(t => t.id === newTagParentId) : null;
-      const { data } = await supabase
-        .from('tags')
-        .insert({
-          user_id:    userId,
-          name:       newTagName.trim(),
-          parent_id:  newTagParentId,
-          depth:      parent ? parent.depth + 1 : 0,
-          sort_order: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select('id, name, parent_id, depth, sort_order')
-        .single();
-      if (data) {
-        setTags(prev => [...prev, data]);
-        setChecked(prev => new Set(prev).add(data.id));
-        // Push to sync service
-        await pushTag({
-          id: data.id,
-          user_id: userId,
-          name: data.name,
-          updated_at: new Date().toISOString(),
-        }).catch(() => {});
-      }
-      setNewTagName('');
-      setNewTagParentId(null);
-    } finally {
-      setCreating(false);
+  async function handleCreateTag(parentId: string | null, name: string) {
+    const parent = parentId ? tags.find(t => t.id === parentId) : null;
+    const { data } = await supabase
+      .from('tags')
+      .insert({
+        user_id:    userId,
+        name,
+        parent_id:  parentId,
+        depth:      parent ? parent.depth + 1 : 0,
+        sort_order: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select('id, name, parent_id, depth, sort_order')
+      .single();
+    if (data) {
+      setTags(prev => [...prev, data]);
+      setChecked(prev => new Set(prev).add(data.id));
+      // Push to sync service
+      await pushTag({
+        id: data.id,
+        user_id: userId,
+        name: data.name,
+        updated_at: new Date().toISOString(),
+      }).catch(() => {});
     }
+    setCreatorOpenFor(null);
   }
 
   async function handleSave() {
@@ -191,8 +187,12 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
 
           {/* Add child button */}
           <button
-            onClick={() => { setNewTagParentId(tag.id); setNewTagName(''); }}
-            className="text-gray-300 dark:text-[#4A6478] hover:text-[#1B6B7B] dark:hover:text-[#2D9DB3] text-lg leading-none transition-colors px-1"
+            onClick={() => setCreatorOpenFor(prev => (prev === tag.id ? null : tag.id))}
+            className={`text-lg leading-none transition-colors px-1 ${
+              creatorOpenFor === tag.id
+                ? 'text-[#1B6B7B] dark:text-[#2D9DB3]'
+                : 'text-gray-300 dark:text-[#4A6478] hover:text-[#1B6B7B] dark:hover:text-[#2D9DB3]'
+            }`}
             title={t('tagPanel.addSubTag')}
           >
             +
@@ -203,6 +203,18 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             <ContextMenu options={deleteOption} />
           </div>
         </div>
+
+        {/* Inline "create a sub-compilation" editor — appears directly under
+            THIS row, not in the input that used to sit above the tag list. */}
+        {creatorOpenFor === tag.id && (
+          <div style={{ paddingLeft: 20 + tag.depth * 20 }} className="pe-5">
+            <InlineCompilationCreator
+              parentName={tag.name}
+              onSave={name => handleCreateTag(tag.id, name)}
+              onCancel={() => setCreatorOpenFor(null)}
+            />
+          </div>
+        )}
 
         {/* Inline quote reveal — this tag's existing selections (mobile parity).
             Loaded-and-empty renders nothing at all. */}
@@ -248,33 +260,25 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
         <p className="text-xs text-gray-500 dark:text-[#8FA4B8] line-clamp-2">"{selectionText}"</p>
       </div>
 
-      {/* New tag input */}
+      {/* Top-level "+ New Compilation" — same inline-expand pattern as every
+          row's own "+", just with no parent to name. */}
       <div className="px-5 pb-3">
-        {newTagParentId && (
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('tagPanel.under')}</span>
-            <span className="text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">
-              {tags.find(t => t.id === newTagParentId)?.name}
-            </span>
-            <button onClick={() => setNewTagParentId(null)} className="text-gray-300 dark:text-[#4A6478] hover:text-gray-500 dark:hover:text-[#8FA4B8] text-xs ms-1">✕</button>
+        <button
+          onClick={() => setCreatorOpenFor(prev => (prev === 'root' ? null : 'root'))}
+          className="flex items-center gap-2 py-1 text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-80"
+        >
+          <span className="text-lg leading-none">+</span>
+          {t('tagPanel.new')}
+        </button>
+        {creatorOpenFor === 'root' && (
+          <div className="mt-2">
+            <InlineCompilationCreator
+              parentName={null}
+              onSave={name => handleCreateTag(null, name)}
+              onCancel={() => setCreatorOpenFor(null)}
+            />
           </div>
         )}
-        <div className="flex gap-2">
-          <input
-            value={newTagName}
-            onChange={e => setNewTagName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreateTag()}
-            placeholder={t('tagPanel.new')}
-            className="flex-1 border border-gray-200 dark:border-[#2D4050] rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3]"
-          />
-          <button
-            onClick={handleCreateTag}
-            disabled={!newTagName.trim() || creating}
-            className="px-4 py-2 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm rounded-xl disabled:opacity-40 hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
-          >
-            {t('tagPanel.create')}
-          </button>
-        </div>
       </div>
 
       {/* Tag list */}
