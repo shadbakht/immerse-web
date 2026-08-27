@@ -7,11 +7,14 @@ import {
   AlignmentType,
   Document,
   Footer,
-  HeadingLevel,
   Packer,
   Paragraph,
   TextRun,
 } from 'docx';
+import {
+  escapeHtml, safeFilename, citationInParens, citationBare, csvField, triggerDownload,
+  depthHeading, DOC_PRIMARY, DOC_BODY, DOC_MUTED, DOC_FAINT,
+} from './exportShared';
 
 // ─── Shared types (imported by TagsScreen) ────────────────────────────────────
 
@@ -42,18 +45,6 @@ export interface ExportOptions {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function safeFilename(name: string): string {
-  return name.replace(/[/\\?%*:|"<>]/g, '').replace(/\s+/g, ' ').trim() || 'tag';
-}
-
 /**
  * Filename stem for an export: the main (top-level) tag heading, which is what
  * the document leads with. Falls back to the first tag when the selection is
@@ -62,27 +53,6 @@ function safeFilename(name: string): string {
 function exportBaseName(selectedTags: TagRow[]): string {
   const root = selectedTags.find(t => (t.depth ?? 0) === 0) ?? selectedTags[0];
   return safeFilename(root?.name ?? 'tags');
-}
-
-function citationInParens(raw: string): string {
-  if (!raw) return '';
-  return `(${raw.replace(/^—\s*/, '').replace(/\.$/, '')})`;
-}
-
-function citationBare(raw: string): string {
-  if (!raw) return '';
-  return raw.replace(/^—\s*/, '').replace(/\.$/, '');
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 // ─── Enrich with notes + full selection offsets from Supabase ─────────────────
@@ -157,36 +127,10 @@ async function fetchEnrichedData(selIds: string[], opts: ExportOptions): Promise
  * Both builders run in the browser, so the stored language is readable
  * directly rather than threaded through every call site.
  */
-const exportTranslator = () => {
+export const exportTranslator = () => {
   const lang = getStoredUiLanguage();
   return (key: TranslationKey, vars?: TranslateVars) => translate(lang, key, vars);
 };
-
-const DOC_PRIMARY = '1B6B7B';
-const DOC_BODY    = '1C2B35';
-const DOC_MUTED   = '6B7280';
-const DOC_FAINT   = '9CA3AF';
-
-/**
- * Real Word outline levels by nesting depth, so a long Compilation gets a
- * working Navigation Pane / table of contents in Word. Depth 0 → Heading 1,
- * clamped at Heading 6 for trees deeper than the app's own limit. The run's
- * explicit size/color still override the built-in style, so the document's
- * look is unchanged — only the `<w:pStyle>` outline reference is added.
- * Mirrors the mobile repo's `depthHeading`.
- */
-const DEPTH_HEADING = [
-  HeadingLevel.HEADING_1,
-  HeadingLevel.HEADING_2,
-  HeadingLevel.HEADING_3,
-  HeadingLevel.HEADING_4,
-  HeadingLevel.HEADING_5,
-  HeadingLevel.HEADING_6,
-] as const;
-
-function depthHeading(depth: number): (typeof DEPTH_HEADING)[number] {
-  return DEPTH_HEADING[Math.min(Math.max(depth, 0), DEPTH_HEADING.length - 1)];
-}
 
 export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
   const t = exportTranslator();
@@ -370,12 +314,6 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
 }
 
 // ─── Export: CSV ──────────────────────────────────────────────────────────────
-
-/** Wrap a CSV field value — quotes it if it contains comma, quote, or newline. */
-function csvField(value: string): string {
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
 
 /** Column-for-column identical to the mobile CSV export. */
 export async function exportAsCsv(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
