@@ -107,13 +107,22 @@ function bcp47(language: string | undefined): string {
   return raw === 'english' ? 'en' : raw;
 }
 
-// A chapter-opening paragraph in a non-prayer book gets the drop-cap hook
-// class. Prayer-style books use a centred layout where a floated initial
-// would fight the centring; section changes, excerpt/tablet dividers and
-// ordinary paragraphs are not chapter starts. RTL/CJK are filtered in CSS
-// (globals.css) off the .reader-page lang/dir, not here.
-export function dropCapEligible(p: { showChapter: boolean; isPrayerStyle: boolean }): boolean {
-  return p.showChapter && !p.isPrayerStyle;
+// A chapter-opening body paragraph in a non-prayer book gets the drop-cap hook
+// class. Two ways a chapter opens: the passage renders its own <p> with
+// showChapter true (injected heading), or a preceding heading-echo row drew the
+// eyebrow and this is the first real paragraph after it (pendingAfterHeading).
+// Heading-echo rows render no <p>, so they are never eligible themselves.
+// Prayer-style books use a centred layout where a floated initial would fight
+// the centring. RTL/CJK are filtered in CSS (globals.css) off the .reader-page
+// lang/dir, not here.
+export function dropCapEligible(p: {
+  showChapter: boolean;
+  isPrayerStyle: boolean;
+  isHeadingEcho: boolean;
+  pendingAfterHeading: boolean;
+}): boolean {
+  if (p.isPrayerStyle || p.isHeadingEcho) return false;
+  return p.showChapter || p.pendingAfterHeading;
 }
 
 // Books whose TOC is genuinely two-level (chapter_label = chapter, section_title =
@@ -1712,6 +1721,7 @@ async function handleCopy() {
   const hasTdNumbers = !!target?.bookId && TD_NUMBER_BOOKS.has(target.bookId);
   let lastPrayerSection = '';
   let prevTdNum: number | null = null; // previous passage's leading tablet number (divider books)
+  let pendingDropCapAfterHeading = false; // a heading-echo row opened a chapter; cap the next real <p>
 
   // Build collapsible TOC rows: each depth-1 entry is keyed to its parent section
   // (depth-0 passageId); hide children of collapsed sections.
@@ -1920,6 +1930,15 @@ async function handleCopy() {
               (passage.content === passage.chapter_label ||
                passage.content === passage.section_title);
 
+            // A heading-echo row draws the eyebrow but renders no <p>, so the
+            // drop cap belongs on the next real body paragraph.
+            if (showChapter && isHeadingEcho) pendingDropCapAfterHeading = true;
+            const applyDropCap = dropCapEligible({
+              showChapter: !!showChapter, isPrayerStyle, isHeadingEcho,
+              pendingAfterHeading: pendingDropCapAfterHeading,
+            });
+            if (applyDropCap) pendingDropCapAfterHeading = false;
+
             // Prayer-style books: split "Section, Title" into a centered divider +
             // title, and peel a trailing attribution off the body.
             let prayerSection: string | null = null;
@@ -2119,7 +2138,7 @@ async function handleCopy() {
                       they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${dropCapEligible({ showChapter: !!showChapter, isPrayerStyle }) ? ' dropcap-open' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}
