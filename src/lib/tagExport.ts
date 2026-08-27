@@ -7,6 +7,7 @@ import {
   AlignmentType,
   Document,
   Footer,
+  HeadingLevel,
   Packer,
   Paragraph,
   TextRun,
@@ -166,6 +167,27 @@ const DOC_BODY    = '1C2B35';
 const DOC_MUTED   = '6B7280';
 const DOC_FAINT   = '9CA3AF';
 
+/**
+ * Real Word outline levels by nesting depth, so a long Compilation gets a
+ * working Navigation Pane / table of contents in Word. Depth 0 → Heading 1,
+ * clamped at Heading 6 for trees deeper than the app's own limit. The run's
+ * explicit size/color still override the built-in style, so the document's
+ * look is unchanged — only the `<w:pStyle>` outline reference is added.
+ * Mirrors the mobile repo's `depthHeading`.
+ */
+const DEPTH_HEADING = [
+  HeadingLevel.HEADING_1,
+  HeadingLevel.HEADING_2,
+  HeadingLevel.HEADING_3,
+  HeadingLevel.HEADING_4,
+  HeadingLevel.HEADING_5,
+  HeadingLevel.HEADING_6,
+] as const;
+
+function depthHeading(depth: number): (typeof DEPTH_HEADING)[number] {
+  return DEPTH_HEADING[Math.min(Math.max(depth, 0), DEPTH_HEADING.length - 1)];
+}
+
 export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions = { includeNotes: true, includeXrefs: true }): Promise<void> {
   const t = exportTranslator();
   const allSelIds = selectedTags.flatMap(tag => tag.selections.map(s => s.id));
@@ -180,6 +202,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
 
     children.push(
       new Paragraph({
+        heading: depthHeading(D),
         children: [new TextRun({ text: tag.name, size: hSz, color: DOC_PRIMARY })],
         indent:  D > 0 ? { left: dI } : undefined,
         spacing: { before: D === 0 ? 600 : 400, after: 160 },
