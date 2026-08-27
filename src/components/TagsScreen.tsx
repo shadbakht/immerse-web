@@ -139,7 +139,7 @@ function Checkbox({ state, onChange }: { state: CheckState; onChange: () => void
   return (
     <button
       onClick={e => { e.stopPropagation(); onChange(); }}
-      className="flex items-center justify-center shrink-0 w-8 h-8 -ms-1"
+      className="flex items-center justify-center shrink-0 w-11 h-11 -ms-1"
     >
       <div className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
         state === 'checked'       ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3]' :
