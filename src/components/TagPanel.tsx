@@ -73,31 +73,34 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
 
   async function handleCreateTag(parentId: string | null, name: string) {
     const parent = parentId ? tags.find(t => t.id === parentId) : null;
-    const { data } = await supabase
-      .from('tags')
-      .insert({
-        user_id:    userId,
-        name,
-        parent_id:  parentId,
-        depth:      parent ? parent.depth + 1 : 0,
-        sort_order: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select('id, name, parent_id, depth, sort_order')
-      .single();
-    if (data) {
-      setTags(prev => [...prev, data]);
-      setChecked(prev => new Set(prev).add(data.id));
-      // Push to sync service
-      await pushTag({
-        id: data.id,
-        user_id: userId,
-        name: data.name,
-        updated_at: new Date().toISOString(),
-      }).catch(() => {});
+    try {
+      const { data } = await supabase
+        .from('tags')
+        .insert({
+          user_id:    userId,
+          name,
+          parent_id:  parentId,
+          depth:      parent ? parent.depth + 1 : 0,
+          sort_order: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select('id, name, parent_id, depth, sort_order')
+        .single();
+      if (data) {
+        setTags(prev => [...prev, data]);
+        setChecked(prev => new Set(prev).add(data.id));
+        // Push to sync service
+        await pushTag({
+          id: data.id,
+          user_id: userId,
+          name: data.name,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    } finally {
+      setCreatorOpenFor(null);
     }
-    setCreatorOpenFor(null);
   }
 
   async function handleSave() {
