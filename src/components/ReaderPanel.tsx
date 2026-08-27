@@ -2061,7 +2061,7 @@ async function handleCopy() {
                       {taggedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}
-                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
+                          className="w-8 h-11 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title={t('reader.viewTags')}
                         >
                           <TagIcon size={20} />
@@ -2070,7 +2070,7 @@ async function handleCopy() {
                       {notedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleNoteIconClick(passage.id); }}
-                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
+                          className="w-8 h-11 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title={t('reader.viewNote')}
                         >
                           <NoteIcon size={20} />
@@ -2079,7 +2079,7 @@ async function handleCopy() {
                       {xrefPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleXrefIconClick(passage.id); }}
-                          className="w-8 h-8 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
+                          className="w-8 h-11 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title={t('reader.viewXrefs')}
                         >
                           <XRefIcon size={20} />
