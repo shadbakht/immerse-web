@@ -382,9 +382,12 @@ export async function exportAsMarkdown(selectedTags: TagRow[], opts: ExportOptio
       lines.push(`> "${sel.snapshot_text}"`);
       lines.push(`> *${citationInParens(sel.citation)}*`);
 
+      // Keep hard-enters inside a note as Markdown hard breaks (two trailing
+      // spaces) with a hanging indent so wrapped lines stay part of the bullet
+      // instead of collapsing into one line.
       for (const note of notes) {
         lines.push('');
-        lines.push(`- ${note}`);
+        lines.push(`- ${note.replace(/\r?\n/g, '  \n  ')}`);
       }
 
       if (xrefs.length > 0) {
