@@ -211,6 +211,24 @@ body {
   text-indent: 0;
 }
 
+/* Chapter-opening drop cap — mirrors the mobile rule in readerHtml.ts.
+   .dropcap-open is set in ReaderPanel via dropCapEligible(). ::first-letter
+   inherits the reader typeface/weight and includes a leading quote in its box.
+   Excluded for RTL and CJK off the .reader-page lang/dir; flat books never get
+   .dropcap-open because they never open a chapter. */
+.reader-page:not([dir="rtl"]):not(:lang(zh)):not(:lang(ja)):not(:lang(ko))
+  p.dropcap-open::first-letter {
+  float: left;
+  font-size: 3.3em;
+  line-height: 0.86;
+  padding: 0.02em 0.09em 0 0;
+  font-weight: inherit;
+  color: var(--reader-fg);
+}
+
+/* A drop-capped paragraph must not also first-line-indent. */
+.reader-page p.dropcap-open { text-indent: 0; }
+
 /* Hyphens and indents are for prose only — in a heading or an attribution they
    read as a typo. */
 .reader-page h1, .reader-page h2, .reader-page h3,
