@@ -18,6 +18,7 @@ import { loadSlugMaps } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { directionOf } from '@immerse/i18n';
 import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerPrefs';
+import { collectPassages, getCachedBook, putCachedBook, type FetchPage } from '@/lib/bookFetch';
 import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
 
 interface Passage {
@@ -919,32 +920,43 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         return data;
       }
 
-      // Fetch book metadata and all passages in parallel.
-      // Passages are fetched in batches of 1000 to bypass the PostgREST server-side
-      // row cap (default 1000). We keep fetching until a batch returns fewer than 1000 rows.
+      // Fetch book metadata and all passages.
+      // Passages page at the PostgREST server-side row cap (1000). After the
+      // first page, collectPassages fetches the rest in parallel waves instead
+      // of one serial round trip each (Phase 4d).
       const BATCH = 1000;
-      const fetchAllPassages = async () => {
-        const all: any[] = [];
-        let from = 0;
-        while (true) {
-          const batch = await withSessionRetry(() => supabase
-            .from('passages')
-            .select('id, content, chapter_label, section_title, paragraph_number, sort_order, opens_excerpt')
-            .eq('book_id', bookId)
-            .order('sort_order')
-            .range(from, from + BATCH - 1));
-          if (!batch || batch.length === 0) break;
-          all.push(...batch);
-          if (batch.length < BATCH) break; // last page
-          from += BATCH;
+      const PASSAGE_SELECT = 'id, content, chapter_label, section_title, paragraph_number, sort_order, opens_excerpt';
+      const fetchPage: FetchPage = async (from, to) => {
+        const run = () => supabase
+          .from('passages')
+          .select(PASSAGE_SELECT)
+          .eq('book_id', bookId)
+          .order('sort_order')
+          .range(from, to);
+        let res = await run();
+        if (res.error) {
+          await supabase.auth.getSession();
+          res = await run();
         }
-        return all;
+        if (res.error) throw res.error;
+        return { rows: res.data ?? [] };
       };
+      const fetchAllPassages = () => collectPassages(fetchPage, BATCH);
 
-      const [bookData, passageData] = await Promise.all([
-        withSessionRetry(() => supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single()),
-        fetchAllPassages(),
-      ]);
+      // Last 2 opened cloud books are cached so a return from Settings / Notes /
+      // Tags / X-Refs (which unmount the reader) doesn't re-fetch the whole book.
+      let bookData: any, passageData: any[];
+      const cachedBook = getCachedBook(bookId);
+      if (cachedBook) {
+        bookData = cachedBook.bookData;
+        passageData = cachedBook.passageData as any[];
+      } else {
+        [bookData, passageData] = await Promise.all([
+          withSessionRetry(() => supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single()),
+          fetchAllPassages(),
+        ]);
+        putCachedBook(bookId, { bookData, passageData });
+      }
 
       if (bookData) {
         setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language) });
