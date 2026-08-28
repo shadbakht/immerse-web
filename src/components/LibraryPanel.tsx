@@ -11,6 +11,7 @@ import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { planAiSearch, weightedRankFusion, fusionWeights, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
+import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
 
@@ -32,6 +33,10 @@ const titleSortKey = (s: string): string => (s || '')
   .replace(/\p{M}/gu, '')
   .replace(/^[^\p{L}\p{N}]+/u, '')
   .toLowerCase();
+
+/** Run the quoted-phrase proximity fallback only when the strict phrase search
+ *  returned fewer than this many rows (4f spec: Option B, "few"). */
+const PROXIMITY_THRESHOLD = 5;
 
 interface SearchResult {
   passageId:    string;
@@ -453,7 +458,22 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       const onlyImportedSelected = selectedSlugs.size > 0 && importedSelected.length === selectedSlugs.size;
       if (!onlyImportedSelected) {
         if (exactPhrase) {
-          remoteResults = await runExactPhraseSearch(exactPhrase, regularUUIDs);
+          const strict = await runExactPhraseSearch(exactPhrase, regularUUIDs);
+          remoteResults = strict;
+          // 4f — proximity recall when the literal phrase matched few / nothing.
+          // Reader's own words only; ranked below the verbatim hits.
+          if (strict.length < PROXIMITY_THRESHOLD) {
+            const [tier1, tier2] = await Promise.all([
+              runAiPhraseSearch(exactPhrase, regularUUIDs, []).catch(() => [] as SearchResult[]),
+              runCrossRowPhraseSearch(exactPhrase, regularUUIDs).catch(() => [] as SearchResult[]),
+            ]);
+            const seen = new Set(strict.map(r => r.passageId));
+            for (const r of [...tier1, ...tier2]) {
+              if (seen.has(r.passageId)) continue;
+              seen.add(r.passageId);
+              remoteResults.push(r);
+            }
+          }
         } else {
           remoteResults = await runFtsSearch(q, regularUUIDs);
           if (remoteResults.length === 0) remoteResults = await runFuzzySearch(q, regularUUIDs);
@@ -707,6 +727,58 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
     scored.sort((a, b) => a.span - b.span);
     return [...local, ...mapResults(scored.map(s => s.row))];
+  }
+
+  // Cross-row proximity: a quoted phrase split across a paragraph break matches
+  // no single `passages` row. Fetch the bag-of-words candidates, pull the small
+  // window of rows around each (via `sort_order`), and stitch consecutive rows.
+  // 4f — runs only on the < PROXIMITY_THRESHOLD quoted-phrase path.
+  async function runCrossRowPhraseSearch(phrase: string, scope: string[] | null): Promise<SearchResult[]> {
+    if (scope !== null && scope.length === 0) return [];
+    const words = phrase.split(/\s+/)
+      .map(w => foldPunctuation(w).toLowerCase())
+      .filter(w => w.length >= 4);
+    if (words.length < 2) return [];
+
+    // search_passages RETURNS SETOF passages, so sort_order / book_id select fine.
+    const { data: candData } = await supabase
+      .rpc('search_passages', {
+        search_query: words.join(' '),
+        book_scope: scope && scope.length > 0 ? scope : null,
+      })
+      .select('id, content, sort_order, book_id, chapter_label, section_title, books(id, title, authors(name))');
+    const cands = ((candData as any[]) ?? []).filter(r => r.book_id != null && r.sort_order != null);
+    if (cands.length === 0) return [];
+
+    const bookIds = [...new Set(cands.map(r => r.book_id as string))];
+    const neededOrders = new Set<number>();
+    for (const r of cands) {
+      for (let d = -1; d <= 2; d++) neededOrders.add((r.sort_order as number) + d);
+    }
+
+    const { data: windowData } = await supabase
+      .from('passages')
+      .select('id, content, sort_order, book_id, chapter_label, section_title, books(id, title, authors(name))')
+      .in('book_id', bookIds)
+      .in('sort_order', [...neededOrders])
+      .limit(500);
+    const windowRows = (windowData as any[]) ?? [];
+
+    const foldedPhrase = foldPunctuation(phrase).toLowerCase();
+    const out: SearchResult[] = [];
+    for (const bId of bookIds) {
+      const candOrders = cands.filter(r => r.book_id === bId).map(r => r.sort_order as number);
+      const rowsForBook = windowRows
+        .filter(r => r.book_id === bId)
+        .filter(r => candOrders.some(o => (r.sort_order as number) >= o - 1 && (r.sort_order as number) <= o + 2));
+      const stitched = stitchPhraseAcrossRows(
+        rowsForBook.map(r => ({ ...r, sort_order: r.sort_order as number, content: String(r.content ?? '') })),
+        foldedPhrase,
+        foldPunctuation,
+      );
+      out.push(...mapResults(stitched).map(h => ({ ...h, matchPhrase: phrase })));
+    }
+    return out;
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
