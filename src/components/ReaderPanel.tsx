@@ -20,6 +20,7 @@ import { directionOf } from '@immerse/i18n';
 import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerPrefs';
 import { collectPassages, getCachedBook, putCachedBook, type FetchPage } from '@/lib/bookFetch';
 import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
+import { resolveSelectionPassages } from '@/lib/selectionRange';
 
 interface Passage {
   id: string;
@@ -783,14 +784,18 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   }
 
   useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
+    function handleDismiss(e: MouseEvent | TouchEvent) {
       if (selectionBar && selectionBarRef.current && !selectionBarRef.current.contains(e.target as Node)) {
         setSelectionBar(null);
         window.getSelection()?.removeAllRanges();
       }
     }
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousedown', handleDismiss);
+    document.addEventListener('touchstart', handleDismiss, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleDismiss);
+      document.removeEventListener('touchstart', handleDismiss);
+    };
   }, [selectionBar]);
 
   async function loadBook(bookId: string, scrollToId?: string, snapshotText?: string) {
@@ -1103,46 +1108,59 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     }
   }
 
-  // Handle text selection — show action bar on mouseup
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+  // Handle text selection — show action bar. Shared by the mouse (mouseup) and
+  // touch (touchend / selectionchange) paths.
+  const buildSelectionBar = useCallback(() => {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-      setSelectionBar(null);
-      return;
-    }
-
-    const selectedText = sel.toString().trim();
-    const range = sel.getRangeAt(0);
-
-    // Find which passage elements the selection starts/ends in
-    const startEl = (range.startContainer.nodeType === Node.TEXT_NODE
-      ? range.startContainer.parentElement
-      : range.startContainer as Element)?.closest('[data-pid]') as HTMLElement | null;
-    const endEl = (range.endContainer.nodeType === Node.TEXT_NODE
-      ? range.endContainer.parentElement
-      : range.endContainer as Element)?.closest('[data-pid]') as HTMLElement | null;
-
-    if (!startEl || !endEl) { setSelectionBar(null); return; }
-
-    const startPassageId = startEl.dataset.pid!;
-    const endPassageId   = endEl.dataset.pid!;
-
-    // Use the bounding rect of the selection to position the bar
+    const resolved = resolveSelectionPassages(sel, scrollRef.current ?? readerRef.current);
+    if (!resolved) { setSelectionBar(null); return; }
+    const range = sel!.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     const containerRect = readerRef.current?.getBoundingClientRect();
     if (!containerRect) return;
-
     setSelectionBar({
       x: rect.left + rect.width / 2 - containerRect.left,
       y: rect.top - containerRect.top - 48,
-      text: selectedText,
-      startPassageId,
-      endPassageId,
+      text: resolved.text.trim(),
+      startPassageId: resolved.startPassageId,
+      endPassageId: resolved.endPassageId,
       startOffset: range.startOffset,
       endOffset: range.endOffset,
     });
     logEvent('selection_made', { bookId: target?.bookId ?? null }, userId || null);
   }, [target?.bookId, userId]);
+
+  const handleMouseUp = useCallback(() => { buildSelectionBar(); }, [buildSelectionBar]);
+
+  // Touch selection: iOS/Android browsers do not reliably fire mouseup after a
+  // long-press text selection, so also raise the bar when a touch selection
+  // settles. Debounced — selectionchange fires continuously during a drag.
+  useEffect(() => {
+    if (isImported) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    let touchActive = false;
+    const onTouchStart = () => { touchActive = true; };
+    const onTouchEnd = () => {
+      if (!touchActive) return;
+      touchActive = false;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { buildSelectionBar(); }, 150);
+    };
+    const onSelectionChange = () => {
+      if (!touchActive) return;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { buildSelectionBar(); }, 400);
+    };
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      if (t) clearTimeout(t);
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  }, [isImported, buildSelectionBar]);
 
 async function handleCopy() {
     if (!selectionBar) return;
