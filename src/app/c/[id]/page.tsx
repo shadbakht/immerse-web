@@ -22,7 +22,7 @@ const NOT_FOUND_TITLE = 'Compilation not found';
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   if (!UUID_RE.test(id)) {
-    return { title: NOT_FOUND_TITLE, robots: { index: false, follow: false } };
+    return { title: { absolute: NOT_FOUND_TITLE }, robots: { index: false, follow: false } };
   }
 
   const supabase = await createClient();
@@ -33,13 +33,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .maybeSingle();
 
   if (!row) {
-    return { title: NOT_FOUND_TITLE, robots: { index: false, follow: false } };
+    return { title: { absolute: NOT_FOUND_TITLE }, robots: { index: false, follow: false } };
   }
 
-  const description = buildShareMetaDescription(row.payload, row.selection_count);
+  const description = buildShareMetaDescription(
+    Array.isArray(row.payload) ? row.payload : [],
+    row.selection_count,
+  );
   const title = `${row.name} — a compilation on Immerse`;
   return {
-    title,
+    title: { absolute: title },
     description,
     robots: { index: false, follow: false },
     openGraph: { title, description, type: 'article' },
@@ -63,7 +66,11 @@ export default async function SharedCompilationPage({ params }: Props) {
   return (
     <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
       <main className="mx-auto max-w-2xl px-4 py-10">
-        <SharedCompilationView id={row.id} name={row.name} payload={row.payload} />
+        <SharedCompilationView
+          id={row.id}
+          name={row.name}
+          payload={Array.isArray(row.payload) ? row.payload : []}
+        />
       </main>
     </div>
   );
