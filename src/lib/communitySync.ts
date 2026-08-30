@@ -310,7 +310,11 @@ async function buildCommunityPayload(
  * Push a tag + its full subtree to the community (idempotent upsert).
  * Mirrors mobile publishTag.
  */
-export async function publishTag(rootTag: { id: string; name: string }, userId: string): Promise<void> {
+export async function publishTag(
+  rootTag: { id: string; name: string },
+  userId: string,
+  opts: { listed?: boolean } = {},
+): Promise<void> {
   const supabase = createClient();
   const { data: allTagsData } = await supabase
     .from('tags')
@@ -329,6 +333,7 @@ export async function publishTag(rootTag: { id: string; name: string }, userId: 
         name:            rootTag.name,
         payload:         tags,
         selection_count: selectionCount,
+        listed:          opts.listed ?? true,
         updated_at:      new Date().toISOString(),
       },
       { onConflict: 'user_id,tag_id' },
@@ -360,7 +365,7 @@ export async function unpublishTag(rootTagId: string, userId: string): Promise<v
  * and supabase-js reports that in `error` rather than throwing, so an import that
  * gets this wrong silently produces a tag with no quotes in it.
  */
-async function resolvePassageIds(
+export async function resolvePassageIds(
   supabase: ReturnType<typeof createClient>,
   pids: string[],
 ): Promise<Record<string, string>> {
@@ -412,6 +417,48 @@ function selectionRowsFor(
 }
 
 /**
+ * Write a community payload as a fresh local tag subtree for `userId`.
+ * Returns the new root local tag id. Does NOT record a subscription or a copy —
+ * the caller decides which (importCommunityTag → subscription, copyCommunityTag → copy).
+ */
+export async function writeLocalTagTree(
+  supabase: ReturnType<typeof createClient>,
+  payload: ImmTagExport[],
+  userId: string,
+  visibility: 'imported' | 'private',
+): Promise<string> {
+  const now    = new Date().toISOString();
+  const idMap: Record<string, string> = {};
+  let rootLocalTagId = '';
+  const sorted = [...payload].sort((a, b) => a.depth - b.depth);
+  const pidMap = await resolvePassageIds(supabase, sorted.flatMap(t => (t.selections ?? []).map(s => s.startPid)));
+
+  for (const tagExport of sorted) {
+    const newTagId = crypto.randomUUID();
+    idMap[tagExport.exportId] = newTagId;
+    if (tagExport.depth === 0) rootLocalTagId = newTagId;
+
+    const { error: tagErr } = await supabase.from('tags').insert({
+      id: newTagId, user_id: userId,
+      parent_id: tagExport.parentExportId ? (idMap[tagExport.parentExportId] ?? null) : null,
+      name: tagExport.name, depth: tagExport.depth, sort_order: tagExport.sortOrder,
+      visibility, created_at: now,
+    });
+    if (tagErr) throw tagErr;
+
+    const selRows = selectionRowsFor(tagExport, userId, pidMap, now);
+    if (selRows.length === 0) continue;
+    const { error: selErr } = await supabase.from('selections').insert(selRows);
+    if (selErr) throw selErr;
+    const { error: linkErr } = await supabase.from('selection_tags').insert(
+      selRows.map(r => ({ selection_id: r.id as string, tag_id: newTagId, created_at: now })),
+    );
+    if (linkErr) throw linkErr;
+  }
+  return rootLocalTagId;
+}
+
+/**
  * Import a community tag into the user's library and subscribe to updates.
  * Returns the local root tag ID.
  *
@@ -421,7 +468,6 @@ function selectionRowsFor(
  */
 export async function importCommunityTag(ct: CommunityTagRow, userId: string): Promise<string> {
   const supabase = createClient();
-  const now      = new Date().toISOString();
 
   // Already subscribed, and the root tag still exists? Nothing to import.
   const { data: existingSub } = await supabase
@@ -440,44 +486,7 @@ export async function importCommunityTag(ct: CommunityTagRow, userId: string): P
     if (rootStillThere) return existingSub.local_tag_id as string;
   }
 
-  const idMap: Record<string, string> = {};
-  let   rootLocalTagId = '';
-
-  // Parents before children
-  const sorted = [...ct.payload].sort((a, b) => a.depth - b.depth);
-  const pidMap = await resolvePassageIds(
-    supabase,
-    sorted.flatMap(t => (t.selections ?? []).map(s => s.startPid)),
-  );
-
-  for (const tagExport of sorted) {
-    const newTagId = crypto.randomUUID();
-    idMap[tagExport.exportId] = newTagId;
-    if (tagExport.depth === 0) rootLocalTagId = newTagId;
-
-    const { error: tagErr } = await supabase.from('tags').insert({
-      id:         newTagId,
-      user_id:    userId,
-      parent_id:  tagExport.parentExportId ? (idMap[tagExport.parentExportId] ?? null) : null,
-      name:       tagExport.name,
-      depth:      tagExport.depth,
-      sort_order: tagExport.sortOrder,
-      visibility: 'imported',
-      created_at: now,
-    });
-    if (tagErr) throw tagErr;
-
-    const selRows = selectionRowsFor(tagExport, userId, pidMap, now);
-    if (selRows.length === 0) continue;
-
-    const { error: selErr } = await supabase.from('selections').insert(selRows);
-    if (selErr) throw selErr;
-
-    const { error: linkErr } = await supabase.from('selection_tags').insert(
-      selRows.map(r => ({ selection_id: r.id as string, tag_id: newTagId, created_at: now })),
-    );
-    if (linkErr) throw linkErr;
-  }
+  const rootLocalTagId = await writeLocalTagTree(supabase, ct.payload, userId, 'imported');
 
   const { error: subErr } = await supabase.from('community_tag_subscriptions').upsert(
     {
@@ -642,7 +651,7 @@ export async function followUser(subscriberId: string, followedUserId: string): 
   if (error) throw error;
 
   const [{ data: tags }, { data: subs }] = await Promise.all([
-    supabase.from('community_tags').select(COMMUNITY_TAG_FIELDS).eq('user_id', followedUserId),
+    supabase.from('community_tags').select(COMMUNITY_TAG_FIELDS).eq('user_id', followedUserId).eq('listed', true),
     supabase.from('community_tag_subscriptions').select('community_tag_id').eq('subscriber_id', subscriberId),
   ]);
 
@@ -694,7 +703,8 @@ export async function syncFollowedUsers(userId: string): Promise<void> {
     const { data: tags } = await supabase
       .from('community_tags')
       .select(COMMUNITY_TAG_FIELDS)
-      .eq('user_id', followed_user_id);
+      .eq('user_id', followed_user_id)
+      .eq('listed', true);
 
     for (const tag of (tags ?? []) as CommunityTagRow[]) {
       if (!subscribedIds.has(tag.id)) {
