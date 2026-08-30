@@ -7,6 +7,7 @@ import {
   writeLocalTagTree,
   type ImmTagExport,
 } from './communitySync';
+import { shareUrl } from './shareUrl';
 
 export interface Tradition { id: string; name: string }
 export interface TraditionPair { pairKey: string; pairName: string }
@@ -243,4 +244,93 @@ export async function saveSharedXrefs(sharedSetId: string, userId: string): Prom
   );
 
   return { saved: createdXrefIds.length, skipped, total: entries.length };
+}
+
+// ─── Share creation / lifecycle (owner) ───────────────────────────────────────
+
+type XrefShareRow = { id: string; ref: { xref_ids?: string[] } };
+type CompilationShareRow = { id: string; ref: { tag_id?: string } };
+
+export async function createXrefShareLink(
+  xrefIds: string[], title: string, userId: string,
+): Promise<{ id: string; url: string }> {
+  const supabase = createClient();
+  const { data: row, error } = await supabase.from('shared_sets').insert({
+    owner_id: userId, kind: 'xrefs', title: title.trim() || 'Cross-References',
+    ref: { xref_ids: xrefIds }, item_count: xrefIds.length,
+  }).select('id').single();
+  if (error) throw error;
+  const id = (row as { id: string }).id;
+  void supabase.from('analytics_events').insert({
+    event_type: 'share_link_created', properties: { shared_set_id: id, kind: 'xrefs' }, platform: 'web',
+  }).then(() => {}, () => {});
+  return { id, url: shareUrl(id) };
+}
+
+/** An existing xref share whose membership set-equals `xrefIds`, or null.
+ *  Partial overlap counts as no match — Create then makes a new share. */
+export async function findXrefShareForSelection(
+  xrefIds: string[], userId: string,
+): Promise<{ id: string; url: string } | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('shared_sets').select('id, ref')
+    .eq('owner_id', userId).eq('kind', 'xrefs');
+  for (const r of (data ?? []) as XrefShareRow[]) {
+    if (xrefIdSetEquals(r.ref?.xref_ids ?? [], xrefIds)) return { id: r.id, url: shareUrl(r.id) };
+  }
+  return null;
+}
+
+/** Kind-agnostic explicit revoke — deletes the shared_sets row by id. Guarded:
+ *  a compilation row that still backs a Discover publication is left alone
+ *  (retire that via Unpublish, which keeps the link working). */
+export async function revokeShareLink(sharedSetId: string, userId: string): Promise<void> {
+  const supabase = createClient();
+  const { data: ss } = await supabase
+    .from('shared_sets').select('id, kind, ref').eq('id', sharedSetId).eq('owner_id', userId).maybeSingle();
+  if (!ss) return;
+  const row = ss as { id: string; kind: string; ref: { tag_id?: string } };
+  if (row.kind === 'compilation') {
+    const { data: ct } = await supabase
+      .from('community_tags').select('id')
+      .eq('user_id', userId).eq('tag_id', row.ref?.tag_id ?? '').maybeSingle();
+    if (ct) return;   // in Discover → retire via Unpublish
+  }
+  await supabase.from('shared_sets').delete().eq('id', sharedSetId).eq('owner_id', userId);
+}
+
+/** On TagsScreen focus: delete compilation shares whose tag no longer exists locally. */
+export async function pruneOrphanedSharedSets(userId: string, localTagIds: string[]): Promise<void> {
+  const supabase = createClient();
+  const live = new Set(localTagIds);
+  const { data } = await supabase
+    .from('shared_sets').select('id, ref').eq('owner_id', userId).eq('kind', 'compilation');
+  const dead = ((data ?? []) as CompilationShareRow[])
+    .filter(r => !live.has(r.ref?.tag_id ?? ''))
+    .map(r => r.id);
+  if (!dead.length) return;
+  await supabase.from('community_tags').delete().eq('user_id', userId).in('shared_set_id', dead);
+  await supabase.from('shared_sets').delete().in('id', dead);
+}
+
+/** On XRefsScreen focus: drop now-deleted xref ids from every xref share the user
+ *  owns; delete a share that empties out entirely. */
+export async function pruneDeletedXrefsFromShares(userId: string, liveXrefIds: string[]): Promise<void> {
+  const supabase = createClient();
+  const live = new Set(liveXrefIds);
+  const { data } = await supabase
+    .from('shared_sets').select('id, ref').eq('owner_id', userId).eq('kind', 'xrefs');
+  for (const r of (data ?? []) as XrefShareRow[]) {
+    const current = r.ref?.xref_ids ?? [];
+    const kept = current.filter(id => live.has(id));
+    if (kept.length === current.length) continue;
+    if (kept.length === 0) {
+      await supabase.from('shared_sets').delete().eq('id', r.id);
+    } else {
+      await supabase.from('shared_sets').update({
+        ref: { xref_ids: kept }, item_count: kept.length, updated_at: new Date().toISOString(),
+      }).eq('id', r.id);
+    }
+  }
 }
