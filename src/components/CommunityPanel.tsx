@@ -310,6 +310,7 @@ function ProfileView({
       .from('community_tags')
       .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
       .eq('user_id', profile.userId)
+      .eq('listed', true)
       .order('updated_at', { ascending: false })
       .then(({ data }) => {
         setTags((data ?? []) as unknown as CommunityTag[]);
@@ -522,6 +523,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       const { data } = await supabase
         .from('community_tags')
         .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
+        .eq('listed', true)
         .order('published_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
       setRecentTags((data ?? []) as unknown as CommunityTag[]);
@@ -536,6 +538,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       const { data } = await (supabase
         .from('community_tags')
         .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
+        .eq('listed', true)
         .order('import_count', { ascending: false }) as any)
         .order('published_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
