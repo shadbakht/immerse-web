@@ -66,4 +66,30 @@ describe('stitchPhraseAcrossRows', () => {
     const out = stitchPhraseAcrossRows(rows, '"holy mariner"', fold);
     expect(out.map(r => r.sort_order)).toEqual([1]);
   });
+
+  it('matches across a terminal-punctuation paragraph break when given a flattening fold', () => {
+    // The real caller (runCrossRowPhraseSearch) passes a fold that collapses
+    // ALL punctuation to spaces, because a paragraph break almost always lands
+    // on a period \u2014 "still waters." then "He restoreth my soul".
+    const flatten = (x: string) => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const rows = [
+      row(2, 'he leadeth me beside the still waters.'),
+      row(3, 'He restoreth my soul: he leadeth me in the paths of righteousness'),
+    ];
+    const out = stitchPhraseAcrossRows(rows, flatten('still waters he restoreth my soul'), flatten);
+    expect(out.map((r: { sort_order: number }) => r.sort_order)).toEqual([2]);
+  });
+
+  it('reports the row where the phrase STARTS, not an earlier row whose 3-window happens to contain it', () => {
+    // Psalm 23: the phrase spans v2 -> v3. A naive [v1,v2,v3] join also contains
+    // it, but v1 must not be reported.
+    const flatten = (x: string) => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const rows = [
+      row(1, 'The LORD is my shepherd; I shall not want.'),
+      row(2, 'He maketh me to lie down in green pastures: he leadeth me beside the still waters.'),
+      row(3, 'He restoreth my soul: he leadeth me in the paths of righteousness'),
+    ];
+    const out = stitchPhraseAcrossRows(rows, flatten('still waters he restoreth my soul'), flatten);
+    expect(out.map((r: { sort_order: number }) => r.sort_order)).toEqual([2]);
+  });
 });

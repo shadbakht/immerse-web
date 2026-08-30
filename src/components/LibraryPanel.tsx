@@ -736,14 +736,24 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   async function runCrossRowPhraseSearch(phrase: string, scope: string[] | null): Promise<SearchResult[]> {
     if (scope !== null && scope.length === 0) return [];
     const words = phrase.split(/\s+/)
-      .map(w => foldPunctuation(w).toLowerCase())
-      .filter(w => w.length >= 4);
-    if (words.length < 2) return [];
+      .map(w => foldPunctuation(w).replace(/"/g, ''))
+      .filter(Boolean);
+    // Too short to meaningfully straddle a paragraph break.
+    if (words.length < 3) return [];
 
-    // search_passages RETURNS SETOF passages, so sort_order / book_id select fine.
+    // The words are split across the break BY DEFINITION, so a bag query
+    // requiring all of them in one row finds nothing. Look instead for either
+    // half of the phrase as a contiguous sub-phrase: whichever side of the
+    // break is the longer fragment lands intact in one row, so at least one
+    // half always hits. `websearch_to_tsquery` reads "..." as a phrase and `or`
+    // as a real OR. search_passages RETURNS SETOF passages, so sort_order /
+    // book_id select fine.
+    const mid = Math.floor(words.length / 2);
+    const firstHalf = words.slice(0, mid).join(' ');
+    const secondHalf = words.slice(mid).join(' ');
     const { data: candData } = await supabase
       .rpc('search_passages', {
-        search_query: words.join(' '),
+        search_query: `"${firstHalf}" or "${secondHalf}"`,
         book_scope: scope && scope.length > 0 ? scope : null,
       })
       .select('id, content, sort_order, book_id, chapter_label, section_title, books(id, title, authors(name))');
@@ -764,7 +774,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .limit(500);
     const windowRows = (windowData as any[]) ?? [];
 
-    const foldedPhrase = foldPunctuation(phrase).toLowerCase();
+    // A paragraph break almost always coincides with terminal punctuation, so
+    // "still waters. He restoreth" would never contain the literal phrase
+    // "still waters he restoreth". Compare with all punctuation collapsed to
+    // spaces — the same thing FTS5 tokenisation does for the strict match on
+    // mobile, where this cross-row case is already covered inside one chunk.
+    const flatten = (s: string) =>
+      foldPunctuation(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const foldedPhrase = flatten(phrase);
     const out: SearchResult[] = [];
     for (const bId of bookIds) {
       const candOrders = cands.filter(r => r.book_id === bId).map(r => r.sort_order as number);
@@ -774,7 +791,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       const stitched = stitchPhraseAcrossRows(
         rowsForBook.map(r => ({ ...r, sort_order: r.sort_order as number, content: String(r.content ?? '') })),
         foldedPhrase,
-        foldPunctuation,
+        flatten,
       );
       out.push(...mapResults(stitched).map(h => ({ ...h, matchPhrase: phrase })));
     }

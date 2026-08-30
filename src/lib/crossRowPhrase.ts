@@ -20,8 +20,10 @@ export interface RowLike {
  * @param foldedPhrase  the phrase, already lower-cased AND punctuation-folded
  * @param fold          the app's foldPunctuation (injected to stay pure)
  * @returns the FIRST row of each 2–3-row consecutive window whose joined,
- *          folded, lower-cased text contains `foldedPhrase` while no single row
- *          in that window does. Each distinct start row is returned at most once.
+ *          folded, lower-cased text contains `foldedPhrase`, where the phrase
+ *          genuinely straddles the boundary: no single row contains it, and it
+ *          is not wholly within the window's tail (a tighter window rooted there
+ *          would be the real match). Each distinct start row is returned once.
  */
 export function stitchPhraseAcrossRows<T extends RowLike>(
   rows: T[],
@@ -48,6 +50,14 @@ export function stitchPhraseAcrossRows<T extends RowLike>(
         r => !fold(r.content).toLowerCase().includes(foldedPhrase),
       );
       if (!noSingleRowHasIt) continue;
+
+      // The phrase must START in window[0]. If it is wholly inside the tail
+      // (rows after the first), a tighter window rooted at that later row is
+      // the correct match — this window would just misreport window[0].
+      if (window.length > 1) {
+        const tail = fold(window.slice(1).map(r => r.content).join(' ')).toLowerCase();
+        if (tail.includes(foldedPhrase)) continue;
+      }
 
       const joined = fold(window.map(r => r.content).join(' ')).toLowerCase();
       if (joined.includes(foldedPhrase) && !usedStart.has(window[0].sort_order)) {
