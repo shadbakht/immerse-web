@@ -339,6 +339,39 @@ export async function publishTag(
       { onConflict: 'user_id,tag_id' },
     );
   if (error) throw error;
+
+  // Phase 8: keep the canonical shared_sets row in step (payload + FK).
+  // NOTE: `shared_sets_compilation_uniq` is a PARTIAL EXPRESSION index, which
+  // PostgREST's `onConflict` cannot target (it quotes each entry as an
+  // identifier → `42703 column "(ref->>tag_id)" does not exist`, verified live).
+  // Hence the explicit select-then-update-or-insert.
+  const now = new Date().toISOString();
+  const { data: existingSs } = await supabase
+    .from('shared_sets')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('kind', 'compilation')
+    .eq('ref->>tag_id', rootTag.id)
+    .maybeSingle();
+
+  let sharedSetId = (existingSs as { id: string } | null)?.id ?? null;
+  if (sharedSetId) {
+    await supabase.from('shared_sets').update({
+      title: rootTag.name, payload: tags, item_count: selectionCount, updated_at: now,
+    }).eq('id', sharedSetId);
+  } else {
+    const { data: inserted } = await supabase.from('shared_sets').insert({
+      owner_id: userId, kind: 'compilation', title: rootTag.name,
+      ref: { tag_id: rootTag.id }, payload: tags, item_count: selectionCount, updated_at: now,
+    }).select('id').maybeSingle();
+    sharedSetId = (inserted as { id: string } | null)?.id ?? null;
+  }
+
+  if (sharedSetId) {
+    await supabase.from('community_tags')
+      .update({ shared_set_id: sharedSetId })
+      .eq('user_id', userId).eq('tag_id', rootTag.id);
+  }
 }
 
 /**
