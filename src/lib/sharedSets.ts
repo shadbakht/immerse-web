@@ -82,7 +82,15 @@ export async function refreshSharedCompilation(tagId: string, userId: string): P
 
   const { tags, selectionCount } = await buildSnapshot(supabase, tagId, userId);
 
+  // Keep `title` in step too — the /c page and its OG tags read shared_sets.title,
+  // so without this a rename leaves the shared page showing the old name.
+  // The root is the payload entry with no parent (matching communitySync's
+  // buildTagIdMap); `depth === 0` would be wrong for a nested tag shared as a root,
+  // since buildCommunityPayload copies each tag's real depth from the DB.
+  const rootName = tags.find(t => t.parentExportId === null)?.name;
+
   await supabase.from('shared_sets').update({
+    ...(rootName !== undefined ? { title: rootName } : {}),
     payload: tags,
     item_count: selectionCount,
     updated_at: new Date().toISOString(),
@@ -232,10 +240,16 @@ export async function saveSharedXrefs(sharedSetId: string, userId: string): Prom
   }
 
   if (selRows.length) {
+    const selIds = selRows.map(r => r.id as string);
     const { error: se } = await supabase.from('selections').insert(selRows);
     if (se) throw se;
     const { error: xe } = await supabase.from('xrefs').insert(xrefRows);
-    if (xe) throw xe;
+    if (xe) {
+      // Compensating delete: no shared_set_copies row is written on this path, so
+      // without it a retry would double-batch and leave orphan selections behind.
+      await supabase.from('selections').delete().in('id', selIds);
+      throw xe;
+    }
   }
 
   await supabase.from('shared_set_copies').upsert(
@@ -282,10 +296,16 @@ export async function findXrefShareForSelection(
   return null;
 }
 
-/** Kind-agnostic explicit revoke — deletes the shared_sets row by id. Guarded:
- *  a compilation row that still backs a Discover publication is left alone
- *  (retire that via Unpublish, which keeps the link working). */
-export async function revokeShareLink(sharedSetId: string, userId: string): Promise<void> {
+/**
+ * Kind-agnostic explicit revoke — deletes the shared_sets row **by shared-set id**.
+ * Guarded: a compilation row that still backs a Discover publication is left alone
+ * (retire that via Unpublish, which keeps the link working).
+ *
+ * ⚠️ Not to be confused with `shareLinks.ts`'s `revokeShareLink(rootTagId, userId)`,
+ * which takes a **local tag id** and is the Phase 5 compilation-only entry point.
+ * Deliberately named differently so the two can't be swapped by accident.
+ */
+export async function revokeSharedSet(sharedSetId: string, userId: string): Promise<void> {
   const supabase = createClient();
   const { data: ss } = await supabase
     .from('shared_sets').select('id, kind, ref').eq('id', sharedSetId).eq('owner_id', userId).maybeSingle();
