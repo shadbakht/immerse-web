@@ -125,7 +125,7 @@ function rawCitation(passage: any, book: any): string {
  * xref citations — exactly like mobile buildImmPayload. Selections whose book is
  * user-imported are stripped (privacy: imported books never reach the community).
  */
-async function buildCommunityPayload(
+export async function buildCommunityPayload(
   subtreeTagIds: string[],
   userId: string,
 ): Promise<{ tags: PublishTagExport[]; selectionCount: number }> {
