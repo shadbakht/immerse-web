@@ -1,7 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { buildCommunityPayload } from './communitySync';
+import { buildCommunityPayload, writeLocalTagTree, type ImmTagExport } from './communitySync';
 
 export interface Tradition { id: string; name: string }
 export interface TraditionPair { pairKey: string; pairName: string }
@@ -81,4 +81,52 @@ export async function refreshSharedCompilation(tagId: string, userId: string): P
     item_count: selectionCount,
     updated_at: new Date().toISOString(),
   }).eq('id', (row as { id: string }).id);
+}
+
+/** Ensure a link-only compilation share exists (shared_sets only — never touches
+ *  community_tags, so creating a link does not publish to Discover). Idempotent. */
+export async function ensureCompilationShare(
+  supabase: ReturnType<typeof createClient>,
+  rootTag: { id: string; name: string },
+  userId: string,
+): Promise<{ id: string }> {
+  const { data: existing } = await supabase
+    .from('shared_sets').select('id')
+    .eq('owner_id', userId).eq('kind', 'compilation').eq('ref->>tag_id', rootTag.id).maybeSingle();
+  if (existing) return { id: (existing as { id: string }).id };
+
+  const { tags, selectionCount } = await buildSnapshot(supabase, rootTag.id, userId);
+
+  const { data: row, error } = await supabase.from('shared_sets').insert({
+    owner_id: userId, kind: 'compilation', title: rootTag.name,
+    ref: { tag_id: rootTag.id }, payload: tags, item_count: selectionCount,
+  }).select('id').single();
+  if (error) throw error;
+  return { id: (row as { id: string }).id };
+}
+
+/** One-time copy of a shared compilation into the caller's own Compilations
+ *  (no subscription). Port of Phase 5's copyCommunityTag, reading
+ *  `shared_sets.payload` and recording the copy in `shared_set_copies`. */
+export async function copySharedCompilation(sharedSetId: string, userId: string): Promise<string> {
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from('shared_set_copies').select('local_root_ref')
+    .eq('subscriber_id', userId).eq('shared_set_id', sharedSetId).eq('kind', 'compilation').maybeSingle();
+  if (existing?.local_root_ref) {
+    const { data: still } = await supabase
+      .from('tags').select('id').eq('id', existing.local_root_ref as string).maybeSingle();
+    if (still) return existing.local_root_ref as string;
+  }
+
+  const { data: ss } = await supabase
+    .from('shared_sets').select('payload').eq('id', sharedSetId).eq('kind', 'compilation').maybeSingle();
+  if (!ss?.payload) throw new Error('shared compilation not found');
+
+  const rootLocalTagId = await writeLocalTagTree(supabase, ss.payload as ImmTagExport[], userId, 'private');
+  await supabase.from('shared_set_copies').upsert(
+    { subscriber_id: userId, shared_set_id: sharedSetId, kind: 'compilation', local_root_ref: rootLocalTagId },
+    { onConflict: 'subscriber_id,shared_set_id' },   // plain unique index — supported
+  );
+  return rootLocalTagId;
 }
