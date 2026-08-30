@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { publishTag, unpublishTag } from '@/lib/communitySync';
+import { getShareState, createShareLink, revokeShareLink, shareUrl, type ShareState } from '@/lib/shareLinks';
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { Highlight } from './Highlight';
@@ -233,7 +234,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
       onClick: () => setRenaming(true),
     },
     {
-      label: tag.visibility === 'published' ? t('tags.setPrivate') : t('tags.setPublic'),
+      label: tag.visibility === 'published' ? t('share.stopDiscover') : t('share.discoverToggle'),
       icon: tag.visibility === 'published' ? '🔓' : '🔒',
       onClick: () => onToggleVisibility(tag.id, tag.visibility === 'published' ? 'private' : 'published'),
     },
@@ -414,6 +415,9 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [selIdsWithNotes, setSelIdsWithNotes] = useState<Set<string>>(new Set());
   const [selIdsWithXrefs, setSelIdsWithXrefs] = useState<Set<string>>(new Set());
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const [shareState, setShareState] = useState<ShareState | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => { if (userId) load(); }, [userId]);
 
@@ -440,6 +444,22 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [showExportMenu]);
+
+  // The single selected compilation (share links act on exactly one root tag).
+  const singleTag = selectedTagIds.size === 1
+    ? tags.find(t => t.id === [...selectedTagIds][0]) ?? null
+    : null;
+
+  // Load the share state when the export menu opens over a single compilation.
+  useEffect(() => {
+    if (showExportMenu && singleTag && userId) {
+      getShareState(userId, singleTag.id).then(setShareState).catch(() => setShareState(null));
+    } else {
+      setShareState(null);
+      setLinkCopied(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showExportMenu, singleTag?.id, userId]);
 
   async function load() {
     setLoading(true);
@@ -751,6 +771,66 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                         {label}
                       </button>
                     ))}
+                  </div>
+                  <div className="py-1 border-t border-gray-100 dark:border-[#2D4050]">
+                    {selectedTagIds.size > 1 ? (
+                      <p className="px-4 py-2 text-xs text-gray-400 dark:text-[#5C7A8E]">{t('share.selectOne')}</p>
+                    ) : singleTag && !shareState ? (
+                      <button
+                        disabled={shareBusy}
+                        onClick={async () => {
+                          setShareBusy(true);
+                          try {
+                            const { url, id, listed } = await createShareLink({ id: singleTag.id, name: singleTag.name }, userId);
+                            setShareState({ id, listed });
+                            await navigator.clipboard.writeText(url);
+                            setLinkCopied(true);
+                            setTimeout(() => setLinkCopied(false), 2000);
+                          } finally {
+                            setShareBusy(false);
+                          }
+                        }}
+                        className="w-full text-start px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors disabled:opacity-60"
+                      >
+                        <span className="block text-sm text-gray-700 dark:text-[#B8C7D6]">
+                          {linkCopied ? t('share.linkCopied') : t('share.createLink')}
+                        </span>
+                        <span className="block text-[11px] text-gray-400 dark:text-[#5C7A8E]">{t('share.createLinkHint')}</span>
+                      </button>
+                    ) : singleTag && shareState ? (
+                      <div className="px-4 py-2">
+                        <p className="font-mono text-xs text-gray-500 dark:text-[#8FA4B8] truncate" title={shareUrl(shareState.id)}>
+                          {shareUrl(shareState.id)}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(shareUrl(shareState.id));
+                              setLinkCopied(true);
+                              setTimeout(() => setLinkCopied(false), 2000);
+                            }}
+                            className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70"
+                          >
+                            {linkCopied ? t('share.linkCopied') : t('share.copyLink')}
+                          </button>
+                          {!shareState.listed && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(t('share.revokeConfirm'))) return;
+                                await revokeShareLink(singleTag.id, userId);
+                                setShareState(null);
+                              }}
+                              className="text-sm font-medium text-red-600 dark:text-red-400 hover:opacity-70"
+                            >
+                              {t('share.revoke')}
+                            </button>
+                          )}
+                        </div>
+                        {shareState.listed && (
+                          <p className="text-[11px] text-gray-400 dark:text-[#5C7A8E] mt-2">{t('share.publishedNote')}</p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}
