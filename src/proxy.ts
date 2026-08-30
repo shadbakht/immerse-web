@@ -28,7 +28,10 @@ export async function proxy(request: NextRequest) {
   // path "starts with" '/') so a signed-out visitor lands straight on the
   // guest-mode library instead of being bounced through /login first.
   const { pathname } = request.nextUrl;
-  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support'];
+  // '/c' = public shared-compilation pages (Phase 5 share links). A signed-out
+  // visitor with a link must see the page, not a login bounce — the page's own
+  // Save button handles the sign-in redirect when they choose to save.
+  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c'];
   const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {

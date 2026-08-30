@@ -16,6 +16,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const catalog = loadCatalogServer();
   const lastModified = new Date();
 
+  // No `/c/<id>` share pages here on purpose: they are unlisted, link-only
+  // compilations and every one is served with `robots: { index: false }`, so
+  // enumerating community_tags into the sitemap would contradict that.
   return [
     { url: SITE_URL, lastModified, changeFrequency: 'daily', priority: 1 },
     ...catalog.books.map(book => ({
