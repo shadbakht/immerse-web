@@ -68,6 +68,12 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
   );
   const [libraryCollapsed, setLibraryCollapsed] = useState(false);
   const [xrefPickFrom, setXrefPickFrom] = useState<XRefPickFrom | null>(null);
+  // AI cross-reference suggestions (v2.0 Phase 6). Lifted here — not local to
+  // ReaderPanel — so the results sheet survives `onOpenBook` re-rendering the
+  // reader with a new target (the "accept" flow navigates to the candidate's
+  // book) and survives a cancelled pick returning to the source passage.
+  const [xrefSuggestions, setXrefSuggestions] = useState<import('@/lib/xrefSuggest').XrefSuggestion[] | null>(null);
+  const [xrefSuggestSource, setXrefSuggestSource] = useState<{ passageId: string; bookId: string } | null>(null);
 
   // Library is the only split-panel tab; everything else is full-width
   const isFullWidth = activeTab !== 'library';
@@ -122,6 +128,19 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     if (initialBookId) logEvent('book_opened', { bookId: initialBookId, source: 'direct' }, userId || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once for the id this page loaded with, not on every userId change
   }, []);
+
+  // Phase 6: drop a stale AI-suggestions sheet when the reader leaves the source
+  // book. Kept while a pick is in flight (`xrefPickFrom` — the "accept" flow
+  // navigates to a candidate's book) and while the reader is on / back on the
+  // source book (a cancelled pick routes here, and the sheet should reappear).
+  // Any other book being loaded means the user walked away — clear it, so it
+  // can't reappear later when they happen back onto the source book.
+  useEffect(() => {
+    if (xrefPickFrom || !xrefSuggestSource) return;
+    if (readerTarget?.bookId === xrefSuggestSource.bookId) return;
+    setXrefSuggestions(null);
+    setXrefSuggestSource(null);
+  }, [readerTarget?.bookId, xrefPickFrom, xrefSuggestSource]);
 
   function openBook(bookId: string, passageId?: string, highlightQuery?: string, collapseLibrary = false, passageSnapshot?: string) {
     // Switch to the reader IMMEDIATELY — never block the tab change on slug
@@ -219,6 +238,10 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
               xrefPickFrom={xrefPickFrom}
               onStartXrefPick={handleStartXrefPick}
               onXrefPickDone={handleXrefPickDone}
+              xrefSuggestions={xrefSuggestions}
+              setXrefSuggestions={setXrefSuggestions}
+              xrefSuggestSource={xrefSuggestSource}
+              setXrefSuggestSource={setXrefSuggestSource}
             />
           </div>
         </>

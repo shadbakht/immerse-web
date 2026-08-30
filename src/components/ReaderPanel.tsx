@@ -21,6 +21,7 @@ import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerP
 import { collectPassages, getCachedBook, putCachedBook, type FetchPage } from '@/lib/bookFetch';
 import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
 import { resolveSelectionPassages } from '@/lib/selectionRange';
+import { fetchXrefSuggestions, type XrefSuggestion } from '@/lib/xrefSuggest';
 
 interface Passage {
   id: string;
@@ -260,6 +261,12 @@ interface ReaderPanelProps {
   xrefPickFrom?: XRefPickFrom | null;
   onStartXrefPick?: (from: XRefPickFrom) => void;
   onXrefPickDone?: () => void;
+  // AI cross-reference suggestions (v2.0 Phase 6) — state lifted to AppShell so
+  // the sheet survives navigation to a candidate's book and a cancelled pick.
+  xrefSuggestions?: XrefSuggestion[] | null;
+  setXrefSuggestions?: (s: XrefSuggestion[] | null) => void;
+  xrefSuggestSource?: { passageId: string; bookId: string } | null;
+  setXrefSuggestSource?: (s: { passageId: string; bookId: string } | null) => void;
 }
 
 // Prayer paragraph break: each newline in a prayer body is a source paragraph
@@ -492,7 +499,56 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
   );
 }
 
-export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone }: ReaderPanelProps) {
+// Phase 6: one AI-suggested cross-reference candidate. Collapsed shows citation
+// + a 2-line quote + reason / annotation badge; tapping expands the full quote
+// and reveals "Use this passage". Loose matches render dimmed. Kept in this
+// file like mobile keeps it in XRefPanel.tsx.
+function SuggestionCard({ suggestion, onAccept }: {
+  suggestion: XrefSuggestion;
+  onAccept: (s: XrefSuggestion) => void;
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const text = suggestion.text.replace(/\[\d+\]/g, '');
+  const badge =
+    suggestion.annotated == null
+      ? null
+      : suggestion.annotated.kind === 'compilation'
+        ? t('xref.inCompilation', { name: suggestion.annotated.label })
+        : t('xref.youNotedThis');
+  return (
+    <div className={suggestion.loose ? 'opacity-60' : undefined}>
+      <div
+        className="px-4 py-3 bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050] cursor-pointer select-none"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mb-1.5 truncate">{suggestion.citation}</p>
+        <p className={`font-serif text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+          &ldquo;{text}&rdquo;
+        </p>
+        {suggestion.loose && (
+          <p className="text-xs italic text-gray-400 dark:text-[#5C7A8E] mt-1.5">{t('xref.looseMatch')}</p>
+        )}
+        {suggestion.reason && (
+          <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] mt-1.5">◆ {suggestion.reason}</p>
+        )}
+        {badge && (
+          <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-1.5">{badge}</p>
+        )}
+      </div>
+      {expanded && (
+        <button
+          onClick={() => onAccept(suggestion)}
+          className="mt-2 w-full py-2.5 rounded-xl bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
+        >
+          {t('xref.useThisPassage')}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone, xrefSuggestions, setXrefSuggestions, xrefSuggestSource, setXrefSuggestSource }: ReaderPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [passages, setPassages] = useState<Passage[]>([]);
@@ -515,6 +571,10 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const [savingAnnotation, setSavingAnnotation] = useState(false);
   const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'ai' | 'signin' | null>(null);
   const [pickSaving, setPickSaving] = useState(false);
+  // AI cross-reference suggestions (v2.0 Phase 6) — transient UI state; the
+  // results themselves live on AppShell (xrefSuggestions / xrefSuggestSource).
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState<{ passageId: string; query: string; exact?: boolean } | null>(null);
   const [taggedPassageIds, setTaggedPassageIds]   = useState<Set<string>>(new Set());
@@ -538,6 +598,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const selectionBarRef = useRef<HTMLDivElement>(null);
   // Persists the selection data while a panel is open (selectionBar state gets cleared by mousedown listener)
   const pendingSelectionRef = useRef<SelectionBar | null>(null);
+  // Phase 6: the source `XRefPickFrom` for an in-flight AI suggestion. Stashed
+  // here because handleSuggestMatch clears selectionBar, and acceptSuggestion
+  // (fired much later, possibly after a re-render) still needs it to rebuild
+  // the pick-from endpoint.
+  const suggestSrcRef = useRef<XRefPickFrom | null>(null);
   // Reading progress tracking
   const progressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedPidRef   = useRef<string | null>(null);
@@ -1503,6 +1568,72 @@ async function handleCopy() {
     onStartXrefPick?.(from);
   }
 
+  // Phase 6: "✦ Suggest a match" — ask the AI for candidate passages to
+  // cross-reference the current single-passage selection to.
+  async function handleSuggestMatch() {
+    const bar = selectionBar;
+    if (!bar || !target || !userId || !setXrefSuggestions) return;
+
+    const sourcePassageId = bar.startPassageId;
+    const sourceText = bar.text.replace(/\[\d+\]/g, '');
+
+    // Stash the pick-from endpoint before clearing the bar — acceptSuggestion
+    // needs the offsets/text and the bar is about to go away.
+    suggestSrcRef.current = {
+      text: bar.text,
+      startPassageId: bar.startPassageId,
+      bookId: target.bookId,
+      passageId: bar.startPassageId,
+      startOffset: bar.startOffset,
+      endOffset: bar.endOffset,
+    };
+
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+    setSuggesting(true);
+    setSuggestError(false);
+    setXrefSuggestions(null);
+    setXrefSuggestSource?.({ passageId: sourcePassageId, bookId: target.bookId });
+
+    try {
+      const alreadyLinkedIds = new Set(
+        (passageToXrefs.get(sourcePassageId) ?? []).map(e => e.otherPassageId),
+      );
+      const out = await fetchXrefSuggestions({
+        supabase,
+        sourceText,
+        sourcePassageId,
+        sourceBookUuid: target.bookId,
+        // Mobile sends a bare 2-letter code and the edge fn's LANGUAGE_NAMES
+        // map keys on those; book.language here is bcp47-normalized (en-US).
+        language: (book?.language ?? 'en').split('-')[0],
+        // TODO Phase 6: scope to same-language book uuids. Whole-library for now —
+        // cross-language literal-phrase hits are rare and the AI rank stage
+        // filters relevance.
+        bookScope: null,
+        alreadyLinkedIds,
+        userId,
+      });
+      if (out.status === 'unavailable') setSuggestError(true);
+      else setXrefSuggestions(out.suggestions);
+    } catch {
+      setSuggestError(true);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  // Phase 6: "Use this passage" — take the reader into pick mode on the chosen
+  // candidate's book. The user then selects text there and the existing
+  // handlePickFromSelection saves the xref. Suggestions are NOT cleared here —
+  // a cancelled pick returns to the source passage and the sheet reappears.
+  function acceptSuggestion(s: XrefSuggestion) {
+    const from = suggestSrcRef.current;
+    if (!from) return;
+    onStartXrefPick?.(from);
+    onOpenBook?.(s.bookId, s.pid, s.text);
+  }
+
   // Creates selection A (the "from") using stored pick-from data
   // Find an existing selection covering the same range so a highlight cross-referenced
   // (or also tagged/noted) more than once shares one selection row instead of duplicating it.
@@ -1611,6 +1742,9 @@ async function handleCopy() {
 
       // Navigate back to the original passage
       onXrefPickDone?.();
+      // Phase 6: the suggestion flow is now complete — drop the results sheet.
+      setXrefSuggestions?.(null);
+      setXrefSuggestSource?.(null);
 
       // For same-book picks, loadBook won't re-fire so reload annotations explicitly
       if (sameBook) {
@@ -1694,6 +1828,9 @@ async function handleCopy() {
       }
 
       onXrefPickDone?.();
+      // Phase 6: the suggestion flow is now complete — drop the results sheet.
+      setXrefSuggestions?.(null);
+      setXrefSuggestSource?.(null);
       if (sameBook) {
         loadAnnotations(passages.map(p => p.id)).catch(() => {});
       }
@@ -1848,6 +1985,9 @@ async function handleCopy() {
                 { label: t('reader.actionTag'),  onClick: () => openPanel('tag'), hint: 'Add this selection to a compilation' },
                 { label: t('reader.actionNote'), onClick: () => openPanel('note'), hint: 'Add a note about this selection' },
                 { label: t('reader.actionXref'), onClick: handleXrefStart, hint: 'Add a cross-reference linking this selection to another' },
+                ...(setXrefSuggestions && selectionBar.startPassageId === selectionBar.endPassageId
+                  ? [{ label: `✦ ${t('xref.suggestMatch')}`, onClick: handleSuggestMatch, hint: 'Let AI suggest a passage to cross-reference' }]
+                  : []),
                 { label: t('reader.actionAi'),   onClick: () => openPanel('ai'), hint: 'Get an AI-generated summary of this selection' },
                 { label: t('reader.actionCopy'), onClick: handleCopy, hint: 'Copy this selection to your clipboard' },
               ]
@@ -2407,6 +2547,53 @@ async function handleCopy() {
                       onOpenBook={onOpenBook ? (bookId, passageId, passageSnapshot) => { onOpenBook(bookId, passageId, passageSnapshot); closeAnnotationPanel(); } : undefined}
                       onDelete={() => handleDeleteXref(annotationPanel!.passageId, entry.xrefId)}
                     />
+                  ))}
+                </div>
+              )}
+            </div>
+          </PanelSheet>
+        );
+      })()}
+
+      {/* Phase 6: AI cross-reference suggestions sheet. Shown while the request
+          is in flight / errored, or once results are back AND the source
+          passage is in the currently-loaded book (so it hides while the reader
+          is off in a candidate's book during "accept", and reappears if that
+          pick is cancelled and the reader returns to the source). */}
+      {(() => {
+        // `xrefSuggestSource` is set before the fetch await, so inCurrentBook is
+        // true during normal loading too. Gating loading/error on it means the
+        // ✕/tap-away can always dismiss, and an `unavailable` error can't pop up
+        // after the user already dismissed. Also never show over the pick-mode
+        // banner — during "accept" the user is selecting the target text; the
+        // sheet returns when the pick ends or is cancelled.
+        const inCurrentBook =
+          !!xrefSuggestSource && passages.some(p => p.id === xrefSuggestSource.passageId);
+        const visible =
+          !xrefPickFrom &&
+          inCurrentBook &&
+          (suggesting || suggestError || xrefSuggestions != null);
+        if (!visible) return null;
+        return (
+          <PanelSheet
+            visible
+            onClose={() => { setXrefSuggestions?.(null); setXrefSuggestSource?.(null); setSuggestError(false); setSuggesting(false); }}
+            title={t('xref.suggestMatch')}
+          >
+            <div className="px-5 pt-4 pb-4" dir={directionOf(bcp47(book?.language))}>
+              {suggesting ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                  <div className="w-4 h-4 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-gray-500 dark:text-[#8FA4B8]">{t('xref.suggesting')}</p>
+                </div>
+              ) : suggestError ? (
+                <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-10">{t('xref.suggestError')}</p>
+              ) : !xrefSuggestions || xrefSuggestions.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-10">{t('xref.noMatches')}</p>
+              ) : (
+                <div className="space-y-3">
+                  {xrefSuggestions.map(s => (
+                    <SuggestionCard key={s.id} suggestion={s} onAccept={acceptSuggestion} />
                   ))}
                 </div>
               )}
