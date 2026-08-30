@@ -31,7 +31,10 @@ export async function proxy(request: NextRequest) {
   // '/c' = public shared-compilation pages (Phase 5 share links). A signed-out
   // visitor with a link must see the page, not a login bounce — the page's own
   // Save button handles the sign-in redirect when they choose to save.
-  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c'];
+  // '/.well-known' = apple-app-site-association (no file extension, so the
+  // static-asset matcher below doesn't exempt it) + assetlinks.json — the OS
+  // fetches these unauthenticated to verify universal / App Links for /c/*.
+  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/.well-known'];
   const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {
