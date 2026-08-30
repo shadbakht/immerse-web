@@ -4,19 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { copySharedCompilation, saveSharedXrefs, type SaveXrefsResult } from '@/lib/sharedSets';
 import { useTranslation } from '@/contexts/LanguageProvider';
-import type { TranslationKey } from '@immerse/i18n';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'signin';
 export type ShareKind = 'compilation' | 'xrefs';
-
-// ⚠️ Phase 8 / Part I adds these to @immerse/i18n. Until that release is pinned
-// they are not in `TranslationKey`, hence the casts — delete them (and this
-// note) in Task I2. `npm run i18n:check` flags them meanwhile, on purpose.
-const K = {
-  saveXrefs: 'sharePage.saveXrefs' as TranslationKey,
-  savedXrefs: 'sharePage.savedXrefs' as TranslationKey,
-  savedXrefsPartial: 'sharePage.savedXrefsPartial' as TranslationKey,
-};
 
 /**
  * Handles the one-time "save this to my library" flow for a shared set.
@@ -100,13 +90,13 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
   const savedText = (): string => {
     if (kind !== 'xrefs') return t('sharePage.saved');
     if (partial && partial.skipped > 0) {
-      return t(K.savedXrefsPartial, {
+      return t('sharePage.savedXrefsPartial', {
         saved: partial.saved,
         total: partial.total,
         skipped: partial.skipped,
       });
     }
-    return t(K.savedXrefs);
+    return t('sharePage.savedXrefs');
   };
 
   return (
@@ -125,7 +115,7 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
             {state === 'saving'
               ? t('sharePage.saving')
               : kind === 'xrefs'
-                ? t(K.saveXrefs)
+                ? t('sharePage.saveXrefs')
                 : t('sharePage.save')}
           </a>
           <p className="mt-2 text-[11px] text-gray-400 dark:text-[#5C7A8E]">

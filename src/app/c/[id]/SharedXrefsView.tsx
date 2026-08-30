@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useTranslation } from '@/contexts/LanguageProvider';
-import type { TranslationKey } from '@immerse/i18n';
 import { buildCitation } from '@/lib/citationUtils';
 import { citationInParens } from '@/lib/exportShared';
 import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
@@ -11,14 +10,6 @@ import { groupXrefsByPair } from '@/lib/xrefGrouping';
 import { makeTraditionResolver } from '@/lib/tradition';
 import { traditionPairOf, getSharedXrefSet, type XrefShareSide } from '@/lib/sharedSets';
 import SaveOnLoad from './SaveOnLoad';
-
-// ⚠️ Phase 8 / Part I adds these to @immerse/i18n. Until that release is pinned
-// they are not in `TranslationKey`, hence the casts — delete them (and this
-// note) in Task I2. `npm run i18n:check` flags them meanwhile, on purpose.
-const K = {
-  xrefEyebrow: 'sharePage.xrefEyebrow' as TranslationKey,
-  xrefsGone: 'sharePage.xrefsGone' as TranslationKey,
-};
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -166,7 +157,7 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E]">
-        {t(K.xrefEyebrow)}
+        {t('sharePage.xrefEyebrow')}
       </p>
       <h1 className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
 
@@ -174,7 +165,7 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
         <p className="mt-6 text-sm text-gray-400 dark:text-[#5C7A8E]">{t('common.loading')}</p>
       )}
       {(state === 'error' || state === 'empty') && (
-        <p className="mt-6 text-sm text-gray-400 dark:text-[#5C7A8E]">{t(K.xrefsGone)}</p>
+        <p className="mt-6 text-sm text-gray-400 dark:text-[#5C7A8E]">{t('sharePage.xrefsGone')}</p>
       )}
 
       {state === 'ready' && (
