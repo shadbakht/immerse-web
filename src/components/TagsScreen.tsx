@@ -419,6 +419,12 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   const [shareBusy, setShareBusy] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  const closeExportMenu = useCallback(() => {
+    setShowExportMenu(false);
+    setShareState(null);
+    setLinkCopied(false);
+  }, []);
+
   useEffect(() => { if (userId) load(); }, [userId]);
 
   const loadRef = useRef(load);
@@ -438,28 +444,30 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     if (!showExportMenu) return;
     function handleMouseDown(e: MouseEvent) {
       if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false);
+        closeExportMenu();
       }
     }
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [showExportMenu]);
+  }, [showExportMenu, closeExportMenu]);
 
   // The single selected compilation (share links act on exactly one root tag).
   const singleTag = selectedTagIds.size === 1
     ? tags.find(t => t.id === [...selectedTagIds][0]) ?? null
     : null;
 
-  // Load the share state when the export menu opens over a single compilation.
-  useEffect(() => {
-    if (showExportMenu && singleTag && userId) {
-      getShareState(userId, singleTag.id).then(setShareState).catch(() => setShareState(null));
-    } else {
-      setShareState(null);
-      setLinkCopied(false);
+  // Load the share state lazily when the export menu opens over a single
+  // compilation — no effect needed, this is a user-driven transition.
+  function toggleExportMenu() {
+    if (showExportMenu) {
+      closeExportMenu();
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showExportMenu, singleTag?.id, userId]);
+    setShowExportMenu(true);
+    if (singleTag && userId) {
+      getShareState(userId, singleTag.id).then(setShareState).catch(() => setShareState(null));
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -594,7 +602,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   }
 
   async function handleExport(format: 'pdf' | 'docx' | 'csv' | 'markdown') {
-    setShowExportMenu(false);
+    closeExportMenu();
     setExporting(true);
     try {
       const selected = tags.filter(t => selectedTagIds.has(t.id));
@@ -723,7 +731,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           {!organizing && selectedTagIds.size > 0 && (
             <div className="relative" ref={exportMenuRef}>
               <button
-                onClick={() => setShowExportMenu(v => !v)}
+                onClick={toggleExportMenu}
                 disabled={exporting}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
                 title={t('tags.exportSelected')}
@@ -779,13 +787,20 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                       <button
                         disabled={shareBusy}
                         onClick={async () => {
+                          if (shareBusy) return;
                           setShareBusy(true);
                           try {
                             const { url, id, listed } = await createShareLink({ id: singleTag.id, name: singleTag.name }, userId);
                             setShareState({ id, listed });
-                            await navigator.clipboard.writeText(url);
-                            setLinkCopied(true);
-                            setTimeout(() => setLinkCopied(false), 2000);
+                            try {
+                              await navigator.clipboard.writeText(url);
+                              setLinkCopied(true);
+                              setTimeout(() => setLinkCopied(false), 2000);
+                            } catch {
+                              /* clipboard blocked — link is still created */
+                            }
+                          } catch {
+                            /* create failed — no link, no copied flash */
                           } finally {
                             setShareBusy(false);
                           }
@@ -804,23 +819,36 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                         </p>
                         <div className="flex items-center gap-3 mt-2">
                           <button
+                            disabled={shareBusy}
                             onClick={() => {
-                              navigator.clipboard.writeText(shareUrl(shareState.id));
-                              setLinkCopied(true);
-                              setTimeout(() => setLinkCopied(false), 2000);
+                              navigator.clipboard.writeText(shareUrl(shareState.id))
+                                .then(() => {
+                                  setLinkCopied(true);
+                                  setTimeout(() => setLinkCopied(false), 2000);
+                                })
+                                .catch(() => {});
                             }}
-                            className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70"
+                            className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70 disabled:opacity-60"
                           >
                             {linkCopied ? t('share.linkCopied') : t('share.copyLink')}
                           </button>
                           {!shareState.listed && (
                             <button
+                              disabled={shareBusy}
                               onClick={async () => {
+                                if (shareBusy) return;
                                 if (!confirm(t('share.revokeConfirm'))) return;
-                                await revokeShareLink(singleTag.id, userId);
-                                setShareState(null);
+                                setShareBusy(true);
+                                try {
+                                  await revokeShareLink(singleTag.id, userId);
+                                  setShareState(null);
+                                } catch {
+                                  /* revoke failed — leave the link visible */
+                                } finally {
+                                  setShareBusy(false);
+                                }
                               }}
-                              className="text-sm font-medium text-red-600 dark:text-red-400 hover:opacity-70"
+                              className="text-sm font-medium text-red-600 dark:text-red-400 hover:opacity-70 disabled:opacity-60"
                             >
                               {t('share.revoke')}
                             </button>
