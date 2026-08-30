@@ -2,23 +2,40 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { copyCommunityTag } from '@/lib/shareLinks';
+import { copySharedCompilation, saveSharedXrefs, type SaveXrefsResult } from '@/lib/sharedSets';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import type { TranslationKey } from '@immerse/i18n';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'signin';
+export type ShareKind = 'compilation' | 'xrefs';
+
+// ⚠️ Phase 8 / Part I adds these to @immerse/i18n. Until that release is pinned
+// they are not in `TranslationKey`, hence the casts — delete them (and this
+// note) in Task I2. `npm run i18n:check` flags them meanwhile, on purpose.
+const K = {
+  saveXrefs: 'sharePage.saveXrefs' as TranslationKey,
+  savedXrefs: 'sharePage.savedXrefs' as TranslationKey,
+  savedXrefsPartial: 'sharePage.savedXrefsPartial' as TranslationKey,
+};
 
 /**
- * Handles the one-time "Save to my Compilations" flow for a shared compilation.
+ * Handles the one-time "save this to my library" flow for a shared set.
  *
- * - Always logs one `shared_compilation_viewed` analytics event on mount
- *   (fire-and-forget; never awaited, never throws).
+ * - Always logs exactly ONE view event on mount — `shared_compilation_viewed`
+ *   or `shared_xrefs_viewed` depending on `kind`. This component always
+ *   mounts, so it is the single place either event is fired; neither view
+ *   component may fire its own (that would double-count).
  * - When the URL carries `?save=1`: if signed out, bounce to /login with a
  *   `redirect` back to `/c/<id>?save=1`; if signed in, run the idempotent copy
  *   and strip `save` from the URL afterwards.
+ *
+ * `kind` defaults to 'compilation' so `SharedCompilationView`'s existing
+ * `<SaveOnLoad id={id} />` call site is unchanged.
  */
-export default function SaveOnLoad({ id }: { id: string }) {
+export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; kind?: ShareKind }) {
   const { t } = useTranslation();
   const [state, setState] = useState<SaveState>('idle');
+  const [partial, setPartial] = useState<SaveXrefsResult | null>(null);
   const ranRef = useRef(false);
 
   useEffect(() => {
@@ -33,11 +50,19 @@ export default function SaveOnLoad({ id }: { id: string }) {
     // Fire-and-forget: view analytics must never surface or block.
     void supabase
       .from('analytics_events')
-      .insert({
-        event_type: 'shared_compilation_viewed',
-        properties: { compilation_id: id, saved: wantsSave },
-        platform: 'web',
-      })
+      .insert(
+        kind === 'xrefs'
+          ? {
+              event_type: 'shared_xrefs_viewed',
+              properties: { shared_set_id: id, saved: wantsSave },
+              platform: 'web',
+            }
+          : {
+              event_type: 'shared_compilation_viewed',
+              properties: { compilation_id: id, saved: wantsSave },
+              platform: 'web',
+            },
+      )
       .then(() => {}, () => {});
 
     if (!wantsSave) return;
@@ -56,7 +81,11 @@ export default function SaveOnLoad({ id }: { id: string }) {
 
       setState('saving');
       try {
-        await copyCommunityTag(id, user.id);
+        if (kind === 'xrefs') {
+          setPartial(await saveSharedXrefs(id, user.id));
+        } else {
+          await copySharedCompilation(id, user.id);
+        }
         setState('saved');
       } catch {
         setState('idle');
@@ -66,14 +95,26 @@ export default function SaveOnLoad({ id }: { id: string }) {
         window.history.replaceState({}, '', url.toString());
       }
     })();
-  }, [id]);
+  }, [id, kind]);
+
+  const savedText = (): string => {
+    if (kind !== 'xrefs') return t('sharePage.saved');
+    if (partial && partial.skipped > 0) {
+      return t(K.savedXrefsPartial, {
+        saved: partial.saved,
+        total: partial.total,
+        skipped: partial.skipped,
+      });
+    }
+    return t(K.savedXrefs);
+  };
 
   return (
     <div className="mt-8 border-t border-gray-100 pt-4 dark:border-[#2D4050]">
       {state === 'saved' ? (
         <p className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">
           {'✓ '}
-          {t('sharePage.saved')}
+          {savedText()}
         </p>
       ) : (
         <>
@@ -81,7 +122,11 @@ export default function SaveOnLoad({ id }: { id: string }) {
             href={`/c/${id}?save=1`}
             className="inline-block rounded-lg bg-[#1B6B7B] px-4 py-2 text-sm font-medium text-white dark:bg-[#2D9DB3]"
           >
-            {state === 'saving' ? t('sharePage.saving') : t('sharePage.save')}
+            {state === 'saving'
+              ? t('sharePage.saving')
+              : kind === 'xrefs'
+                ? t(K.saveXrefs)
+                : t('sharePage.save')}
           </a>
           <p className="mt-2 text-[11px] text-gray-400 dark:text-[#5C7A8E]">
             {t('sharePage.saveHint')}

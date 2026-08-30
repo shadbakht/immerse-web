@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushXref, deleteRemote } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
-import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
+import { loadCatalog, loadSlugMaps, type CatalogBook } from '@/lib/catalog';
+import { makeTraditionResolver } from '@/lib/tradition';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import { groupXrefsByPair } from '@/lib/xrefGrouping';
@@ -208,21 +209,11 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         loadSlugMaps(supabase),
       ]);
 
-      const catMap  = new Map<string, CatalogCategory>(catalog.categories.map(c => [c.id, c]));
       const bookMap = new Map<string, CatalogBook>(catalog.books.map(b => [b.id, b]));
 
-      const getRootCat = (catId: string): CatalogCategory | null => {
-        let c = catMap.get(catId);
-        while (c?.parentId) c = catMap.get(c.parentId) ?? undefined as any;
-        return c ?? null;
-      };
-
-      const getTradition = (bookUuid: string): { id: string; name: string } => {
-        const slug    = uuidToSlug.get(bookUuid) ?? '';
-        const catBook = slug ? bookMap.get(slug) : null;
-        const root    = catBook ? getRootCat(catBook.categoryId) : null;
-        return { id: root?.id ?? bookUuid, name: root?.name ?? t('common.otherTradition') };
-      };
+      // Shared with the public /c/<id> xref share page so both group by the
+      // same tradition pairs (Phase 8).
+      const getTradition = makeTraditionResolver(catalog, uuidToSlug, t('common.otherTradition'));
 
       function getSel(id: string) {
         const s = selMap[id] ?? { snapshot_text: '', citation: '', passage_id: '', book_id: '' };
