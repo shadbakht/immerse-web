@@ -165,6 +165,8 @@ export async function fetchXrefSuggestions(args: FetchArgs): Promise<XrefSuggest
               search_query: contentWords.join(' '),
               // An empty array yields no rows — send null (whole library) instead.
               book_scope: args.bookScope && args.bookScope.length > 0 ? args.bookScope : null,
+              // Suggestions never cross languages — scope to the source book's.
+              lang: args.language,
             })
             .select(PASSAGE_SELECT);
 

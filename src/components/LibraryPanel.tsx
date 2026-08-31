@@ -12,6 +12,7 @@ import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { planAiSearch, weightedRankFusion, fusionWeights, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
+import { proximityTokens, clusterCoverage, PROXIMITY_HL_STOP } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
 
@@ -48,6 +49,7 @@ interface SearchResult {
   content:      string;
   semantic?:    boolean;  // meaning-based ("Related") hit
   matchPhrase?: string;   // the AI phrase that found it, if any
+  proximity?:   boolean;  // matched loosely (bag / cross-row) — cluster-anchor its snippet + highlight
 }
 
 interface LibraryPanelProps {
@@ -633,6 +635,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .rpc('search_passages', {
         search_query: tsQuery,
         book_scope: scope && scope.length > 0 ? scope : null,
+        lang: contentLang,
       })
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
     // supabase types .rpc().select() as object|array; the RPC returns rows and
@@ -659,6 +662,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .rpc('search_passages', {
         search_query: bagQuery,
         book_scope: scope && scope.length > 0 ? scope : null,
+        lang: contentLang,
       })
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
     const foldedPhrase = foldPunctuation(phrase).toLowerCase();
@@ -704,6 +708,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .rpc('search_passages', {
         search_query: content.join(' '),
         book_scope: scope && scope.length > 0 ? scope : null,
+        lang: contentLang,
       })
       .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
 
@@ -726,7 +731,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }).filter(Boolean) as Array<{ row: any; span: number }>;
 
     scored.sort((a, b) => a.span - b.span);
-    return [...local, ...mapResults(scored.map(s => s.row))];
+    // The bag-ranked rows matched loosely — flag them so the snippet + highlight
+    // anchor on the word cluster, not on the first "the" in the paragraph.
+    return [...local, ...mapResults(scored.map(s => s.row)).map(h => ({ ...h, proximity: true }))];
   }
 
   // Cross-row proximity: a quoted phrase split across a paragraph break matches
@@ -755,6 +762,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       .rpc('search_passages', {
         search_query: `"${firstHalf}" or "${secondHalf}"`,
         book_scope: scope && scope.length > 0 ? scope : null,
+        lang: contentLang,
       })
       .select('id, content, sort_order, book_id, chapter_label, section_title, books(id, title, authors(name))');
     const cands = ((candData as any[]) ?? []).filter(r => r.book_id != null && r.sort_order != null);
@@ -793,7 +801,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         foldedPhrase,
         flatten,
       );
-      out.push(...mapResults(stitched).map(h => ({ ...h, matchPhrase: phrase })));
+      out.push(...mapResults(stitched).map(h => ({ ...h, matchPhrase: phrase, proximity: true })));
     }
     return out;
   }
@@ -804,8 +812,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     if (words.length === 0) return [];
     let query = supabase
       .from('passages')
-      .select('id, content, chapter_label, section_title, books(id, title, authors(name))')
+      .select('id, content, chapter_label, section_title, books!inner(id, title, language, authors(name))')
       .ilike('content', `%${words[0]}%`)
+      .eq('books.language', contentLang)
       .limit(60);
     if (scope && scope.length > 0) query = query.in('book_id', scope);
     const { data } = await query;
@@ -827,13 +836,21 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }));
   }
 
-  function getSnippet(content: string, query: string): string {
-    const words = query.trim().split(/\s+/).filter(Boolean);
+  function getSnippet(content: string, query: string, proximity = false): string {
     const normContent = normalize(content);
     let bestIdx = -1;
-    for (const w of words) {
-      const idx = normContent.indexOf(normalize(w.replace(/[*":]/g, '')));
-      if (idx >= 0 && (bestIdx < 0 || idx < bestIdx)) bestIdx = idx;
+    if (proximity) {
+      // A loose match — centre on where the phrase's words cluster, not on the
+      // first one to appear (which is usually "the", early in the paragraph).
+      const tokens = proximityTokens(query).map(normalize).filter(Boolean);
+      bestIdx = clusterCoverage(normContent, tokens).index;
+    }
+    if (bestIdx < 0) {
+      const words = query.trim().split(/\s+/).filter(Boolean);
+      for (const w of words) {
+        const idx = normContent.indexOf(normalize(w.replace(/[*":]/g, '')));
+        if (idx >= 0 && (bestIdx < 0 || idx < bestIdx)) bestIdx = idx;
+      }
     }
     if (bestIdx < 0) return content.slice(0, 220);
     const start = Math.max(0, bestIdx - 80);
@@ -841,10 +858,15 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     return (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
   }
 
-  function highlightQuery(text: string, query: string) {
-    const words = query.trim().split(/\s+/)
-      .map(w => w.replace(/[*":()&|]/g, '').trim())
-      .filter(w => w.length >= 2);
+  function highlightQuery(text: string, query: string, proximity = false) {
+    // A loose match: tint the phrase's significant words (drops "he"/"be"/"ye"
+    // by length, "the"/"and"/pronouns by the stopword set, and no synonym
+    // expansion) so the marked run reads as the phrase, not every article.
+    const words = proximity
+      ? proximityTokens(query).filter(w => !PROXIMITY_HL_STOP.has(w))
+      : query.trim().split(/\s+/)
+          .map(w => w.replace(/[*":()&|]/g, '').trim())
+          .filter(w => w.length >= 2);
     if (!words.length) return <span>{text}</span>;
     const normText = normalize(text);
     const ranges: { start: number; end: number }[] = [];
@@ -852,7 +874,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       const normW = normalize(w);
       let idx = normText.indexOf(normW);
       while (idx >= 0) { ranges.push({ start: idx, end: idx + normW.length }); idx = normText.indexOf(normW, idx + 1); }
-      const group = synonymMap.get(w.toLowerCase());
+      const group = proximity ? undefined : synonymMap.get(w.toLowerCase());
       if (group) {
         for (const syn of group) {
           const normSyn = normalize(syn);
@@ -1062,7 +1084,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 const isExpanded = expandedResults.has(result.passageId);
                 const isChecked  = checkedResultIds.has(result.passageId);
                 const matchQuery = result.matchPhrase ?? searchQuery;
-                const snippet    = getSnippet(result.content, matchQuery);
+                const snippet    = getSnippet(result.content, matchQuery, result.proximity);
                 const location   = result.chapterLabel || result.sectionTitle;
                 return (
                   <div key={result.passageId} className={`border-b border-gray-100 dark:border-[#2D4050] ${isChecked ? 'bg-[#1B6B7B]/5 dark:bg-[#2D9DB3]/5' : ''}`}>
@@ -1080,11 +1102,19 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                           {result.semantic ? `${t('library.relatedPrefix')} · ` : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
-                          {isExpanded ? highlightQuery(result.content, matchQuery) : highlightQuery(snippet, matchQuery)}
+                          {isExpanded ? highlightQuery(result.content, matchQuery, result.proximity) : highlightQuery(snippet, matchQuery, result.proximity)}
                         </p>
                         {isExpanded && (
                           <button
-                            onClick={e => { e.stopPropagation(); onOpenBook(result.bookId, result.passageId, result.matchPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim()); }}
+                            onClick={e => {
+                              e.stopPropagation();
+                              // A proximity hit's phrase is loose — hand the reader its
+                              // significant words (minus stopwords), not "the"/"he".
+                              const hq = result.proximity && result.matchPhrase
+                                ? proximityTokens(result.matchPhrase).filter(w => !PROXIMITY_HL_STOP.has(w)).join(' ')
+                                : (result.matchPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim());
+                              onOpenBook(result.bookId, result.passageId, hq);
+                            }}
                             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
                           >
                             {t('common.openInReader')} →
