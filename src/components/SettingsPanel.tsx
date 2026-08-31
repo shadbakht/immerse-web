@@ -65,6 +65,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [nameInput, setNameInput] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeError, setStripeError] = useState(false);
   const [loading, setLoading] = useState(!isGuest);
   const [justUpgraded, setJustUpgraded] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
@@ -134,19 +135,33 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   }
 
   async function handleUpgrade() {
+    setStripeError(false);
     setStripeLoading(true);
-    const res = await fetch('/api/stripe/checkout', { method: 'POST' });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
-    else setStripeLoading(false);
+    try {
+      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+      const data = res.ok ? await res.json().catch(() => null) : null;
+      if (data?.url) { window.location.href = data.url; return; }
+      setStripeError(true);
+    } catch {
+      setStripeError(true);
+    } finally {
+      setStripeLoading(false);
+    }
   }
 
   async function handleManageSubscription() {
+    setStripeError(false);
     setStripeLoading(true);
-    const res = await fetch('/api/stripe/portal', { method: 'POST' });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
-    else setStripeLoading(false);
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = res.ok ? await res.json().catch(() => null) : null;
+      if (data?.url) { window.location.href = data.url; return; }
+      setStripeError(true);
+    } catch {
+      setStripeError(true);
+    } finally {
+      setStripeLoading(false);
+    }
   }
 
   function handleColorModeChange(mode: ColorMode) {
@@ -228,33 +243,40 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
 
               {/* Plan */}
-              <div className={`px-5 py-4 flex items-center justify-between ${!isGuest && !isPro ? 'border-b border-gray-50 dark:border-[#2D4050]/60' : ''}`}>
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.plan')}</span>
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B] dark:text-[#2D9DB3]' : 'text-gray-500 dark:text-[#8FA4B8]'}`}>
-                    {isGuest ? t('settings.planGuest')
-                      : isTrial ? t('settings.planTrial')
-                      : isPro ? t('settings.planPro')
-                      : t('settings.planStandard')}
-                  </span>
-                  {!isGuest && isPro && !isTrial && (
-                    <button
-                      onClick={handleManageSubscription}
-                      disabled={stripeLoading}
-                      className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8] hover:underline disabled:opacity-50"
-                    >
-                      {stripeLoading ? t('common.loading') : t('settings.manage')}
-                    </button>
-                  )}
-                  {isGuest && (
-                    <a
-                      href="/login"
-                      className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
-                    >
-                      {t('common.signInCreate')}
-                    </a>
-                  )}
+              <div className={`px-5 py-4 ${!isGuest && !isPro ? 'border-b border-gray-50 dark:border-[#2D4050]/60' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400 dark:text-[#5C7A8E] w-24 shrink-0">{t('settings.plan')}</span>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-sm font-semibold ${isPro ? 'text-[#1B6B7B] dark:text-[#2D9DB3]' : 'text-gray-500 dark:text-[#8FA4B8]'}`}>
+                      {isGuest ? t('settings.planGuest')
+                        : isTrial ? t('settings.planTrial')
+                        : isPro ? t('settings.planPro')
+                        : t('settings.planStandard')}
+                    </span>
+                    {!isGuest && isPro && !isTrial && (
+                      <button
+                        onClick={handleManageSubscription}
+                        disabled={stripeLoading}
+                        className="text-xs text-gray-400 dark:text-[#5C7A8E] hover:text-gray-600 dark:hover:text-[#8FA4B8] hover:underline disabled:opacity-50"
+                      >
+                        {stripeLoading ? t('common.loading') : t('settings.manage')}
+                      </button>
+                    )}
+                    {isGuest && (
+                      <a
+                        href="/login"
+                        className="text-xs font-semibold bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white px-3 py-1.5 rounded-lg hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors"
+                      >
+                        {t('common.signInCreate')}
+                      </a>
+                    )}
+                  </div>
                 </div>
+                {stripeError && (
+                  <p className="mt-2 text-xs text-red-500 dark:text-red-400 text-right">
+                    {t('common.somethingWrong')} {t('common.tryAgain')}
+                  </p>
+                )}
               </div>
 
               {/* Upgrade — used to be a small pill inline in the Plan row
