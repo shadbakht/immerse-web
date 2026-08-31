@@ -38,8 +38,10 @@ export async function POST() {
       price:    process.env.STRIPE_PRICE_ID!,
       quantity: 1,
     }],
-    success_url: `${origin}/settings?upgraded=1`,
-    cancel_url:  `${origin}/settings`,
+    // Settings is a client-side tab inside AppShell — there is no /settings
+    // route (AppShell reads ?tab=settings on mount). Plain /settings 404s.
+    success_url: `${origin}/?tab=settings&upgraded=1`,
+    cancel_url:  `${origin}/?tab=settings`,
     metadata: { supabase_user_id: user.id },
     subscription_data: {
       metadata: { supabase_user_id: user.id },
