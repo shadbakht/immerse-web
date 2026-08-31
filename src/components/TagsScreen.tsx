@@ -6,6 +6,7 @@ import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { publishTag, unpublishTag } from '@/lib/communitySync';
 import { getShareState, createShareLink, revokeShareLink, shareUrl, type ShareState } from '@/lib/shareLinks';
+import { refreshSharedCompilation, pruneOrphanedSharedSets } from '@/lib/sharedSets';
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { Highlight } from './Highlight';
@@ -472,12 +473,18 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   async function load() {
     setLoading(true);
     try {
-      const [{ data: tagData }, selMap] = await Promise.all([
+      const [{ data: tagData, error: tagErr }, selMap] = await Promise.all([
         supabase.from('tags').select('id, name, parent_id, depth, sort_order, created_at, visibility').eq('user_id', userId).order('sort_order', { ascending: true }),
         fetchSelectionsByUser(userId),
       ]);
       const tagList = tagData ?? [];
-      if (!tagList.length) { setTags([]); return; }
+      if (!tagList.length) {
+        setTags([]);
+        // PRUNE SAFETY: an empty list is only authoritative when the fetch
+        // itself succeeded — never prune off an errored query.
+        if (!tagErr) void pruneOrphanedSharedSets(userId, []).catch(() => {});
+        return;
+      }
 
       const tagIds = tagList.map((t: any) => t.id);
       const selIds = Object.keys(selMap);
@@ -523,9 +530,24 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
         .forEach(addTag);
       setTags(ordered.map(t => ({ ...t, selections: selsByTag[t.id] ?? [], visibility: t.visibility ?? 'private' })));
+      // PRUNE SAFETY: success path only, with the id list from the fetch that
+      // just populated `tags` — deletes compilation shares whose tag is gone.
+      void pruneOrphanedSharedSets(userId, (tagList as { id: string }[]).map(t => t.id)).catch(() => {});
     } finally {
       setLoading(false);
     }
+  }
+
+  // The depth-0 ancestor of a tag — the root a share link / community_tags row
+  // is keyed on. Walks up `parent_id`; falls back to the tag's own id.
+  function rootTagIdOf(id: string): string {
+    let cur = tags.find(t => t.id === id) ?? null;
+    while (cur && cur.parent_id) {
+      const next = tags.find(t => t.id === cur!.parent_id) ?? null;
+      if (!next) break;
+      cur = next;
+    }
+    return cur?.id ?? id;
   }
 
   async function handleDeleteTag(id: string) {
@@ -533,6 +555,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     if (tag?.visibility === 'published') {
       await unpublishTag(id, userId).catch(() => {});
     }
+    // Phase 8: best-effort revoke of any link-only compilation share for this tag.
+    void supabase.from('shared_sets').delete()
+      .eq('owner_id', userId).eq('kind', 'compilation').eq('ref->>tag_id', id)
+      .then(undefined, () => {});
     // If this was an imported community tag, drop the subscription so its
     // Import button re-activates in the Community screen.
     await supabase.from('community_tag_subscriptions')
@@ -554,6 +580,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           updated_at: new Date().toISOString(),
         }).catch(() => {});
         setTags(tags.map(t => t.id === id ? { ...t, name: newName.trim() } : t));
+        // Phase 8: keep the shared_sets snapshot (payload + title) in step.
+        void refreshSharedCompilation(rootTagIdOf(id), userId).catch(() => {});
       }
     }
   }
@@ -561,6 +589,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
   async function handleRemovePassage(tagId: string, selId: string) {
     try { await supabase.from('selection_tags').delete().eq('tag_id', tagId).eq('selection_id', selId); } catch {}
     setTags(tags.map(t => t.id === tagId ? { ...t, selections: t.selections.filter(s => s.id !== selId) } : t));
+    // Phase 8: membership of a shared subtree changed — refresh its snapshot.
+    void refreshSharedCompilation(rootTagIdOf(tagId), userId).catch(() => {});
   }
 
   async function handleToggleVisibility(id: string, visibility: string) {
