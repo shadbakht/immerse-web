@@ -22,6 +22,7 @@ import { collectPassages, getCachedBook, putCachedBook, type FetchPage } from '@
 import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
 import { resolveSelectionPassages } from '@/lib/selectionRange';
 import { fetchXrefSuggestions, type XrefSuggestion } from '@/lib/xrefSuggest';
+import { seedCollapsedToc, TOC_EXPAND_ROW_BUDGET } from '@/lib/tocCollapse';
 
 interface Passage {
   id: string;
@@ -1910,13 +1911,26 @@ async function handleCopy() {
 
   // Must run before the !target early return: hooks after a conditional return
   // change the hook count between renders and crash React when a book is opened.
+  //
+  // Resolve the TOC collapse state once per book. A persisted user choice wins;
+  // otherwise seed from the fit heuristic once `toc` has loaded (see
+  // tocCollapse.ts). Re-runs harmlessly while `toc` is still empty.
+  const collapseResolvedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!target?.bookId) return;
-    try {
-      const raw = localStorage.getItem(`immerse.toc.collapsed.${target.bookId}`);
-      setCollapsedToc(raw ? new Set(JSON.parse(raw)) : new Set());
-    } catch { setCollapsedToc(new Set()); }
-  }, [target?.bookId]);
+    const bid = target?.bookId;
+    if (!bid || collapseResolvedForRef.current === bid) return;
+    setCollapsedToc(new Set());
+    let raw: string | null = null;
+    try { raw = localStorage.getItem(`immerse.toc.collapsed.${bid}`); } catch { /* private mode */ }
+    if (raw) {
+      try { setCollapsedToc(new Set(JSON.parse(raw))); } catch { /* keep default */ }
+      collapseResolvedForRef.current = bid;
+      return;
+    }
+    if (toc.length === 0) return;   // TOC not fetched yet — re-runs when it is
+    setCollapsedToc(seedCollapsedToc(toc, TOC_EXPAND_ROW_BUDGET));
+    collapseResolvedForRef.current = bid;
+  }, [target?.bookId, toc]);
 
   if (!target) {
     return (
