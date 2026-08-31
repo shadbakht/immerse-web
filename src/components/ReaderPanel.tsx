@@ -548,6 +548,53 @@ function SuggestionCard({ suggestion, onAccept }: {
   );
 }
 
+/**
+ * Scroll to a passage on book open (a deep link /read/<id>?p=<pid>, an
+ * annotation jump, restored reading progress). Two hazards this rides over:
+ *
+ * 1. loadBook swaps in hundreds of <p> nodes; a fixed setTimeout can fire
+ *    before React has committed them, landing at the top instead. So poll
+ *    (up to ~3s) until the node exists — with setTimeout, not
+ *    requestAnimationFrame, which is paused while the tab is backgrounded and
+ *    a share link is often opened into a background tab.
+ * 2. Content above the target keeps reflowing for a few seconds after first
+ *    paint (passages hydrating to full height, font swap, late layout mode),
+ *    which shoves a correctly-scrolled target back out of view. So re-assert
+ *    the scroll on follow-up ticks — but only while the page height is still
+ *    changing, so a user who scrolls away themselves isn't yanked back.
+ *
+ * behavior 'auto', not 'smooth': a smooth scroll is silently dropped when
+ * started during that unstable layout, and an instant jump is what you want on
+ * a fresh page load anyway.
+ */
+function scrollToPassageWhenReady(passageId: string, block: ScrollLogicalPosition = 'center') {
+  let tries = 0;
+  const settle = () => {
+    const el0 = document.getElementById(`p-${passageId}`);
+    if (!el0) return;
+    el0.scrollIntoView({ behavior: 'auto', block });
+    let lastHeight = document.documentElement.scrollHeight;
+    let checks = 0;
+    const recheck = () => {
+      const el = document.getElementById(`p-${passageId}`);
+      const h = document.documentElement.scrollHeight;
+      if (el && h !== lastHeight) {
+        // Layout still shifting — keep the target pinned.
+        const { top, bottom } = el.getBoundingClientRect();
+        if (bottom < 60 || top > window.innerHeight - 60) el.scrollIntoView({ behavior: 'auto', block });
+        lastHeight = h;
+      }
+      if (++checks < 20) setTimeout(recheck, 200);   // watch for ~4s
+    };
+    setTimeout(recheck, 200);
+  };
+  const tick = () => {
+    if (document.getElementById(`p-${passageId}`)) { settle(); return; }
+    if (++tries < 40) setTimeout(tick, 75);
+  };
+  tick();
+}
+
 export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone, xrefSuggestions, setXrefSuggestions, xrefSuggestSource, setXrefSuggestSource }: ReaderPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
@@ -931,9 +978,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
             setToc(starts.map(s => ({ label: s.label, passageId: `local-${localId}-${s.index}`, depth: 0 })));
           }
           if (scrollToId) {
-            setTimeout(() => {
-              document.getElementById(`p-${scrollToId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
+            scrollToPassageWhenReady(scrollToId);
           } else {
             scrollRef.current?.scrollTo({ top: 0 });
           }
@@ -1130,9 +1175,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
       if (resolvedScrollId) {
         lastSavedPidRef.current = resolvedScrollId;
-        setTimeout(() => {
-          document.getElementById(`p-${resolvedScrollId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
+        scrollToPassageWhenReady(resolvedScrollId);
         if (target?.highlightQuery) {
           setSearchHighlight({ passageId: resolvedScrollId, query: target.highlightQuery });
           setTimeout(() => setSearchHighlight(null), 5000);

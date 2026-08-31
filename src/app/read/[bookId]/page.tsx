@@ -7,6 +7,9 @@ import { traditionName } from '@/lib/catalog';
 
 interface Props {
   params: Promise<{ bookId: string }>;
+  // ?p=<passageUuid> — a deep link into a specific paragraph (shared xref sets,
+  // shared compilation quotes). ReaderPanel scrolls to it once the book loads.
+  searchParams: Promise<{ p?: string }>;
 }
 
 // bookId is usually a catalog slug ("hidden-words") but can also be a
@@ -36,8 +39,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // ?guest=1 requirement this route used to have is gone; AppShell/ReaderPanel
 // already show a sign-in prompt on the specific actions that need an account
 // (tag/note/xref/publish), so nothing else changes for a signed-out reader.
-export default async function ReadPage({ params }: Props) {
+export default async function ReadPage({ params, searchParams }: Props) {
   const { bookId } = await params;
+  const { p: initialPassageId } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -63,7 +67,7 @@ export default async function ReadPage({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <AppShell user={user} initialBookId={bookId} />
+      <AppShell user={user} initialBookId={bookId} initialPassageId={initialPassageId} />
     </>
   );
 }

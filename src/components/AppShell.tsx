@@ -53,9 +53,13 @@ export interface XRefPickFrom {
 interface AppShellProps {
   user:          User | null;
   initialBookId?: string;
+  // ?p=<passageUuid> from /read/<id>?p=... — a deep link into a paragraph
+  // (shared xref sets, shared compilation quotes). Seeded into the reader
+  // target so ReaderPanel scrolls to it once the book loads.
+  initialPassageId?: string;
 }
 
-export default function AppShell({ user, initialBookId }: AppShellProps) {
+export default function AppShell({ user, initialBookId, initialPassageId }: AppShellProps) {
   const { t } = useTranslation();
   // Signed-in visitors land on Home; a signed-out (guest) visitor lands on
   // Library instead — skipping "Browse without an account" is the whole
@@ -64,7 +68,7 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     initialBookId ? 'library' : (user ? 'home' : 'library'),
   );
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
-    initialBookId ? { bookId: initialBookId } : null,
+    initialBookId ? { bookId: initialBookId, passageId: initialPassageId } : null,
   );
   const [libraryCollapsed, setLibraryCollapsed] = useState(false);
   const [xrefPickFrom, setXrefPickFrom] = useState<XRefPickFrom | null>(null);
@@ -106,10 +110,10 @@ export default function AppShell({ user, initialBookId }: AppShellProps) {
     resolveBookId(initialBookId).then(id => {
       if (id !== initialBookId) {
         setReaderTarget(t => (t && t.bookId === initialBookId ? { ...t, bookId: id } : t));
-        history.replaceState(null, '', `/read/${id}`);
+        history.replaceState(null, '', `/read/${id}${initialPassageId ? `?p=${initialPassageId}` : ''}`);
       }
     });
-  }, [initialBookId]);
+  }, [initialBookId, initialPassageId]);
 
   // Silently sync subscribed and followed community tags on every page load
   useEffect(() => {

@@ -211,7 +211,17 @@ export async function saveSharedXrefs(sharedSetId: string, userId: string): Prom
   let skipped = 0;
 
   for (const e of entries) {
-    if (!e.a.book_local_id || !e.b.book_local_id || !haveBook.has(e.a.book_local_id) || !haveBook.has(e.b.book_local_id)) {
+    // Skip a pair we can't anchor: a book this catalogue doesn't serve, or a
+    // side with no pid to anchor on. The `start_pid` check keeps this in step
+    // with mobile's `saveSharedXrefs` (SQLite `selections.start_pid` is NOT
+    // NULL there) — a pidless, offset-0 selection anchored only by snapshot
+    // text is barely resolvable, and skipping it makes the "Saved N of M"
+    // count mean the same thing on both platforms.
+    if (
+      !e.a.book_local_id || !e.b.book_local_id ||
+      !e.a.start_pid || !e.b.start_pid ||
+      !haveBook.has(e.a.book_local_id) || !haveBook.has(e.b.book_local_id)
+    ) {
       skipped++; continue;
     }
     const aId = crypto.randomUUID();
