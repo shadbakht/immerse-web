@@ -3,9 +3,11 @@
 import { createClient } from '@/lib/supabase/client';
 import {
   buildCommunityPayload,
+  getSubtreeIds,
   resolvePassageIds,
   writeLocalTagTree,
   type ImmTagExport,
+  type TagSubtreeRow,
 } from './communitySync';
 import { shareUrl } from './shareUrl';
 
@@ -25,7 +27,10 @@ export function xrefIdSetEquals(a: string[], b: string[]): boolean {
  *  Mirrors XRefsScreen / xrefExport exactly (sort by name; key by id in name order). */
 export function traditionPairOf(a: Tradition, b: Tradition): TraditionPair {
   const [nameFirst, nameSecond] = [a.name, b.name].sort();
-  const [idFirst, idSecond] = a.name <= b.name ? [a.id, b.id] : [b.id, a.id];
+  // Tiebreak on id when the names are equal (e.g. two unresolved books that both
+  // fall back to "Other") so the key is stable regardless of argument order.
+  const aFirst = a.name < b.name || (a.name === b.name && a.id <= b.id);
+  const [idFirst, idSecond] = aFirst ? [a.id, b.id] : [b.id, a.id];
   return {
     pairKey: `${idFirst}↔${idSecond}`,
     pairName: nameFirst === nameSecond ? `${nameFirst} ↔ ${nameFirst}` : `${nameFirst} ↔ ${nameSecond}`,
@@ -43,19 +48,6 @@ export function traditionPairOf(a: Tradition, b: Tradition): TraditionPair {
 // share write therefore uses an explicit select-then-insert-or-update instead.
 // (The JSON-path *filter* `.eq('ref->>tag_id', v)` IS supported — verified live.)
 
-type SubtreeRow = { id: string; parent_id: string | null };
-
-/** Local copy of communitySync's getSubtreeIds (not exported there). */
-function getSubtreeIdsPublic(rootId: string, allTags: SubtreeRow[]): string[] {
-  const result = [rootId];
-  const queue = [rootId];
-  while (queue.length) {
-    const cur = queue.shift()!;
-    for (const k of allTags.filter(t => t.parent_id === cur)) { result.push(k.id); queue.push(k.id); }
-  }
-  return result;
-}
-
 /** Build the current ImmTagExport[] snapshot for a compilation subtree. */
 async function buildSnapshot(
   supabase: ReturnType<typeof createClient>,
@@ -63,7 +55,7 @@ async function buildSnapshot(
   userId: string,
 ) {
   const { data: allTagsData } = await supabase.from('tags').select('id, parent_id').eq('user_id', userId);
-  const subtreeIds = getSubtreeIdsPublic(tagId, (allTagsData ?? []) as SubtreeRow[]);
+  const subtreeIds = getSubtreeIds(tagId, (allTagsData ?? []) as TagSubtreeRow[]);
   return buildCommunityPayload(subtreeIds, userId);
 }
 

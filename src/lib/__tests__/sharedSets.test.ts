@@ -28,4 +28,11 @@ describe('traditionPairOf', () => {
     expect(p.pairName).toBe('Islam ↔ Islam');
     expect(p.pairKey).toBe('x↔x');
   });
+  it('is order-independent for two distinct traditions with the same name', () => {
+    // Both books unresolved → both named "Other" but different ids.
+    const p1 = traditionPairOf({ id: 'b1', name: 'Other' }, { id: 'b2', name: 'Other' });
+    const p2 = traditionPairOf({ id: 'b2', name: 'Other' }, { id: 'b1', name: 'Other' });
+    expect(p1).toEqual(p2);
+    expect(p1.pairKey).toBe('b1↔b2');
+  });
 });

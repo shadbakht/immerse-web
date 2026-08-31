@@ -98,10 +98,10 @@ interface PublishTagExport {
   selections:     PublishSelection[];
 }
 
-type TagSubtreeRow = { id: string; parent_id: string | null };
+export type TagSubtreeRow = { id: string; parent_id: string | null };
 
 /** Collect a tag's id plus all descendant ids from a flat parent_id list (BFS). */
-function getSubtreeIds(rootId: string, allTags: TagSubtreeRow[]): string[] {
+export function getSubtreeIds(rootId: string, allTags: TagSubtreeRow[]): string[] {
   const result = [rootId];
   const queue  = [rootId];
   while (queue.length > 0) {
@@ -360,11 +360,24 @@ export async function publishTag(
       title: rootTag.name, payload: tags, item_count: selectionCount, updated_at: now,
     }).eq('id', sharedSetId);
   } else {
-    const { data: inserted } = await supabase.from('shared_sets').insert({
+    const { data: inserted, error: insErr } = await supabase.from('shared_sets').insert({
       owner_id: userId, kind: 'compilation', title: rootTag.name,
       ref: { tag_id: rootTag.id }, payload: tags, item_count: selectionCount, updated_at: now,
     }).select('id').maybeSingle();
     sharedSetId = (inserted as { id: string } | null)?.id ?? null;
+    if (!sharedSetId) {
+      // A concurrent publishTag won the race and inserted first (unique-violation
+      // on shared_sets_compilation_uniq), or the row otherwise exists now.
+      // Re-read so the community_tags FK below still gets set. If even this
+      // fails, leave the FK null — the next publishTag / refreshSharedCompilation
+      // heals it.
+      if (insErr && insErr.code !== '23505') console.warn('[publishTag] shared_sets insert:', insErr.message);
+      const { data: reread } = await supabase.from('shared_sets')
+        .select('id')
+        .eq('owner_id', userId).eq('kind', 'compilation').eq('ref->>tag_id', rootTag.id)
+        .maybeSingle();
+      sharedSetId = (reread as { id: string } | null)?.id ?? null;
+    }
   }
 
   if (sharedSetId) {
