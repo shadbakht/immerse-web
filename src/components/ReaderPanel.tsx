@@ -548,9 +548,19 @@ function SuggestionCard({ suggestion, onAccept }: {
   );
 }
 
+/** Nearest scrollable ancestor of `el` (the reader's passage column), or null. */
+function scrollParent(el: Element | null): HTMLElement | null {
+  let n = el?.parentElement ?? null;
+  while (n) {
+    if (n.scrollHeight > n.clientHeight + 100 && /(auto|scroll)/.test(getComputedStyle(n).overflowY)) return n;
+    n = n.parentElement;
+  }
+  return null;
+}
+
 /**
  * Scroll to a passage on book open (a deep link /read/<id>?p=<pid>, an
- * annotation jump, restored reading progress). Two hazards this rides over:
+ * annotation jump, restored reading progress). Three hazards this rides over:
  *
  * 1. loadBook swaps in hundreds of <p> nodes; a fixed setTimeout can fire
  *    before React has committed them, landing at the top instead. So poll
@@ -558,30 +568,37 @@ function SuggestionCard({ suggestion, onAccept }: {
  *    requestAnimationFrame, which is paused while the tab is backgrounded and
  *    a share link is often opened into a background tab.
  * 2. Content above the target keeps reflowing for a few seconds after first
- *    paint (passages hydrating to full height, font swap, late layout mode),
- *    which shoves a correctly-scrolled target back out of view. So re-assert
- *    the scroll on follow-up ticks — but only while the page height is still
- *    changing, so a user who scrolls away themselves isn't yanked back.
+ *    paint (later passage-fetch waves, font swap, late layout mode), which
+ *    shoves a correctly-scrolled target back out of view. So re-assert the
+ *    scroll while the passage column's scrollHeight is still changing (not the
+ *    document's — the reader scrolls an inner div, so documentElement never
+ *    moves), which also means a user who scrolls away after it settles isn't
+ *    yanked back.
+ * 3. block 'start', not 'center': a passage can be far taller than the viewport
+ *    (a whole prayer as one paragraph), and 'center' then scrolls its opening
+ *    line off the top. Land on the start of the target.
  *
  * behavior 'auto', not 'smooth': a smooth scroll is silently dropped when
  * started during that unstable layout, and an instant jump is what you want on
  * a fresh page load anyway.
  */
-function scrollToPassageWhenReady(passageId: string, block: ScrollLogicalPosition = 'center') {
+function scrollToPassageWhenReady(passageId: string, block: ScrollLogicalPosition = 'start') {
   let tries = 0;
   const settle = () => {
     const el0 = document.getElementById(`p-${passageId}`);
     if (!el0) return;
     el0.scrollIntoView({ behavior: 'auto', block });
-    let lastHeight = document.documentElement.scrollHeight;
+    const sc = scrollParent(el0);
+    let lastHeight = sc?.scrollHeight ?? 0;
     let checks = 0;
     const recheck = () => {
       const el = document.getElementById(`p-${passageId}`);
-      const h = document.documentElement.scrollHeight;
+      const h = sc?.scrollHeight ?? 0;
       if (el && h !== lastHeight) {
-        // Layout still shifting — keep the target pinned.
-        const { top, bottom } = el.getBoundingClientRect();
-        if (bottom < 60 || top > window.innerHeight - 60) el.scrollIntoView({ behavior: 'auto', block });
+        // Layout still shifting — keep the target's start pinned near the top
+        // (a tall passage's bottom is always off-screen, so test its top).
+        const { top } = el.getBoundingClientRect();
+        if (top < -40 || top > window.innerHeight - 60) el.scrollIntoView({ behavior: 'auto', block });
         lastHeight = h;
       }
       if (++checks < 20) setTimeout(recheck, 200);   // watch for ~4s
@@ -675,7 +692,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     // to just leave the reader sitting wherever it already was.
     if (!target.passageId) return;
     lastSavedPidRef.current = target.passageId;
-    document.getElementById(`p-${target.passageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // block 'start' (see scrollToPassageWhenReady) — 'center' scrolls a
+    // taller-than-viewport passage's opening line off the top.
+    document.getElementById(`p-${target.passageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (target.highlightQuery) {
       setSearchHighlight({ passageId: target.passageId, query: target.highlightQuery });
       setTimeout(() => setSearchHighlight(null), 5000);
