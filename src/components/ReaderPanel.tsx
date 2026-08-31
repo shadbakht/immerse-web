@@ -675,6 +675,12 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // target?.bookId itself — lets the effect below tell "book changed" apart
   // from "same book, new passage/search target" without a second effect.
   const loadedBookIdRef   = useRef<string | null>(null);
+  // Which book the current `toc` state actually describes. loadBook() clears it
+  // to null alongside `setToc([])` and stamps it with the bookId only once real
+  // entries land. The TOC-collapse effect below uses it to avoid seeding book C
+  // from book B's still-displayed TOC during an in-reader navigation, when
+  // `target.bookId` has already flipped but `setToc([])` hasn't yet applied.
+  const tocForBookRef     = useRef<string | null>(null);
 
   useEffect(() => {
     if (!target?.bookId) return;
@@ -950,6 +956,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     // into whatever loads next — including an import, which used to never
     // set toc at all and so never hit this.
     setToc([]);
+    tocForBookRef.current = null;
     lastSavedPidRef.current = null;
 
     // ── Local (IndexedDB) imported book ──────────────────────────────────────
@@ -996,6 +1003,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
           setPassages(ps);
           if (starts.length > 0) {
             setToc(starts.map(s => ({ label: s.label, passageId: `local-${localId}-${s.index}`, depth: 0 })));
+            tocForBookRef.current = bookId;
           }
           if (scrollToId) {
             scrollToPassageWhenReady(scrollToId);
@@ -1165,6 +1173,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         }
       }
       setToc(tocEntries);
+      tocForBookRef.current = bookId;
 
       // Resolve scroll target: explicit passageId > saved cloud progress > top
       let resolvedScrollId = scrollToId;
@@ -1927,7 +1936,7 @@ async function handleCopy() {
       collapseResolvedForRef.current = bid;
       return;
     }
-    if (toc.length === 0) return;   // TOC not fetched yet — re-runs when it is
+    if (tocForBookRef.current !== bid) return;   // TOC for this book not loaded yet — re-runs when it is
     setCollapsedToc(seedCollapsedToc(toc, TOC_EXPAND_ROW_BUDGET));
     collapseResolvedForRef.current = bid;
   }, [target?.bookId, toc]);
