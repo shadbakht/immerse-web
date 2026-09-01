@@ -229,6 +229,21 @@ body {
 /* A drop-capped paragraph must not also first-line-indent. */
 .reader-page p.dropcap-open { text-indent: 0; }
 
+/* Appearance-settings type specimen drop cap — MIRRORS the .reader-page rule
+   above. The specimen is not a .reader-page (that pulls ~15 CSS vars it never
+   sets), so this is a scoped parallel copy carrying the same RTL/CJK guard off
+   the container's lang/dir. If the .reader-page rule changes, change this too. */
+.appearance-specimen:not([dir="rtl"]):not(:lang(zh)):not(:lang(ja)):not(:lang(ko))
+  p.dropcap-open::first-letter {
+  float: left;
+  font-size: 3.3em;
+  line-height: 0.86;
+  padding: 0.02em 0.09em 0 0;
+  font-weight: inherit;
+  color: inherit;
+}
+.appearance-specimen p.dropcap-open { text-indent: 0; }
+
 /* Hyphens and indents are for prose only — in a heading or an attribution they
    read as a typo. */
 .reader-page h1, .reader-page h2, .reader-page h3,

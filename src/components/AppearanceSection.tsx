@@ -16,7 +16,7 @@
 import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useTranslation } from '@/contexts/LanguageProvider';
-import type { TranslationKey } from '@immerse/i18n';
+import { directionOf, type TranslationKey } from '@immerse/i18n';
 import {
   TYPEFACES, LINE_SPACING, MARGINS, LETTER_SPACING_RANGE, WORD_SPACING_RANGE,
   WEIGHT_RANGE, DEFAULT_READER_PREFS, resolveTheme,
@@ -57,7 +57,7 @@ export default function AppearanceSection({
   supabase, userId, fontSize, onFontChange, fontOptions,
   colorMode, onColorModeChange, appearanceKeys,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, uiLanguage } = useTranslation();
   const [prefs, setPrefsState] = useState<ReaderPrefs>(DEFAULT_READER_PREFS);
   const [fineOpen, setFineOpen] = useState(false);
 
@@ -87,7 +87,9 @@ export default function AppearanceSection({
              the same @font-face rules that serve the reader serve this page. */}
       <div className="px-5 pt-4">
         <div
-          className="rounded-xl border px-6 py-5"
+          className="appearance-specimen rounded-xl border px-6 py-5"
+          lang={uiLanguage}
+          dir={directionOf(uiLanguage)}
           style={{
             background: palette.bg,
             borderColor: palette.rule,
@@ -108,7 +110,24 @@ export default function AppearanceSection({
           >
             {t('appearance.preview')}
           </div>
-          <p>{t('appearance.previewText')}</p>
+          {/* Chapter eyebrow — mirrors readerHtml.ts .chapter-label: centred,
+              accent-coloured small caps flanked by hairline rules. The drop cap
+              on the paragraph below is the reader's own ::first-letter rule,
+              scoped to .appearance-specimen in globals.css. */}
+          <div
+            className="flex items-center justify-center gap-3.5 uppercase mb-1 leading-snug"
+            style={{
+              color: palette.accent,
+              fontSize: '0.85em',
+              fontWeight: 600,
+              letterSpacing: '0.14em',
+            }}
+          >
+            <span className="flex-1 h-px" style={{ background: palette.rule }} />
+            {t('appearance.previewHeading')}
+            <span className="flex-1 h-px" style={{ background: palette.rule }} />
+          </div>
+          <p className="dropcap-open">{t('appearance.previewText')}</p>
           <p style={{
             textIndent: prefs.paragraphStyle === 'indented' ? '1.4em' : 0,
             marginTop: prefs.paragraphStyle === 'indented' ? 0 : '1em',
