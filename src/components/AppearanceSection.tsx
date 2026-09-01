@@ -113,14 +113,19 @@ export default function AppearanceSection({
           {/* Chapter eyebrow — mirrors readerHtml.ts .chapter-label: centred,
               accent-coloured small caps flanked by hairline rules. The drop cap
               on the paragraph below is the reader's own ::first-letter rule,
-              scoped to .appearance-specimen in globals.css. */}
+              scoped to .appearance-specimen in globals.css. Spacing (0.4em top,
+              1.1em to the paragraph, line-height 1.4) matches the mobile
+              specimen's .chapter-heading / .chapter-label so the eyebrow sits
+              the same distance from the drop cap on phone and laptop. */}
           <div
-            className="flex items-center justify-center gap-3.5 uppercase mb-1 leading-snug"
+            className="flex items-center justify-center gap-3.5 uppercase"
             style={{
               color: palette.accent,
               fontSize: '0.85em',
               fontWeight: 600,
               letterSpacing: '0.14em',
+              lineHeight: 1.4,
+              margin: '0.4em 0 1.1em',
             }}
           >
             <span className="flex-1 h-px" style={{ background: palette.rule }} />
