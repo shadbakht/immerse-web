@@ -6,6 +6,7 @@ import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { publishTag, unpublishTag } from '@/lib/communitySync';
 import { getShareState, createShareLink, revokeShareLink, shareUrl, type ShareState } from '@/lib/shareLinks';
+import { findMultiCompilationShare, ensureMultiCompilationShare, revokeSharedSet } from '@/lib/sharedSets';
 import { refreshSharedCompilation, pruneOrphanedSharedSets } from '@/lib/sharedSets';
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow, type SelRow } from '@/lib/tagExport';
 import { ContextMenu, type MenuOption } from './ContextMenu';
@@ -452,10 +453,16 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [showExportMenu, closeExportMenu]);
 
-  // The single selected compilation (share links act on exactly one root tag).
-  const singleTag = selectedTagIds.size === 1
-    ? tags.find(t => t.id === [...selectedTagIds][0]) ?? null
-    : null;
+  // The "top" selected compilations — a selected tag whose parent isn't also
+  // selected. Cascade selection folds a parent + its whole subtree into ONE top.
+  const topSelectedTags = useMemo(
+    () => tags.filter(tg => selectedTagIds.has(tg.id) && !(tg.parent_id && selectedTagIds.has(tg.parent_id))),
+    [tags, selectedTagIds],
+  );
+  // One top → per-compilation link (+ Discover toggle). Several tops → one
+  // bundled link (no Discover toggle).
+  const singleTag = topSelectedTags.length === 1 ? topSelectedTags[0] : null;
+  const isMultiShare = topSelectedTags.length > 1;
 
   // Load the share state lazily when the export menu opens over a single
   // compilation — no effect needed, this is a user-driven transition.
@@ -465,8 +472,14 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
       return;
     }
     setShowExportMenu(true);
-    if (singleTag && userId) {
+    if (!userId) return;
+    if (singleTag) {
       getShareState(userId, singleTag.id).then(setShareState).catch(() => setShareState(null));
+    } else if (isMultiShare) {
+      const ids = [...topSelectedTags.map(t => t.id)].sort();
+      findMultiCompilationShare(ids, userId)
+        .then(row => setShareState(row ? { id: row.id, listed: false } : null))
+        .catch(() => setShareState(null));
     }
   }
 
@@ -811,17 +824,23 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                     ))}
                   </div>
                   <div className="py-1 border-t border-gray-100 dark:border-[#2D4050]">
-                    {selectedTagIds.size > 1 ? (
-                      <p className="px-4 py-2 text-xs text-gray-400 dark:text-[#5C7A8E]">{t('share.selectOne')}</p>
-                    ) : singleTag && !shareState ? (
+                    {(singleTag || isMultiShare) && !shareState ? (
                       <button
                         disabled={shareBusy}
                         onClick={async () => {
                           if (shareBusy) return;
                           setShareBusy(true);
                           try {
-                            const { url, id, listed } = await createShareLink({ id: singleTag.id, name: singleTag.name }, userId);
-                            setShareState({ id, listed });
+                            let url: string;
+                            if (singleTag) {
+                              const res = await createShareLink({ id: singleTag.id, name: singleTag.name }, userId);
+                              url = res.url;
+                              setShareState({ id: res.id, listed: res.listed });
+                            } else {
+                              const res = await ensureMultiCompilationShare(topSelectedTags, userId, t('share.bundleTitle'));
+                              url = res.url;
+                              setShareState({ id: res.id, listed: false });
+                            }
                             try {
                               await navigator.clipboard.writeText(url);
                               setLinkCopied(true);
@@ -840,9 +859,11 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                         <span className="block text-sm text-gray-700 dark:text-[#B8C7D6]">
                           {linkCopied ? t('share.linkCopied') : t('share.createLink')}
                         </span>
-                        <span className="block text-[11px] text-gray-400 dark:text-[#5C7A8E]">{t('share.createLinkHint')}</span>
+                        <span className="block text-[11px] text-gray-400 dark:text-[#5C7A8E]">
+                          {isMultiShare ? t('share.createLinkMultiHint') : t('share.createLinkHint')}
+                        </span>
                       </button>
-                    ) : singleTag && shareState ? (
+                    ) : (singleTag || isMultiShare) && shareState ? (
                       <div className="px-4 py-2">
                         <p className="font-mono text-xs text-gray-500 dark:text-[#8FA4B8] truncate" title={shareUrl(shareState.id)}>
                           {shareUrl(shareState.id)}
@@ -870,7 +891,8 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                                 if (!confirm(t('share.revokeConfirm'))) return;
                                 setShareBusy(true);
                                 try {
-                                  await revokeShareLink(singleTag.id, userId);
+                                  if (singleTag) await revokeShareLink(singleTag.id, userId);
+                                  else await revokeSharedSet(shareState.id, userId);
                                   setShareState(null);
                                 } catch {
                                   /* revoke failed — leave the link visible */

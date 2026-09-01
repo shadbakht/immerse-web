@@ -11,6 +11,8 @@ import {
   type CommunityTagRow,
 } from '@/lib/communitySync';
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow } from '@/lib/tagExport';
+import { createDiscoverBundleShare, revokeSharedSet } from '@/lib/sharedSets';
+import { shareUrl } from '@/lib/shareUrl';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import {
@@ -452,6 +454,9 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const [shareState, setShareState] = useState<{ id: string } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Per-ct view of the selection (just the id sets) for passing to cards.
   const selectionIds = useMemo(() => {
@@ -481,6 +486,60 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, []);
 
   const clearSelection = useCallback(() => setSelection(new Map()), []);
+
+  // A bundle link is a snapshot of the exact selection — drop it when it changes.
+  useEffect(() => { setShareState(null); }, [selection]);
+
+  // ImmTagExport-shaped nodes for the selected published tags, re-keyed globally.
+  const collectSelectedNodes = useCallback(() => {
+    const out: {
+      exportId: string; parentExportId: string | null; name: string;
+      depth: number; sortOrder: number; selections: unknown[];
+    }[] = [];
+    for (const { ct, ids } of selection.values()) {
+      const payload = Array.isArray(ct.payload) ? ct.payload : [];
+      for (const tnode of payload as any[]) {
+        if (!ids.has(tnode.exportId)) continue;
+        out.push({
+          exportId: `${ct.id}:${tnode.exportId}`,
+          parentExportId: tnode.parentExportId ? `${ct.id}:${tnode.parentExportId}` : null,
+          name: tnode.name,
+          depth: tnode.depth ?? 0,
+          sortOrder: tnode.sortOrder ?? 0,
+          selections: (tnode.selections ?? []).map((s: unknown) => ({ ...(s as object) })),
+        });
+      }
+    }
+    return out;
+  }, [selection]);
+
+  const bundleShareTitle = useCallback(() => {
+    if (selection.size === 1) {
+      const only = [...selection.values()][0].ct;
+      if (only?.name) return only.name;
+    }
+    return t('share.bundleTitle');
+  }, [selection, t]);
+
+  async function createBundleLink() {
+    if (!user?.id || shareBusy) return;
+    setShareBusy(true);
+    try {
+      const nodes = collectSelectedNodes();
+      if (nodes.length === 0) return;
+      const { id, url } = await createDiscoverBundleShare(nodes, bundleShareTitle(), user.id);
+      setShareState({ id });
+      try {
+        await navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
+      } catch { /* clipboard blocked — link still created */ }
+    } catch (e) {
+      console.warn('[Community] share link error:', e);
+    } finally {
+      setShareBusy(false);
+    }
+  }
 
   async function handleExport(format: 'pdf' | 'docx' | 'csv' | 'markdown') {
     setShowExportMenu(false);
@@ -628,6 +687,56 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
                         {label}
                       </button>
                     ))}
+                    {user?.id && (
+                      <div className="py-1 border-t border-gray-100 dark:border-[#2D4050]">
+                        {!shareState ? (
+                          <button
+                            disabled={shareBusy}
+                            onClick={createBundleLink}
+                            className="w-full text-start px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors disabled:opacity-60"
+                          >
+                            <span className="block text-sm text-gray-700 dark:text-[#B8C7D6]">
+                              {linkCopied ? t('share.linkCopied') : t('share.createLink')}
+                            </span>
+                            <span className="block text-[11px] text-gray-400 dark:text-[#5C7A8E]">
+                              {t('share.createLinkMultiHint')}
+                            </span>
+                          </button>
+                        ) : (
+                          <div className="px-4 py-2">
+                            <p className="font-mono text-xs text-gray-500 dark:text-[#8FA4B8] truncate" title={shareUrl(shareState.id)}>
+                              {shareUrl(shareState.id)}
+                            </p>
+                            <div className="flex items-center gap-3 mt-2">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(shareUrl(shareState.id))
+                                    .then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); })
+                                    .catch(() => {});
+                                }}
+                                className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70"
+                              >
+                                {linkCopied ? t('share.linkCopied') : t('share.copyLink')}
+                              </button>
+                              <button
+                                disabled={shareBusy}
+                                onClick={async () => {
+                                  if (shareBusy) return;
+                                  if (!confirm(t('share.revokeConfirm'))) return;
+                                  setShareBusy(true);
+                                  try { await revokeSharedSet(shareState.id, user.id); setShareState(null); }
+                                  catch { /* leave visible */ }
+                                  finally { setShareBusy(false); }
+                                }}
+                                className="text-sm font-medium text-red-600 dark:text-red-400 hover:opacity-70 disabled:opacity-60"
+                              >
+                                {t('share.revoke')}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

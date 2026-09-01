@@ -63,6 +63,8 @@ async function buildSnapshot(
  *  No-op when the compilation is not shared. Fire-and-forget from call sites. */
 export async function refreshSharedCompilation(tagId: string, userId: string): Promise<void> {
   const supabase = createClient();
+  const now = new Date().toISOString();
+
   const { data: row } = await supabase
     .from('shared_sets')
     .select('id')
@@ -70,23 +72,38 @@ export async function refreshSharedCompilation(tagId: string, userId: string): P
     .eq('kind', 'compilation')
     .eq('ref->>tag_id', tagId)
     .maybeSingle();
-  if (!row) return;
 
-  const { tags, selectionCount } = await buildSnapshot(supabase, tagId, userId);
+  if (row) {
+    const { tags, selectionCount } = await buildSnapshot(supabase, tagId, userId);
+    // Keep `title` in step too — the /c page and its OG tags read shared_sets.title,
+    // so without this a rename leaves the shared page showing the old name.
+    const rootName = tags.find(t => t.parentExportId === null)?.name;
+    await supabase.from('shared_sets').update({
+      ...(rootName !== undefined ? { title: rootName } : {}),
+      payload: tags,
+      item_count: selectionCount,
+      updated_at: now,
+    }).eq('id', (row as { id: string }).id);
+  }
 
-  // Keep `title` in step too — the /c page and its OG tags read shared_sets.title,
-  // so without this a rename leaves the shared page showing the old name.
-  // The root is the payload entry with no parent (matching communitySync's
-  // buildTagIdMap); `depth === 0` would be wrong for a nested tag shared as a root,
-  // since buildCommunityPayload copies each tag's real depth from the DB.
-  const rootName = tags.find(t => t.parentExportId === null)?.name;
-
-  await supabase.from('shared_sets').update({
-    ...(rootName !== undefined ? { title: rootName } : {}),
-    payload: tags,
-    item_count: selectionCount,
-    updated_at: new Date().toISOString(),
-  }).eq('id', (row as { id: string }).id);
+  // Bundle shares (ref.tag_ids) that include this tag.
+  const { data: bundles } = await supabase
+    .from('shared_sets').select('id, ref, title')
+    .eq('owner_id', userId).eq('kind', 'compilation');
+  const { data: allTagsData } = await supabase.from('tags').select('id').eq('user_id', userId);
+  const liveIds = new Set((allTagsData ?? []).map((r: { id: string }) => r.id));
+  for (const b of (bundles ?? []) as MultiShareRow[]) {
+    const ids = b.ref?.tag_ids;
+    if (!Array.isArray(ids) || !ids.includes(tagId)) continue;
+    const live = ids.filter(id => liveIds.has(id));
+    if (live.length === 0) continue;
+    const { payload, itemCount } = await buildForestSnapshot(live, userId, b.title ?? 'Shared compilations');
+    await supabase.from('shared_sets').update({
+      payload, item_count: itemCount,
+      ...(live.length !== ids.length ? { ref: { tag_ids: live } } : {}),
+      updated_at: now,
+    }).eq('id', b.id);
+  }
 }
 
 /** Ensure a link-only compilation share exists (shared_sets only — never touches
@@ -135,6 +152,131 @@ export async function copySharedCompilation(sharedSetId: string, userId: string)
     { onConflict: 'subscriber_id,shared_set_id' },   // plain unique index — supported
   );
   return rootLocalTagId;
+}
+
+// ─── Multi-compilation & Discover bundle shares ──────────────────────────────
+//
+// A compilation share can cover ONE subtree (`ref.tag_id`), SEVERAL of the
+// owner's compilations (`ref.tag_ids`), or an ad-hoc bundle snapshotted from
+// Discover (`ref.bundled`). Whatever the source, the stored `payload` is always
+// a SINGLE tree: when more than one root is involved a synthetic wrapper node is
+// prepended, so the public /c page and the save-back path need no forest logic.
+
+const WRAP_EXPORT_ID = '__wrap__';
+
+type ForestNode = {
+  exportId: string;
+  parentExportId: string | null;
+  name: string;
+  depth: number;
+  sortOrder: number;
+  selections: unknown[];
+};
+
+/** Shape a flat set of export nodes (possibly a forest, possibly with stale
+ *  depths) into one payload tree: depth recomputed from `parentExportId`, forest
+ *  roots reparented under a synthetic wrapper when there is more than one. Pure. */
+export function assembleForestPayload<T extends ForestNode>(nodes: T[], wrapperTitle: string): T[] {
+  const present = new Set(nodes.map(n => n.exportId));
+  const rebased = nodes.map(n => ({
+    ...n,
+    parentExportId: n.parentExportId && present.has(n.parentExportId) ? n.parentExportId : null,
+  }));
+  const byId = new Map(rebased.map(n => [n.exportId, n]));
+  const depthOf = (n: ForestNode): number => {
+    let d = 0;
+    let cur: ForestNode | undefined = n;
+    const seen = new Set<string>();
+    while (cur?.parentExportId && !seen.has(cur.exportId)) {
+      seen.add(cur.exportId);
+      d++;
+      cur = byId.get(cur.parentExportId);
+    }
+    return d;
+  };
+  const multi = rebased.filter(n => n.parentExportId === null).length > 1;
+  const shaped = rebased.map(n => ({
+    ...n,
+    depth: depthOf(n) + (multi ? 1 : 0),
+    parentExportId: n.parentExportId ?? (multi ? WRAP_EXPORT_ID : null),
+  })) as T[];
+  if (multi) {
+    shaped.unshift({
+      exportId: WRAP_EXPORT_ID, parentExportId: null, name: wrapperTitle,
+      depth: 0, sortOrder: 0, selections: [],
+    } as unknown as T);
+  }
+  return shaped;
+}
+
+function sameIdSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sb = new Set(b);
+  return a.every(id => sb.has(id));
+}
+
+type MultiShareRow = { id: string; ref: { tag_ids?: string[] }; title: string | null };
+
+/** An existing multi-compilation share whose `ref.tag_ids` set-equals `tagIds`. */
+export async function findMultiCompilationShare(tagIds: string[], userId: string): Promise<{ id: string } | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('shared_sets').select('id, ref, title')
+    .eq('owner_id', userId).eq('kind', 'compilation');
+  for (const r of (data ?? []) as MultiShareRow[]) {
+    if (Array.isArray(r.ref?.tag_ids) && sameIdSet(r.ref.tag_ids, tagIds)) return { id: r.id };
+  }
+  return null;
+}
+
+async function buildForestSnapshot(topTagIds: string[], userId: string, wrapperTitle: string) {
+  const supabase = createClient();
+  const { data: allTagsData } = await supabase.from('tags').select('id, parent_id').eq('user_id', userId);
+  const rows = (allTagsData ?? []) as TagSubtreeRow[];
+  const subtreeIds = [...new Set(topTagIds.flatMap(id => getSubtreeIds(id, rows)))];
+  const { tags, selectionCount } = await buildCommunityPayload(subtreeIds, userId);
+  return { payload: assembleForestPayload(tags as unknown as ForestNode[], wrapperTitle), itemCount: selectionCount };
+}
+
+/** Ensure a link-only bundle share for several of the owner's compilations. Idempotent. */
+export async function ensureMultiCompilationShare(
+  topTags: { id: string }[], userId: string, wrapperTitle: string,
+): Promise<{ id: string; url: string }> {
+  const ids = [...topTags.map(t => t.id)].sort();
+  const existing = await findMultiCompilationShare(ids, userId);
+  if (existing) return { id: existing.id, url: shareUrl(existing.id) };
+
+  const supabase = createClient();
+  const { payload, itemCount } = await buildForestSnapshot(ids, userId, wrapperTitle);
+  const { data: row, error } = await supabase.from('shared_sets').insert({
+    owner_id: userId, kind: 'compilation', title: wrapperTitle,
+    ref: { tag_ids: ids }, payload, item_count: itemCount,
+  }).select('id').single();
+  if (error) throw error;
+  const id = (row as { id: string }).id;
+  void supabase.from('analytics_events').insert({
+    event_type: 'share_link_created', properties: { shared_set_id: id, kind: 'compilation' }, platform: 'web',
+  }).then(() => {}, () => {});
+  return { id, url: shareUrl(id) };
+}
+
+/** Ad-hoc bundle share snapshotted from Discover payloads (not the owner's tags). */
+export async function createDiscoverBundleShare(
+  nodes: ForestNode[], wrapperTitle: string, userId: string,
+): Promise<{ id: string; url: string }> {
+  const supabase = createClient();
+  const payload = assembleForestPayload(nodes, wrapperTitle);
+  const itemCount = payload.reduce((n, t) => n + (t.selections?.length ?? 0), 0);
+  const { data: row, error } = await supabase.from('shared_sets').insert({
+    owner_id: userId, kind: 'compilation', title: wrapperTitle,
+    ref: { bundled: true }, payload, item_count: itemCount,
+  }).select('id').single();
+  if (error) throw error;
+  const id = (row as { id: string }).id;
+  void supabase.from('analytics_events').insert({
+    event_type: 'share_link_created', properties: { shared_set_id: id, kind: 'compilation' }, platform: 'web',
+  }).then(() => {}, () => {});
+  return { id, url: shareUrl(id) };
 }
 
 // ─── Shared cross-reference sets (kind='xrefs') ───────────────────────────────
@@ -265,7 +407,7 @@ export async function saveSharedXrefs(sharedSetId: string, userId: string): Prom
 // ─── Share creation / lifecycle (owner) ───────────────────────────────────────
 
 type XrefShareRow = { id: string; ref: { xref_ids?: string[] } };
-type CompilationShareRow = { id: string; ref: { tag_id?: string } };
+type CompilationShareRow = { id: string; ref: { tag_id?: string; tag_ids?: string[]; bundled?: boolean } };
 
 export async function createXrefShareLink(
   xrefIds: string[], title: string, userId: string,
@@ -329,7 +471,14 @@ export async function pruneOrphanedSharedSets(userId: string, localTagIds: strin
   const { data } = await supabase
     .from('shared_sets').select('id, ref').eq('owner_id', userId).eq('kind', 'compilation');
   const dead = ((data ?? []) as CompilationShareRow[])
-    .filter(r => !live.has(r.ref?.tag_id ?? ''))
+    .filter(r => {
+      // ref.tag_id  → single-subtree share: dead when its tag is gone.
+      // ref.tag_ids → bundle of the owner's compilations: dead only when EVERY member is gone.
+      // ref.bundled → ad-hoc Discover snapshot: no local tags to reconcile, never pruned.
+      if (r.ref?.tag_id) return !live.has(r.ref.tag_id);
+      if (Array.isArray(r.ref?.tag_ids)) return r.ref.tag_ids.every(id => !live.has(id));
+      return false;
+    })
     .map(r => r.id);
   if (!dead.length) return;
   await supabase.from('community_tags').delete().eq('user_id', userId).in('shared_set_id', dead);
