@@ -8,6 +8,7 @@ jest.mock('@/contexts/LanguageProvider', () => ({
     t: (key: string) => {
       if (key === 'common.openInReader') return 'Open in reader';
       if (key === 'common.opening') return 'Opening';
+      if (key === 'sharePage.fromPrivateImport') return 'from a private import';
       return key;
     },
   }),

@@ -128,8 +128,7 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
       />
       {sel.importedReadOnly && (
         <p className="mt-1 ps-1 text-[11px] italic text-gray-400 dark:text-[#5C7A8E]">
-          {/* TODO(i18n): sharePage.fromPrivateImport */}
-          from a private import
+          {t('sharePage.fromPrivateImport')}
         </p>
       )}
     </div>

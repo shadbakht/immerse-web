@@ -110,8 +110,7 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
         </p>
       ) : state === 'viewonly' ? (
         <p className="text-sm text-gray-500 dark:text-[#5C7A8E]">
-          {/* TODO(i18n): sharePage.viewOnly */}
-          This shared compilation is view-only.
+          {t('sharePage.viewOnly')}
         </p>
       ) : (
         <>

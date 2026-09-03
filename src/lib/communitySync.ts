@@ -1,17 +1,19 @@
 'use client';
 
+import { translate } from '@immerse/i18n';
 import { createClient } from '@/lib/supabase/client';
 import { buildCitation } from '@/lib/citationUtils';
+import { getStoredUiLanguage } from '@/lib/language';
 
 /**
  * Thrown by `buildCommunityPayload(..., 'discover')` when every selection in a
  * compilation that HAD selections comes from an imported book, so publishing to
  * Discover would produce an empty compilation. Mirrors mobile's `ImportedOnlyError`
- * — the message string MUST stay byte-identical across platforms.
+ * — both platforms resolve the same i18n key against the viewer's UI language.
  */
 export class ImportedOnlyError extends Error {
   constructor() {
-    super("This compilation's quotes are all from imported books, which can't be published to Discover.");
+    super(translate(getStoredUiLanguage(), 'discover.importedOnlyError'));
     this.name = 'ImportedOnlyError';
   }
 }
@@ -27,12 +29,12 @@ export function isViewOnlyPayload(payload: ImmTagExport[]): boolean {
 /**
  * Thrown by `importCommunityTag` / `copySharedCompilation` when the payload is
  * view-only (every quote is `importedReadOnly`), so a recipient copy would write
- * nothing. Mirrors mobile's `ViewOnlyShareError` — the message string MUST stay
- * byte-identical across platforms.
+ * nothing. Mirrors mobile's `ViewOnlyShareError` — both platforms resolve the
+ * same i18n key against the viewer's UI language.
  */
 export class ViewOnlyShareError extends Error {
   constructor() {
-    super('This shared compilation is view-only.');   // TODO(i18n): sharePage.viewOnly — batched later
+    super(translate(getStoredUiLanguage(), 'sharePage.viewOnly'));
     this.name = 'ViewOnlyShareError';
   }
 }

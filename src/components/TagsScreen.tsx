@@ -627,8 +627,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
       if (visibility === 'published') {
         const { droppedImported } = await publishTag({ id: tag.id, name: tag.name }, userId);
         if (droppedImported > 0) {
-          // TODO(i18n): hard-coded English until share-link strings are batched into @immerse/i18n.
-          alert(`${droppedImported} quote(s) from imported books were left out — imported books can't be published to Discover.`);
+          alert(t('discover.importedDroppedNotice', { count: droppedImported }));
         }
       } else if (wasPublished) {
         await unpublishTag(tag.id, userId);
@@ -641,7 +640,6 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           id: tag.id, user_id: userId, name: tag.name,
           visibility: tag.visibility, updated_at: new Date().toISOString(),
         }).catch(() => {});
-        // TODO(i18n): message comes from ImportedOnlyError, byte-identical with mobile.
         alert((e as Error).message);
         return;
       }

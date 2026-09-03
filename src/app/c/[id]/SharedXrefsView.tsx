@@ -207,8 +207,7 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
                           )}
                           {side.imported && (
                             <p className="mt-0.5 text-[11px] italic text-gray-400 dark:text-[#5C7A8E]">
-                              {/* TODO(i18n): sharePage.fromPrivateImport */}
-                              from a private import
+                              {t('sharePage.fromPrivateImport')}
                             </p>
                           )}
                           {side.readerHref && (
