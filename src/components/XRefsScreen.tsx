@@ -90,8 +90,8 @@ function XRefCard({
   }
 
   const sides = [
-    { key: 'a', snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA },
-    { key: 'b', snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB },
+    { key: 'a', snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA, bookTitle: row.bookTitleA },
+    { key: 'b', snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB, bookTitle: row.bookTitleB },
   ];
 
   const menuOptions: MenuOption[] = [
@@ -149,9 +149,10 @@ function XRefCard({
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
             <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] leading-snug">
-              <Highlight text={side.citation} q={searchQuery} />
+              <Highlight text={side.citation || side.bookTitle} q={searchQuery} />
             </p>
-            {expanded && side.bookId && (
+            {/* Synced imported books have no web reader (empty passage_id). */}
+            {expanded && side.bookId && side.passageId && (
               <button
                 onClick={e => { e.stopPropagation(); onOpenBook(side.bookId, side.passageId, side.snapshot); }}
                 className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline text-start"
@@ -247,8 +248,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
       const getTradition = makeTraditionResolver(catalog, uuidToSlug, t('common.otherTradition'));
 
       function getSel(id: string) {
-        const s = selMap[id] ?? { snapshot_text: '', citation: '', passage_id: '', book_id: '' };
-        return { snapshot: s.snapshot_text, citation: s.citation, bookId: s.book_id, passageId: s.passage_id };
+        const s = selMap[id] ?? { snapshot_text: '', citation: '', passage_id: '', book_id: '', book_title: '' };
+        return { snapshot: s.snapshot_text, citation: s.citation, bookId: s.book_id, passageId: s.passage_id, bookTitle: s.book_title ?? '' };
       }
 
       const bookTitle = (bookUuid: string): string => {
@@ -274,8 +275,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           selectionBId: x.selection_b_id,
           snapshotA: a.snapshot,  citationA:  a.citation,  bookIdA:  a.bookId,  passageIdA: a.passageId,
           snapshotB: b.snapshot,  citationB:  b.citation,  bookIdB:  b.bookId,  passageIdB: b.passageId,
-          bookTitleA: bookTitle(a.bookId),
-          bookTitleB: bookTitle(b.bookId),
+          bookTitleA: bookTitle(a.bookId) || a.bookTitle,
+          bookTitleB: bookTitle(b.bookId) || b.bookTitle,
           pairKey,
           pairName,
         };

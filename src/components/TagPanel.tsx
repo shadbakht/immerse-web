@@ -131,7 +131,8 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
         .map(st => selMap[st.selection_id])
         .filter((s): s is SelInfo => !!s?.snapshot_text)
-        .map(s => ({ text: s.snapshot_text, citation: s.citation }));
+        // Imported-book selections carry no citation — fall back to the title.
+        .map(s => ({ text: s.snapshot_text, citation: s.citation || s.book_title }));
       setTagQuotes(prev => ({ ...prev, [tagId]: quotes }));
     } catch {
       loadedTagIdsRef.current.delete(tagId);

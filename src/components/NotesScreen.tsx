@@ -99,7 +99,7 @@ function NoteItem({
         citationFirst
         onClick={editing ? undefined : () => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
-        belowQuote={note.bookId ? (
+        belowQuote={note.bookId && note.passageId ? (
           <button
             onClick={e => { e.stopPropagation(); onOpenBook(note.bookId, note.passageId, note.snapshotText); }}
             className="mt-1.5 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
@@ -199,11 +199,12 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           updatedAt:   n.updated_at,
           createdAt:   n.created_at ?? n.updated_at,
           snapshotText: sel.snapshot_text,
-          citation:    sel.citation,
+          // Synced imported books carry no citation — fall back to the title.
+          citation:    sel.citation || sel.book_title,
           passageId:   sel.passage_id,
           bookId:      bookUuid,
           bookSlug,
-          bookTitle:   catBook?.title ?? '',
+          bookTitle:   catBook?.title ?? sel.book_title ?? '',
           rootCatId:   root?.id   ?? 'uncategorized',
           rootCatName: root?.name ?? t('common.otherTradition'),
           rootCatSort: root?.sortOrder ?? 9999,

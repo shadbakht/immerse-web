@@ -7,6 +7,7 @@
  */
 import { createClient } from '@/lib/supabase/client';
 import { buildCitation } from '@/lib/citationUtils';
+import { fetchImportedBookTitles } from '@/lib/importedBooksResolve';
 
 export interface SelInfo {
   snapshot_text: string;
@@ -14,6 +15,10 @@ export interface SelInfo {
   book_id:       string;
   book_title:    string;
   citation:      string;
+  /** True for a selection on a synced imported book: it has a real title to
+   *  show, but there is no web reader for it, so "open in reader" must be
+   *  suppressed. */
+  importedReadOnly?: boolean;
 }
 
 export async function fetchSelectionsByUser(userId: string): Promise<Record<string, SelInfo>> {
@@ -22,7 +27,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
   // 1. All user's selections — only user_id filter, no joins (avoids RLS/FK issues)
   const { data: selData } = await supabase
     .from('selections')
-    .select('id, snapshot_text, passage_id')
+    .select('id, snapshot_text, passage_id, book_local_id')
     .eq('user_id', userId);
   if (!selData?.length) return {};
 
@@ -58,5 +63,21 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
       citation:      buildCitation(passage, book, (author as any)?.name),
     };
   }
+
+  // Imported-book selections (passage_id null, book_local_id = a device id not
+  // in the catalog): fill in the real title from imported_books; there is no
+  // web reader for them, so mark them read-only.
+  const needsImported = (selData as any[]).some(s => !s.passage_id && s.book_local_id);
+  if (needsImported) {
+    const titles = await fetchImportedBookTitles(userId);
+    for (const sel of selData as any[]) {
+      if (!sel.passage_id && sel.book_local_id && titles[sel.book_local_id]) {
+        result[sel.id].book_title       = titles[sel.book_local_id];
+        result[sel.id].book_id          = sel.book_local_id;   // a device id, NOT a catalog uuid
+        result[sel.id].importedReadOnly = true;
+      }
+    }
+  }
+
   return result;
 }

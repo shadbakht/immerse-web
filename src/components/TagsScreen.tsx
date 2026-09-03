@@ -187,15 +187,18 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: Se
 
   return (
     <div className="pe-3 py-1.5" style={{ paddingLeft: 36 + depth * 14 }}>
+      {/* Synced imported books have no web reader (empty passage_id) — the
+          citation falls back to the title and the "open in reader" link is
+          suppressed. */}
       <AnnotationCard
         variant="tag"
         quote={sel.snapshot_text}
-        citation={sel.citation}
+        citation={sel.citation || sel.book_title || ''}
         query={searchQuery}
         clampQuote={!expanded}
         onClick={() => setExpanded(v => !v)}
         action={<ContextMenu options={menuOptions} />}
-        footer={expanded && sel.book_id ? (
+        footer={expanded && sel.book_id && sel.passage_id ? (
           <button
             onClick={e => { e.stopPropagation(); onOpenBook(sel.book_id, sel.passage_id, sel.snapshot_text); }}
             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"
