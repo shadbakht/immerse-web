@@ -4,7 +4,7 @@
  * Mirrors mobile's buildCompilationSnapshot(target):
  *   - 'discover' drops imported quotes; throws ImportedOnlyError when that empties
  *     a compilation that HAD selections.
- *   - 'link' keeps them, flagged importedReadOnly, with an empty citation.
+ *   - 'link' keeps them, flagged importedReadOnly, cited by book title only ("— <title>.").
  *
  * The Supabase client is mocked table-by-table (same style as tagExport.test.ts);
  * importedBooksResolve is mocked to supply the imported-book title map.
