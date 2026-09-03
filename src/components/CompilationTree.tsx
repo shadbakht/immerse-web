@@ -4,18 +4,30 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AnnotationCard } from './AnnotationCard';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { openInApp } from '@/lib/openInApp';
+import { loadCatalog, bookLanguage } from '@/lib/catalog';
 
-export type OpenBookFn = (bookId: string, passageId?: string, passageSnapshot?: string) => void;
+export type OpenBookFn = (
+  bookId: string,
+  passageId?: string,
+  passageSnapshot?: string,
+  appLink?: { slug: string; pid?: string; lang: string; snap: string },
+) => void;
 
 /**
- * Default "Open in reader" handler for the standalone share-link page, where no
- * onOpenBook is wired. Navigates the whole window to the web reader route.
- * openCommunitySelection has already resolved the payload slug/pid to web
- * book/passage UUIDs by the time this runs.
+ * Default "Open in reader" for the standalone share page. Hands off to the
+ * Immerse app (immerse://read/<slug>?pid&lang&snap) with the web reader as the
+ * fallback when the app is not installed.
  */
-const DEFAULT_OPEN_BOOK: OpenBookFn = (bookId, passageId) => {
+const DEFAULT_OPEN_BOOK: OpenBookFn = (bookId, passageId, _snap, appLink) => {
   if (typeof window === 'undefined') return;
-  window.location.href = `/read/${bookId}${passageId ? `?p=${passageId}` : ''}`;
+  const webFallback = `/read/${bookId}${passageId ? `?p=${passageId}` : ''}${passageId ? '&' : '?'}flash=1`;
+  if (appLink) {
+    const qs = new URLSearchParams({ pid: appLink.pid ?? '', lang: appLink.lang, snap: appLink.snap });
+    openInApp(`immerse://read/${encodeURIComponent(appLink.slug)}?${qs.toString()}`, webFallback);
+  } else {
+    window.location.href = webFallback;
+  }
 };
 
 /**
@@ -49,7 +61,12 @@ export async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
       .maybeSingle();
     passageUuid = (pidRow as { passage_id?: string } | null)?.passage_id;
   }
-  onOpenBook(bookUuid, passageUuid, sel?.snapshotText);
+
+  const catalog = await loadCatalog();
+  const lang = bookLanguage(catalog, slug ?? '');
+  const snap = String(sel?.snapshotText ?? '').slice(0, 60);
+
+  onOpenBook(bookUuid, passageUuid, sel?.snapshotText, { slug: slug!, pid, lang, snap });
 }
 
 // ── One expandable quote (feed + profile + share page) ───────────────────────
