@@ -380,6 +380,9 @@ export async function importBook(file: File): Promise<ImportBookResult> {
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
+// Local-only: web imported books live in IndexedDB and never push annotations to
+// Supabase, so deleting one needs no remote cleanup (unlike the mobile app —
+// see docs/superpowers/plans/2026-09-03-imported-books-plan-b.md, Task 20/22).
 export async function removeImportedBook(bookId: string): Promise<void> {
   const id = bookId.startsWith('imported:') ? bookId.slice('imported:'.length) : bookId;
   await deleteLocalBook(id);
