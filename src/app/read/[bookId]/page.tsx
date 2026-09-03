@@ -9,7 +9,7 @@ interface Props {
   params: Promise<{ bookId: string }>;
   // ?p=<passageUuid> — a deep link into a specific paragraph (shared xref sets,
   // shared compilation quotes). ReaderPanel scrolls to it once the book loads.
-  searchParams: Promise<{ p?: string }>;
+  searchParams: Promise<{ p?: string; flash?: string }>;
 }
 
 // bookId is usually a catalog slug ("hidden-words") but can also be a
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // (tag/note/xref/publish), so nothing else changes for a signed-out reader.
 export default async function ReadPage({ params, searchParams }: Props) {
   const { bookId } = await params;
-  const { p: initialPassageId } = await searchParams;
+  const { p: initialPassageId, flash } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -67,7 +67,12 @@ export default async function ReadPage({ params, searchParams }: Props) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <AppShell user={user} initialBookId={bookId} initialPassageId={initialPassageId} />
+      <AppShell
+        user={user}
+        initialBookId={bookId}
+        initialPassageId={initialPassageId}
+        initialFlash={flash === '1'}
+      />
     </>
   );
 }

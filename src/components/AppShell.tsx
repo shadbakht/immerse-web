@@ -64,9 +64,12 @@ interface AppShellProps {
   // (shared xref sets, shared compilation quotes). Seeded into the reader
   // target so ReaderPanel scrolls to it once the book loads.
   initialPassageId?: string;
+  // ?flash=1 from a share-link "Open in reader" fallback — pulse the target
+  // paragraph once it's scrolled into view (see ReaderPanel.flashPassageWhenReady).
+  initialFlash?: boolean;
 }
 
-export default function AppShell({ user, initialBookId, initialPassageId }: AppShellProps) {
+export default function AppShell({ user, initialBookId, initialPassageId, initialFlash }: AppShellProps) {
   const { t } = useTranslation();
   // Signed-in visitors land on Home; a signed-out (guest) visitor lands on
   // Library instead — skipping "Browse without an account" is the whole
@@ -75,7 +78,9 @@ export default function AppShell({ user, initialBookId, initialPassageId }: AppS
     initialBookId ? 'library' : (user ? 'home' : 'library'),
   );
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
-    initialBookId ? { bookId: initialBookId, passageId: initialPassageId } : null,
+    initialBookId
+      ? { bookId: initialBookId, passageId: initialPassageId, flashPassage: initialFlash }
+      : null,
   );
   const [libraryCollapsed, setLibraryCollapsed] = useState(() =>
     shouldStartLibraryCollapsed(

@@ -282,6 +282,17 @@ body {
   animation: highlight-fade 5s ease forwards;
 }
 
+/* Whole-paragraph pulse when arriving on a passage via a share link (/read?p=&flash=1). */
+@keyframes passage-flash-fade {
+  0%   { background-color: rgba(254, 240, 138, 0.9); }
+  70%  { background-color: rgba(254, 240, 138, 0.9); }
+  100% { background-color: transparent; }
+}
+.passage-flash {
+  animation: passage-flash-fade 1600ms ease forwards;
+  border-radius: 0.375rem;
+}
+
 /* Ensure typed text is always visible in light inputs */
 input:not([class*="text-white"]),
 textarea:not([class*="text-white"]) {

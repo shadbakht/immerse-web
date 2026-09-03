@@ -613,6 +613,24 @@ function scrollToPassageWhenReady(passageId: string, block: ScrollLogicalPositio
   tick();
 }
 
+/** One-shot whole-paragraph pulse for a share-link landing (?flash=1). Polls
+ *  for the node — same reason as scrollToPassageWhenReady, it may not be
+ *  committed to the DOM yet. A whole-paragraph pulse, not an exact-text
+ *  highlight, so it still lands if the snapshot text has drifted. */
+export function flashPassageWhenReady(passageId: string) {
+  let tries = 0;
+  const tick = () => {
+    const el = document.getElementById(`p-${passageId}`);
+    if (el) {
+      el.classList.add('passage-flash');
+      window.setTimeout(() => el.classList.remove('passage-flash'), 1800);
+      return;
+    }
+    if (++tries < 40) setTimeout(tick, 75);
+  };
+  tick();
+}
+
 export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone, xrefSuggestions, setXrefSuggestions, xrefSuggestSource, setXrefSuggestSource }: ReaderPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
@@ -702,6 +720,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     // block 'start' (see scrollToPassageWhenReady) — 'center' scrolls a
     // taller-than-viewport passage's opening line off the top.
     document.getElementById(`p-${target.passageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (target.flashPassage && target.passageId) flashPassageWhenReady(target.passageId);
     if (target.highlightQuery) {
       setSearchHighlight({ passageId: target.passageId, query: target.highlightQuery });
       setTimeout(() => setSearchHighlight(null), 5000);
@@ -711,7 +730,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       setSearchHighlight({ passageId: target.passageId, query: target.passageSnapshot, exact: true });
       setTimeout(() => setSearchHighlight(null), 5000);
     }
-  }, [target?.bookId, target?.passageId, target?.highlightQuery, target?.passageSnapshot]);
+  }, [target?.bookId, target?.passageId, target?.highlightQuery, target?.passageSnapshot, target?.flashPassage]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1205,6 +1224,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       if (resolvedScrollId) {
         lastSavedPidRef.current = resolvedScrollId;
         scrollToPassageWhenReady(resolvedScrollId);
+        if (target?.flashPassage) flashPassageWhenReady(resolvedScrollId);
         if (target?.highlightQuery) {
           setSearchHighlight({ passageId: resolvedScrollId, query: target.highlightQuery });
           setTimeout(() => setSearchHighlight(null), 5000);
