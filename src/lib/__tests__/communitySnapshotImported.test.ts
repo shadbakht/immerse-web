@@ -12,6 +12,7 @@
 
 let mockData: Record<string, Array<Record<string, unknown>>> = {};
 let mockImportedTitles: Record<string, string> = {};
+let mockInsertCalls: Record<string, unknown[][]> = {};
 
 jest.mock('../supabase/client', () => ({
   createClient: () => ({
@@ -20,6 +21,10 @@ jest.mock('../supabase/client', () => ({
         in: async () => ({ data: mockData[table] ?? [] }),
         or: async () => ({ data: mockData[table] ?? [] }),
       }),
+      insert: async (rows: unknown) => {
+        (mockInsertCalls[table] ??= []).push(Array.isArray(rows) ? rows : [rows]);
+        return { error: null };
+      },
     }),
   }),
 }));
@@ -28,7 +33,14 @@ jest.mock('../importedBooksResolve', () => ({
   fetchImportedBookTitles: async () => mockImportedTitles,
 }));
 
-import { buildCommunityPayload, ImportedOnlyError } from '../communitySync';
+import {
+  buildCommunityPayload,
+  ImportedOnlyError,
+  isViewOnlyPayload,
+  writeLocalTagTree,
+  type ImmTagExport,
+} from '../communitySync';
+import { createClient } from '../supabase/client';
 
 /** One compilation, two quotes: one from a corpus book, one from an imported book
  *  (mobile-synced shape: no passage_id, book_local_id resolved via imported_books). */
@@ -68,6 +80,57 @@ function setScenario({ corpusImported = false }: { corpusImported?: boolean } = 
 beforeEach(() => {
   mockData = {};
   mockImportedTitles = {};
+  mockInsertCalls = {};
+});
+
+/** Minimal ImmTagExport with the given selections. */
+function tagWith(selections: ImmTagExport['selections']): ImmTagExport {
+  return {
+    exportId: 't0', parentExportId: null, name: 'My Compilation',
+    depth: 0, sortOrder: 0, selections,
+  };
+}
+
+function sel(startPid: string, importedReadOnly?: boolean): ImmTagExport['selections'][number] {
+  return {
+    startPid, startOffset: 0, endPid: startPid, endOffset: 5,
+    snapshotText: `quote ${startPid}`, bookId: 'book-1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...(importedReadOnly ? { importedReadOnly: true } : {}),
+  };
+}
+
+describe('isViewOnlyPayload', () => {
+  it('false for an empty payload', () => {
+    expect(isViewOnlyPayload([])).toBe(false);
+  });
+  it('false for a tag with no selections', () => {
+    expect(isViewOnlyPayload([tagWith([])])).toBe(false);
+  });
+  it('false when all selections are normal', () => {
+    expect(isViewOnlyPayload([tagWith([sel('a'), sel('b')])])).toBe(false);
+  });
+  it('false when one normal + one read-only', () => {
+    expect(isViewOnlyPayload([tagWith([sel('a'), sel('b', true)])])).toBe(false);
+  });
+  it('true when every selection is importedReadOnly', () => {
+    expect(isViewOnlyPayload([tagWith([sel('a', true), sel('b', true)])])).toBe(true);
+  });
+});
+
+describe('writeLocalTagTree — importedReadOnly selections', () => {
+  it('skips read-only quotes and only inserts the resolvable normal one', async () => {
+    mockData.passage_pid_map = [{ pid: 'pid-normal', passage_id: 'pass-1' }];
+    const payload = [tagWith([sel('pid-normal'), sel('pid-imported', true)])];
+
+    await writeLocalTagTree(createClient(), payload, 'user-1', 'private');
+
+    expect(mockInsertCalls.tags).toHaveLength(1);
+    expect(mockInsertCalls.selections).toHaveLength(1);
+    expect(mockInsertCalls.selections[0]).toHaveLength(1);
+    expect((mockInsertCalls.selections[0][0] as { start_pid: string }).start_pid).toBe('pid-normal');
+    expect(mockInsertCalls.selection_tags[0]).toHaveLength(1);
+  });
 });
 
 describe('buildCommunityPayload — imported-book handling', () => {

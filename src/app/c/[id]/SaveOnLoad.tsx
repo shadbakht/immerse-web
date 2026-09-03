@@ -6,7 +6,7 @@ import { copySharedCompilation, saveSharedXrefs, type SaveXrefsResult } from '@/
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { openInApp } from '@/lib/openInApp';
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'signin';
+type SaveState = 'idle' | 'saving' | 'saved' | 'signin' | 'viewonly';
 export type ShareKind = 'compilation' | 'xrefs';
 
 /**
@@ -78,8 +78,9 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
           await copySharedCompilation(id, user.id);
         }
         setState('saved');
-      } catch {
-        setState('idle');
+      } catch (e) {
+        if ((e as Error)?.name === 'ViewOnlyShareError') setState('viewonly');
+        else setState('idle');
       } finally {
         const url = new URL(window.location.href);
         url.searchParams.delete('save');
@@ -106,6 +107,11 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
         <p className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">
           {'✓ '}
           {savedText()}
+        </p>
+      ) : state === 'viewonly' ? (
+        <p className="text-sm text-gray-500 dark:text-[#5C7A8E]">
+          {/* TODO(i18n): sharePage.viewOnly */}
+          This shared compilation is view-only.
         </p>
       ) : (
         <>

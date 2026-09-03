@@ -16,6 +16,27 @@ export class ImportedOnlyError extends Error {
   }
 }
 
+/** True when a shared payload has selections but every one is an imported-book
+ *  quote (importedReadOnly) — nothing can be copied into a recipient's library. */
+export function isViewOnlyPayload(payload: ImmTagExport[]): boolean {
+  let total = 0, readOnly = 0;
+  for (const t of payload) for (const s of (t.selections ?? [])) { total++; if (s.importedReadOnly) readOnly++; }
+  return total > 0 && readOnly === total;
+}
+
+/**
+ * Thrown by `importCommunityTag` / `copySharedCompilation` when the payload is
+ * view-only (every quote is `importedReadOnly`), so a recipient copy would write
+ * nothing. Mirrors mobile's `ViewOnlyShareError` — the message string MUST stay
+ * byte-identical across platforms.
+ */
+export class ViewOnlyShareError extends Error {
+  constructor() {
+    super('This shared compilation is view-only.');   // TODO(i18n): sharePage.viewOnly — batched later
+    this.name = 'ViewOnlyShareError';
+  }
+}
+
 export interface ImmTagExport {
   exportId:       string;
   parentExportId: string | null;
@@ -498,6 +519,7 @@ function selectionRowsFor(
 ) {
   const rows: Record<string, unknown>[] = [];
   for (const sel of tagExport.selections) {
+    if (sel.importedReadOnly) continue;   // sharer's imported-book quote — display-only, never copied
     const passageId = pidMap[sel.startPid];
     if (!passageId) {
       console.warn('[communitySync] Skipping selection — unknown passage:', sel.startPid);
@@ -590,6 +612,8 @@ export async function importCommunityTag(ct: CommunityTagRow, userId: string): P
       .maybeSingle();
     if (rootStillThere) return existingSub.local_tag_id as string;
   }
+
+  if (isViewOnlyPayload(ct.payload)) throw new ViewOnlyShareError();
 
   const rootLocalTagId = await writeLocalTagTree(supabase, ct.payload, userId, 'imported');
 

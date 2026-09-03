@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/client';
 import {
   buildCommunityPayload,
   getSubtreeIds,
+  isViewOnlyPayload,
   resolvePassageIds,
+  ViewOnlyShareError,
   writeLocalTagTree,
   type ImmTagExport,
   type TagSubtreeRow,
@@ -146,6 +148,8 @@ export async function copySharedCompilation(sharedSetId: string, userId: string)
   const { data: ss } = await supabase
     .from('shared_sets').select('payload').eq('id', sharedSetId).eq('kind', 'compilation').maybeSingle();
   if (!ss?.payload) throw new Error('shared compilation not found');
+
+  if (isViewOnlyPayload(ss.payload as ImmTagExport[])) throw new ViewOnlyShareError();
 
   const rootLocalTagId = await writeLocalTagTree(supabase, ss.payload as ImmTagExport[], userId, 'private');
   await supabase.from('shared_set_copies').upsert(
