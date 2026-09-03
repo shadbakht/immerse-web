@@ -3,6 +3,19 @@
 import { createClient } from '@/lib/supabase/client';
 import { buildCitation } from '@/lib/citationUtils';
 
+/**
+ * Thrown by `buildCommunityPayload(..., 'discover')` when every selection in a
+ * compilation that HAD selections comes from an imported book, so publishing to
+ * Discover would produce an empty compilation. Mirrors mobile's `ImportedOnlyError`
+ * — the message string MUST stay byte-identical across platforms.
+ */
+export class ImportedOnlyError extends Error {
+  constructor() {
+    super("This compilation's quotes are all from imported books, which can't be published to Discover.");
+    this.name = 'ImportedOnlyError';
+  }
+}
+
 export interface ImmTagExport {
   exportId:       string;
   parentExportId: string | null;
@@ -17,6 +30,10 @@ export interface ImmTagExport {
     snapshotText: string;
     bookId:       string;
     createdAt:    string;
+    /** Set on a 'link'-target snapshot when the quote is from an imported book:
+     *  the importer keeps it read-only (no chapters on the web) instead of
+     *  trying to anchor it. Absent on 'discover' payloads (those drop it). */
+    importedReadOnly?: boolean;
   }[];
 }
 
@@ -81,6 +98,7 @@ interface PublishSelection {
   citation:      string;      // raw "— …." form, matching mobile formatCitation
   notes:         string[];
   xrefCitations: string[];
+  importedReadOnly?: boolean;  // 'link' target only — quote is from an imported book
   startPid:      string;
   startOffset:   number;
   endPid:        string;
@@ -122,14 +140,28 @@ function rawCitation(passage: any, book: any): string {
 /**
  * Build the ImmTagExport[] community payload for a tag subtree.
  * Groups selections by paragraph (startPid) and attaches citations, notes, and
- * xref citations — exactly like mobile buildImmPayload. Selections whose book is
- * user-imported are stripped (privacy: imported books never reach the community).
+ * xref citations — exactly like mobile buildImmPayload.
+ *
+ * `target` decides how imported-book selections are handled, mirroring mobile's
+ * `buildCompilationSnapshot(..., target)`:
+ *   - 'discover' (default): drop them. If that empties a compilation that HAD
+ *     selections, throw `ImportedOnlyError`.
+ *   - 'link': keep them, each flagged `importedReadOnly: true`, with a book-only
+ *     citation ("— <title>.", matching mobile's `formatCitation` for
+ *     `citationFormat: 'book_only'`). `droppedImported` stays 0.
+ *
+ * An imported selection is one whose book row is `is_user_imported`, OR — the
+ * mobile-synced shape web can't see as a `books` row — a selection with no
+ * `passage_id` whose `book_local_id` is a known `imported_books` id.
  */
 export async function buildCommunityPayload(
   subtreeTagIds: string[],
   userId: string,
-): Promise<{ tags: PublishTagExport[]; selectionCount: number }> {
+  target: 'discover' | 'link' = 'discover',
+): Promise<{ tags: PublishTagExport[]; selectionCount: number; droppedImported: number }> {
   const supabase = createClient();
+  const { fetchImportedBookTitles } = await import('./importedBooksResolve');
+  const importedTitles = await fetchImportedBookTitles(userId);
 
   // 1. Subtree tag rows, kept in subtree (BFS) order for stable exportIds.
   const { data: tagRows } = await supabase
@@ -221,6 +253,8 @@ export async function buildCommunityPayload(
   // 5. Assemble each tag's selections, grouped by paragraph like mobile.
   const tagExports: PublishTagExport[] = [];
   let selectionCount = 0;
+  let droppedImported = 0;
+  let rawTotalSelectionsSeen = 0;
 
   for (const tag of orderedTags) {
     type RawSel = PublishSelection & { _note: string | null };
@@ -229,9 +263,16 @@ export async function buildCommunityPayload(
     for (const selId of (selIdsByTag.get(tag.id) ?? [])) {
       const sel = selMap[selId];
       if (!sel) continue;
+      rawTotalSelectionsSeen++;
       const passage = sel.passage_id ? passMap[sel.passage_id] : null;
       const book    = passage ? bookMap[passage.book_id] : null;
-      if (book?.is_user_imported) continue;   // privacy: imported books stay local
+
+      // Imported iff the book row says so, OR (mobile-synced shape) a pidless
+      // selection whose book_local_id is a known imported_books id.
+      const isImported =
+        !!book?.is_user_imported ||
+        (!sel.passage_id && !!sel.book_local_id && !!importedTitles[sel.book_local_id]);
+      if (isImported && target === 'discover') { droppedImported++; continue; }
 
       const xrefCitations: string[] = [];
       for (const targetId of (xrefTargetsBySel.get(selId) ?? [])) {
@@ -246,8 +287,15 @@ export async function buildCommunityPayload(
       rawSels.push({
         snapshotText:  sel.snapshot_text ?? '',
         bookId:        sel.book_local_id ?? '',
-        bookTitle:     book?.title ?? sel.book_local_id ?? '',
-        citation:      rawCitation(passage, book),
+        bookTitle:     isImported
+          ? (importedTitles[sel.book_local_id] ?? book?.title ?? sel.book_local_id ?? '')
+          : (book?.title ?? sel.book_local_id ?? ''),
+        // Imported books have no chapters on the web; mirror mobile's
+        // `formatCitation` for `citationFormat: 'book_only'` — "— <title>.".
+        citation:      isImported
+          ? (importedTitles[sel.book_local_id] ? `— ${importedTitles[sel.book_local_id]}.` : '')
+          : rawCitation(passage, book),
+        importedReadOnly: isImported ? true : undefined,
         notes:         [],
         _note:         noteMap[selId] ?? null,
         xrefCitations,
@@ -281,6 +329,7 @@ export async function buildCommunityPayload(
         bookId:        primary.bookId,
         bookTitle:     primary.bookTitle,
         citation:      primary.citation,
+        importedReadOnly: primary.importedReadOnly,
         notes:         [],
         xrefCitations: [],
         startPid:      primary.startPid,
@@ -303,18 +352,26 @@ export async function buildCommunityPayload(
     });
   }
 
-  return { tags: tagExports, selectionCount };
+  // An all-imported compilation empties out under 'discover' — signal the caller
+  // so it can revert its toggle and explain why (mobile throws the same error).
+  if (target === 'discover' && rawTotalSelectionsSeen > 0 && selectionCount === 0) {
+    throw new ImportedOnlyError();
+  }
+
+  return { tags: tagExports, selectionCount, droppedImported };
 }
 
 /**
  * Push a tag + its full subtree to the community (idempotent upsert).
- * Mirrors mobile publishTag.
+ * Mirrors mobile publishTag. Returns `droppedImported` — how many imported-book
+ * selections were left out of the Discover payload. Propagates `ImportedOnlyError`
+ * when every selection was imported.
  */
 export async function publishTag(
   rootTag: { id: string; name: string },
   userId: string,
   opts: { listed?: boolean } = {},
-): Promise<void> {
+): Promise<{ droppedImported: number }> {
   const supabase = createClient();
   const { data: allTagsData } = await supabase
     .from('tags')
@@ -322,7 +379,7 @@ export async function publishTag(
     .eq('user_id', userId);
   const subtreeIds = getSubtreeIds(rootTag.id, (allTagsData ?? []) as TagSubtreeRow[]);
 
-  const { tags, selectionCount } = await buildCommunityPayload(subtreeIds, userId);
+  const { tags, selectionCount, droppedImported } = await buildCommunityPayload(subtreeIds, userId, 'discover');
 
   const { error } = await supabase
     .from('community_tags')
@@ -385,6 +442,8 @@ export async function publishTag(
       .update({ shared_set_id: sharedSetId })
       .eq('user_id', userId).eq('tag_id', rootTag.id);
   }
+
+  return { droppedImported };
 }
 
 /**

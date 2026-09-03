@@ -56,7 +56,8 @@ async function buildSnapshot(
 ) {
   const { data: allTagsData } = await supabase.from('tags').select('id, parent_id').eq('user_id', userId);
   const subtreeIds = getSubtreeIds(tagId, (allTagsData ?? []) as TagSubtreeRow[]);
-  return buildCommunityPayload(subtreeIds, userId);
+  // 'link': share links keep imported-book quotes (flagged read-only), unlike Discover.
+  return buildCommunityPayload(subtreeIds, userId, 'link');
 }
 
 /** Rebuild the payload snapshot of a compilation's shared_sets row, if one exists.
@@ -234,7 +235,7 @@ async function buildForestSnapshot(topTagIds: string[], userId: string, wrapperT
   const { data: allTagsData } = await supabase.from('tags').select('id, parent_id').eq('user_id', userId);
   const rows = (allTagsData ?? []) as TagSubtreeRow[];
   const subtreeIds = [...new Set(topTagIds.flatMap(id => getSubtreeIds(id, rows)))];
-  const { tags, selectionCount } = await buildCommunityPayload(subtreeIds, userId);
+  const { tags, selectionCount } = await buildCommunityPayload(subtreeIds, userId, 'link');
   return { payload: assembleForestPayload(tags as unknown as ForestNode[], wrapperTitle), itemCount: selectionCount };
 }
 

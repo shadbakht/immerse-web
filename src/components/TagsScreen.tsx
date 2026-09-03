@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
-import { publishTag, unpublishTag } from '@/lib/communitySync';
+import { publishTag, unpublishTag, ImportedOnlyError } from '@/lib/communitySync';
 import { getShareState, createShareLink, revokeShareLink, shareUrl, type ShareState } from '@/lib/shareLinks';
 import { findMultiCompilationShare, ensureMultiCompilationShare, revokeSharedSet } from '@/lib/sharedSets';
 import { refreshSharedCompilation, pruneOrphanedSharedSets } from '@/lib/sharedSets';
@@ -625,11 +625,26 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
     // Add/remove the community_tags row so Community membership stays in sync.
     try {
       if (visibility === 'published') {
-        await publishTag({ id: tag.id, name: tag.name }, userId);
+        const { droppedImported } = await publishTag({ id: tag.id, name: tag.name }, userId);
+        if (droppedImported > 0) {
+          // TODO(i18n): hard-coded English until share-link strings are batched into @immerse/i18n.
+          alert(`${droppedImported} quote(s) from imported books were left out — imported books can't be published to Discover.`);
+        }
       } else if (wasPublished) {
         await unpublishTag(tag.id, userId);
       }
     } catch (e) {
+      if (e instanceof ImportedOnlyError || (e as { name?: string })?.name === 'ImportedOnlyError') {
+        // Revert the optimistic toggle (local state + persisted visibility).
+        setTags(prev => prev.map(t => t.id === id ? { ...t, visibility: tag.visibility } : t));
+        await pushTag({
+          id: tag.id, user_id: userId, name: tag.name,
+          visibility: tag.visibility, updated_at: new Date().toISOString(),
+        }).catch(() => {});
+        // TODO(i18n): message comes from ImportedOnlyError, byte-identical with mobile.
+        alert((e as Error).message);
+        return;
+      }
       console.warn('[Community] publish/unpublish error:', e);
     }
   }
