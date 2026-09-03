@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { copySharedCompilation, saveSharedXrefs, type SaveXrefsResult } from '@/lib/sharedSets';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { openInApp } from '@/lib/openInApp';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'signin';
 export type ShareKind = 'compilation' | 'xrefs';
@@ -108,8 +109,11 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
         </p>
       ) : (
         <>
-          <a
-            href={`/c/${id}?save=1`}
+          <button
+            type="button"
+            onClick={() =>
+              openInApp(`immerse://c/${id}?save=1`, `/c/${id}?save=1`)
+            }
             className="inline-block rounded-lg bg-[#1B6B7B] px-4 py-2 text-sm font-medium text-white dark:bg-[#2D9DB3]"
           >
             {state === 'saving'
@@ -117,7 +121,7 @@ export default function SaveOnLoad({ id, kind = 'compilation' }: { id: string; k
               : kind === 'xrefs'
                 ? t('sharePage.saveXrefs')
                 : t('sharePage.save')}
-          </a>
+          </button>
           <p className="mt-2 text-[11px] text-gray-400 dark:text-[#5C7A8E]">
             {t('sharePage.saveHint')}
           </p>
