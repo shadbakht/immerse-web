@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { AnnotationCard } from './AnnotationCard';
 import { useTranslation } from '@/contexts/LanguageProvider';
@@ -38,35 +38,47 @@ const DEFAULT_OPEN_BOOK: OpenBookFn = (bookId, passageId, _snap, appLink) => {
  * passage that no longer exists), ReaderPanel's loadBook falls back to a
  * snapshot-text content match instead of silently opening at the book's top.
  */
-export async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
+export interface ResolvedCommunitySelection {
+  bookUuid: string;
+  passageUuid?: string;
+  snapshot?: string;
+  appLink: { slug: string; pid?: string; lang: string; snap: string };
+}
+
+/** Resolve a community-payload selection to what the reader needs: the web
+ *  book/passage UUIDs (for the in-app / web-fallback nav) and the mobile
+ *  slug/pid/lang/snap (for the immerse:// deep link). Returns null if the
+ *  book can't be resolved. */
+export async function resolveCommunitySelection(sel: any): Promise<ResolvedCommunitySelection | null> {
   const slug = sel?.bookId as string | undefined;
   const pid  = sel?.startPid as string | undefined;
-  if (!slug) return;
+  if (!slug) return null;
 
   const supabase = createClient();
   const { data: bookRow } = await supabase
-    .from('book_slug_map')
-    .select('book_id')
-    .eq('local_id', slug)
-    .maybeSingle();
+    .from('book_slug_map').select('book_id').eq('local_id', slug).maybeSingle();
   const bookUuid = (bookRow as { book_id?: string } | null)?.book_id;
-  if (!bookUuid) return;
+  if (!bookUuid) return null;
 
   let passageUuid: string | undefined;
   if (pid) {
     const { data: pidRow } = await supabase
-      .from('passage_pid_map')
-      .select('passage_id')
-      .eq('pid', pid)
-      .maybeSingle();
+      .from('passage_pid_map').select('passage_id').eq('pid', pid).maybeSingle();
     passageUuid = (pidRow as { passage_id?: string } | null)?.passage_id;
   }
 
   const catalog = await loadCatalog();
-  const lang = bookLanguage(catalog, slug ?? '');
+  const lang = bookLanguage(catalog, slug);
   const snap = String(sel?.snapshotText ?? '').slice(0, 60);
 
-  onOpenBook(bookUuid, passageUuid, sel?.snapshotText, { slug: slug!, pid, lang, snap });
+  return { bookUuid, passageUuid, snapshot: sel?.snapshotText, appLink: { slug, pid, lang, snap } };
+}
+
+/** Async fast-click fallback: resolve then open in one call. */
+export async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
+  const r = await resolveCommunitySelection(sel);
+  if (!r) return;
+  onOpenBook(r.bookUuid, r.passageUuid, r.snapshot, r.appLink);
 }
 
 // ── One expandable quote (feed + profile + share page) ───────────────────────
@@ -75,13 +87,25 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [opening, setOpening]   = useState(false);
+  const [resolved, setResolved] = useState<ResolvedCommunitySelection | null>(null);
   const citation = sel.citation ?? sel.bookTitle;
 
-  async function handleOpen() {
+  useEffect(() => {
+    if (!expanded || !onOpenBook || !sel?.bookId || resolved) return;
+    let cancelled = false;
+    resolveCommunitySelection(sel).then(r => { if (!cancelled && r) setResolved(r); });
+    return () => { cancelled = true; };
+  }, [expanded, onOpenBook, sel, resolved]);
+
+  function handleOpen() {
     if (!onOpenBook || opening) return;
+    if (resolved) {
+      onOpenBook(resolved.bookUuid, resolved.passageUuid, resolved.snapshot, resolved.appLink);
+      return;
+    }
+    // Not resolved yet (very fast click) — fall back to the async path.
     setOpening(true);
-    try { await openCommunitySelection(sel, onOpenBook); }
-    finally { setOpening(false); }
+    openCommunitySelection(sel, onOpenBook).finally(() => setOpening(false));
   }
 
   return (

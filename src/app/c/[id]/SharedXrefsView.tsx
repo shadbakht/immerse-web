@@ -36,7 +36,7 @@ interface ResolvedSide {
   snapshot: string;
   citation: string;
   readerHref: string | null;      // web fallback path
-  appLink: { slug: string; pid?: string; lang: string; snap: string } | null;
+  appLink: { slug: string; pid: string; lang: string; snap: string } | null;
   bookUuid: string;
 }
 interface ResolvedEntry {
@@ -124,8 +124,8 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
           readerHref: bookUuid
             ? `/read/${bookUuid}${side.passage_id ? `?p=${side.passage_id}&flash=1` : '?flash=1'}`
             : null,
-          appLink: slug
-            ? { slug, pid: side.start_pid ?? undefined, lang, snap: String(side.snapshot_text ?? '').slice(0, 60) }
+          appLink: slug && side.start_pid
+            ? { slug, pid: side.start_pid, lang, snap: String(side.snapshot_text ?? '').slice(0, 60) }
             : null,
           bookUuid,
         };
@@ -207,7 +207,7 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
                               onClick={() => {
                                 if (side.appLink) {
                                   const qs = new URLSearchParams({
-                                    pid: side.appLink.pid ?? '',
+                                    pid: side.appLink.pid,
                                     lang: side.appLink.lang,
                                     snap: side.appLink.snap,
                                   });

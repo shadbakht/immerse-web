@@ -613,13 +613,15 @@ function scrollToPassageWhenReady(passageId: string, block: ScrollLogicalPositio
   tick();
 }
 
-/** One-shot whole-paragraph pulse for a share-link landing (?flash=1). Polls
- *  for the node — same reason as scrollToPassageWhenReady, it may not be
- *  committed to the DOM yet. A whole-paragraph pulse, not an exact-text
- *  highlight, so it still lands if the snapshot text has drifted. */
+let _flashToken = 0;
+/** One-shot whole-paragraph pulse for a share-link landing. Polls for the node
+ *  (same reason as scrollToPassageWhenReady — it may not be committed yet). A
+ *  newer call supersedes an older still-polling one. */
 export function flashPassageWhenReady(passageId: string) {
+  const token = ++_flashToken;
   let tries = 0;
   const tick = () => {
+    if (token !== _flashToken) return;
     const el = document.getElementById(`p-${passageId}`);
     if (el) {
       el.classList.add('passage-flash');

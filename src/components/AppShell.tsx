@@ -82,12 +82,7 @@ export default function AppShell({ user, initialBookId, initialPassageId, initia
       ? { bookId: initialBookId, passageId: initialPassageId, flashPassage: initialFlash }
       : null,
   );
-  const [libraryCollapsed, setLibraryCollapsed] = useState(() =>
-    shouldStartLibraryCollapsed(
-      initialBookId,
-      typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
-    ),
-  );
+  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
   const [xrefPickFrom, setXrefPickFrom] = useState<XRefPickFrom | null>(null);
   // AI cross-reference suggestions (v2.0 Phase 6). Lifted here — not local to
   // ReaderPanel — so the results sheet survives `onOpenBook` re-rendering the
@@ -107,6 +102,16 @@ export default function AppShell({ user, initialBookId, initialPassageId, initia
 
   // Apply the saved light/dark/system color mode on load.
   useEffect(() => { initColorMode(); }, []);
+
+  // Phone-width direct /read/<id> landing: collapse the Library pane so the
+  // reader fills the screen. Done in an effect (not a lazy initializer) so
+  // server and first client render agree — see shouldStartLibraryCollapsed.
+  useEffect(() => {
+    if (shouldStartLibraryCollapsed(initialBookId, window.matchMedia('(max-width: 767px)').matches)) {
+      setLibraryCollapsed(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for the id this page loaded with
+  }, []);
 
   // Landing back from the Stripe billing portal: honor ?tab=settings (see
   // /api/stripe/portal's return_url). There's no dedicated /settings route —

@@ -29,7 +29,6 @@ export function openInApp(appUrl: string, webFallbackUrl: string): void {
   const teardown = () => {
     document.removeEventListener('visibilitychange', onHide);
     window.removeEventListener('pagehide', onHide);
-    window.removeEventListener('blur', onHide);
   };
   const onHide = (e: Event) => {
     if (e.type === 'visibilitychange' && document.visibilityState !== 'hidden') return;
@@ -39,7 +38,6 @@ export function openInApp(appUrl: string, webFallbackUrl: string): void {
 
   document.addEventListener('visibilitychange', onHide);
   window.addEventListener('pagehide', onHide);
-  window.addEventListener('blur', onHide);
 
   _nav.go(appUrl);
 
