@@ -1,12 +1,1 @@
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.shadbakht.immerse",
-      "sha256_cert_fingerprints": [
-        "92:B4:D1:21:40:44:28:23:10:7E:A2:95:9A:17:B1:58:CB:CC:83:43:65:BA:84:D7:1F:3F:31:EB:BC:EA:2B:DB"
-      ]
-    }
-  }
-]
+[]
