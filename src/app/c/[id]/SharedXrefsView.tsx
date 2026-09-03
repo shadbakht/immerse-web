@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { buildCitation } from '@/lib/citationUtils';
 import { citationInParens } from '@/lib/exportShared';
-import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
+import { loadCatalog, loadSlugMaps, bookLanguage } from '@/lib/catalog';
+import { openInApp } from '@/lib/openInApp';
 import { groupXrefsByPair } from '@/lib/xrefGrouping';
 import { makeTraditionResolver } from '@/lib/tradition';
 import { traditionPairOf, getSharedXrefSet, type XrefShareSide } from '@/lib/sharedSets';
@@ -34,7 +35,8 @@ const authorName = (book: BookRow): string | null =>
 interface ResolvedSide {
   snapshot: string;
   citation: string;
-  readerHref: string | null;
+  readerHref: string | null;      // web fallback path
+  appLink: { slug: string; pid?: string; lang: string; snap: string } | null;
   bookUuid: string;
 }
 interface ResolvedEntry {
@@ -114,11 +116,16 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
           passage?.book_id
           ?? (side.book_local_id ? slugToUuid.get(side.book_local_id) : undefined)
           ?? '';
+        const slug = side.book_local_id ?? uuidToSlug.get(bookUuid) ?? '';
+        const lang = slug ? bookLanguage(catalog, slug) : 'en';
         return {
           snapshot: side.snapshot_text,
           citation,
           readerHref: bookUuid
-            ? `/read/${bookUuid}${side.passage_id ? `?p=${side.passage_id}` : ''}`
+            ? `/read/${bookUuid}${side.passage_id ? `?p=${side.passage_id}&flash=1` : '?flash=1'}`
+            : null,
+          appLink: slug
+            ? { slug, pid: side.start_pid ?? undefined, lang, snap: String(side.snapshot_text ?? '').slice(0, 60) }
             : null,
           bookUuid,
         };
@@ -195,12 +202,27 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
                             </p>
                           )}
                           {side.readerHref && (
-                            <a
-                              href={side.readerHref}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (side.appLink) {
+                                  const qs = new URLSearchParams({
+                                    pid: side.appLink.pid ?? '',
+                                    lang: side.appLink.lang,
+                                    snap: side.appLink.snap,
+                                  });
+                                  openInApp(
+                                    `immerse://read/${encodeURIComponent(side.appLink.slug)}?${qs.toString()}`,
+                                    side.readerHref!,
+                                  );
+                                } else {
+                                  window.location.href = side.readerHref!;
+                                }
+                              }}
                               className="mt-1 inline-block text-xs text-[#1B6B7B] hover:underline dark:text-[#2D9DB3]"
                             >
                               {t('sharePage.openInReader')}
-                            </a>
+                            </button>
                           )}
                         </div>
                       ))}
