@@ -152,7 +152,7 @@ describe('defaulting to the language the browser is already in', () => {
   });
 
   it('falls back to English for a browser language Immerse does not speak', async () => {
-    withBrowserLanguages('de-DE');
+    withBrowserLanguages('ja-JP');
 
     const view = await mount(fakeSupabase(null));
 
