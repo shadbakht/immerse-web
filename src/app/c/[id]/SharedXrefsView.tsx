@@ -38,6 +38,7 @@ interface ResolvedSide {
   readerHref: string | null;      // web fallback path
   appLink: { slug: string; pid: string; lang: string; snap: string } | null;
   bookUuid: string;
+  imported: boolean;              // sharer's private imported book — render read-only
 }
 interface ResolvedEntry {
   xrefId: string;
@@ -118,16 +119,19 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
           ?? '';
         const slug = side.book_local_id ?? uuidToSlug.get(bookUuid) ?? '';
         const lang = slug ? bookLanguage(catalog, slug) : 'en';
+        const imported = !!side.imported;
         return {
           snapshot: side.snapshot_text,
           citation,
-          readerHref: bookUuid
-            ? `/read/${bookUuid}${side.passage_id ? `?p=${side.passage_id}&flash=1` : '?flash=1'}`
-            : null,
-          appLink: slug && side.start_pid
+          // An imported side points at the sharer's private book — nothing to open.
+          readerHref: imported || !bookUuid
+            ? null
+            : `/read/${bookUuid}${side.passage_id ? `?p=${side.passage_id}&flash=1` : '?flash=1'}`,
+          appLink: !imported && slug && side.start_pid
             ? { slug, pid: side.start_pid, lang, snap: String(side.snapshot_text ?? '').slice(0, 60) }
             : null,
           bookUuid,
+          imported,
         };
       };
 
@@ -199,6 +203,12 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
                           {side.citation && (
                             <p className="mt-1.5 text-xs italic text-gray-500 dark:text-[#5C7A8E]">
                               {citationInParens(side.citation)}
+                            </p>
+                          )}
+                          {side.imported && (
+                            <p className="mt-0.5 text-[11px] italic text-gray-400 dark:text-[#5C7A8E]">
+                              {/* TODO(i18n): sharePage.fromPrivateImport */}
+                              from a private import
                             </p>
                           )}
                           {side.readerHref && (

@@ -91,7 +91,7 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
   const citation = sel.citation ?? sel.bookTitle;
 
   useEffect(() => {
-    if (!expanded || !onOpenBook || !sel?.bookId || resolved) return;
+    if (!expanded || !onOpenBook || !sel?.bookId || sel.importedReadOnly || resolved) return;
     let cancelled = false;
     resolveCommunitySelection(sel).then(r => { if (!cancelled && r) setResolved(r); });
     return () => { cancelled = true; };
@@ -116,7 +116,7 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
         citation={citation}
         clampQuote={!expanded}
         onClick={() => setExpanded(e => !e)}
-        footer={expanded && onOpenBook && sel.bookId ? (
+        footer={expanded && onOpenBook && sel.bookId && !sel.importedReadOnly ? (
           <button
             onClick={e => { e.stopPropagation(); handleOpen(); }}
             disabled={opening}
@@ -126,6 +126,12 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
           </button>
         ) : undefined}
       />
+      {sel.importedReadOnly && (
+        <p className="mt-1 ps-1 text-[11px] italic text-gray-400 dark:text-[#5C7A8E]">
+          {/* TODO(i18n): sharePage.fromPrivateImport */}
+          from a private import
+        </p>
+      )}
     </div>
   );
 }

@@ -291,6 +291,9 @@ export interface XrefShareSide {
   passage_id: string | null;
   book_local_id: string | null;
   start_pid: string | null;
+  /** True when this side points at one of the sharer's private imported books.
+   *  Such a side renders read-only on the public page — no reader link. */
+  imported?: boolean;
 }
 export interface XrefShareEntry {
   xref_id: string;
