@@ -39,7 +39,14 @@ async function resolveBookId(bookId: string): Promise<string> {
 // and this paragraph moved or was edited), ReaderPanel matches it against
 // the book's own content to land on the nearest still-valid passage instead
 // of silently opening at the book's very top.
-export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string; passageSnapshot?: string } | null;
+export type ReaderTarget = { bookId: string; passageId?: string; highlightQuery?: string; passageSnapshot?: string; flashPassage?: boolean } | null;
+
+/** On a phone-width viewport, a direct /read/<id> landing should start with the
+ *  Library pane collapsed so the reader — not the library list — fills the
+ *  screen. The user can reopen it with the › rail. */
+export function shouldStartLibraryCollapsed(initialBookId: string | undefined, isNarrow: boolean): boolean {
+  return Boolean(initialBookId) && isNarrow;
+}
 
 export interface XRefPickFrom {
   text: string;
@@ -70,7 +77,12 @@ export default function AppShell({ user, initialBookId, initialPassageId }: AppS
   const [readerTarget, setReaderTarget] = useState<ReaderTarget>(
     initialBookId ? { bookId: initialBookId, passageId: initialPassageId } : null,
   );
-  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
+  const [libraryCollapsed, setLibraryCollapsed] = useState(() =>
+    shouldStartLibraryCollapsed(
+      initialBookId,
+      typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+    ),
+  );
   const [xrefPickFrom, setXrefPickFrom] = useState<XRefPickFrom | null>(null);
   // AI cross-reference suggestions (v2.0 Phase 6). Lifted here — not local to
   // ReaderPanel — so the results sheet survives `onOpenBook` re-rendering the
