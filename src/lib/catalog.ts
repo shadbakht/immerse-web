@@ -97,6 +97,12 @@ export function collectionName(catalog: Catalog, catId: string): string {
   return cur?.name ?? '';
 }
 
+/** The BCP-47 language of a catalog book by its corpus slug; 'en' if unknown
+ *  or absent (legacy entries predate the language field). */
+export function bookLanguage(catalog: Catalog, slug: string): string {
+  return catalog.books.find(b => b.id === slug)?.language ?? 'en';
+}
+
 /** Get the root tradition name for a category. */
 export function traditionName(catalog: Catalog, catId: string): string {
   const catMap = new Map(catalog.categories.map(c => [c.id, c]));
