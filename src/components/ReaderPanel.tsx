@@ -2511,6 +2511,7 @@ async function handleCopy() {
         selectionText={(pendingSelectionRef.current ?? selectionBar)?.text ?? ''}
         bookTitle={book?.title ?? ''}
         authorName={book?.authorName ?? ''}
+        bookLanguage={book?.language}
         isPro={isPro}
         userId={userId || null}
       />

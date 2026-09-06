@@ -17,11 +17,12 @@ interface AiPanelProps {
   selectionText: string;
   bookTitle:     string;
   authorName:    string;
+  bookLanguage?: string;
   isPro:         boolean;
   userId?:       string | null;
 }
 
-export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, isPro, userId }: AiPanelProps) {
+export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, bookLanguage, isPro, userId }: AiPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [result, setResult] = useState<AiResult | null>(null);
@@ -40,7 +41,7 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
     setError('');
     try {
       const { data, error } = await supabase.functions.invoke('explain-passage', {
-        body: { text: selectionText, bookTitle, authorName },
+        body: { text: selectionText, bookTitle, authorName, language: bookLanguage || undefined },
       });
       if (error) throw error;
       setResult(data);
