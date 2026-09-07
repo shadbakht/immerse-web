@@ -1,4 +1,4 @@
-import { proximityTokens, clusterCoverage, PROXIMITY_HL_STOP } from '../proximitySnippet';
+import { proximityTokens, clusterCoverage, PROXIMITY_HL_STOP, dropStopwords } from '../proximitySnippet';
 
 describe('proximityTokens', () => {
   it('keeps words > 2 chars, lower-cased, strips FTS punctuation', () => {
@@ -37,5 +37,20 @@ describe('PROXIMITY_HL_STOP', () => {
     const kept = proximityTokens('Seek the Lord while he may be found')
       .filter(w => !PROXIMITY_HL_STOP.has(w));
     expect(kept).toEqual(['seek', 'lord', 'while', 'may', 'found']);
+  });
+});
+
+describe('dropStopwords', () => {
+  it('removes English function words', () => {
+    expect(dropStopwords(['the', 'light', 'of', 'god'])).toEqual(['light', 'god']);
+  });
+  it('keeps everything when the query is all stopwords', () => {
+    expect(dropStopwords(['of', 'the'])).toEqual(['of', 'the']);
+  });
+  it('uses the content language and folds diacritics', () => {
+    expect(dropStopwords(['el', 'amor', 'de', 'dios'], 'es')).toEqual(['amor', 'dios']);
+    expect(dropStopwords(['está', 'la', 'luz'], 'es')).toEqual(['luz']);
+    expect(dropStopwords(['и', 'дух', 'и', 'истина'], 'ru')).toEqual(['дух', 'истина']);
+    expect(dropStopwords(['el', 'faro'], 'en')).toEqual(['el', 'faro']);
   });
 });

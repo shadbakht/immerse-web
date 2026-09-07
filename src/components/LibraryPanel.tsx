@@ -12,7 +12,7 @@ import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { planAiSearch, weightedRankFusion, fusionWeights, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
-import { proximityTokens, clusterCoverage, PROXIMITY_HL_STOP } from '@/lib/proximitySnippet';
+import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
 
@@ -588,7 +588,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   async function searchLocalBooks(q: string, bookIds: string[], exactPhrase: string | null): Promise<SearchResult[]> {
     if (bookIds.length === 0) return [];
-    const words = exactPhrase ? [] : q.trim().split(/\s+/).filter(w => w.length >= 2);
+    const words = exactPhrase ? [] : dropStopwords(q.trim().split(/\s+/).filter(w => w.length >= 2), contentLang);
     const foldedPhrase = exactPhrase ? foldPunctuation(exactPhrase).toLowerCase() : null;
     if (!foldedPhrase && words.length === 0) return [];
 
@@ -624,7 +624,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     if (scope !== null && scope.length === 0) return [];
     const expanded = expandSynonyms(q);
     const hasOps = /[|&!()"]/.test(expanded);
-    const tsQuery = hasOps ? expanded : q.trim().split(/\s+/).filter(Boolean).map(t => `${t}:*`).join(' & ');
+    // Drop English function words — "the light of God" searches for light & God,
+    // not "the" & "of" (which nearly every passage has, so they only drag the
+    // real terms' ranking down). dropStopwords keeps everything for an
+    // all-stopword query so it still returns something.
+    const tsQuery = hasOps
+      ? expanded
+      : dropStopwords(q.trim().split(/\s+/).filter(Boolean), contentLang).map(t => `${t}:*`).join(' & ');
     // Routed through the search_passages RPC rather than a direct
     // .textSearch(...).limit(40): the LIMIT made the planner pick a Seq Scan
     // over ~250k rows for rare terms (~7s → anon statement timeout). The RPC
@@ -808,7 +814,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
     if (scope !== null && scope.length === 0) return [];
-    const words = q.trim().split(/\s+/).filter(w => w.length >= 2);
+    const words = dropStopwords(q.trim().split(/\s+/).filter(w => w.length >= 2), contentLang);
     if (words.length === 0) return [];
     let query = supabase
       .from('passages')
@@ -846,7 +852,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       bestIdx = clusterCoverage(normContent, tokens).index;
     }
     if (bestIdx < 0) {
-      const words = query.trim().split(/\s+/).filter(Boolean);
+      // Anchor on a meaningful word, never the first "the" (usually char 0, the
+      // paragraph's opening line).
+      const words = dropStopwords(query.trim().split(/\s+/).filter(Boolean), contentLang);
       for (const w of words) {
         const idx = normContent.indexOf(normalize(w.replace(/[*":]/g, '')));
         if (idx >= 0 && (bestIdx < 0 || idx < bestIdx)) bestIdx = idx;
@@ -863,10 +871,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     // by length, "the"/"and"/pronouns by the stopword set, and no synonym
     // expansion) so the marked run reads as the phrase, not every article.
     const words = proximity
-      ? proximityTokens(query).filter(w => !PROXIMITY_HL_STOP.has(w))
-      : query.trim().split(/\s+/)
-          .map(w => w.replace(/[*":()&|]/g, '').trim())
-          .filter(w => w.length >= 2);
+      ? dropStopwords(proximityTokens(query), contentLang)
+      : dropStopwords(
+          query.trim().split(/\s+/)
+            .map(w => w.replace(/[*":()&|]/g, '').trim())
+            .filter(w => w.length >= 2),
+          contentLang,
+        );
     if (!words.length) return <span>{text}</span>;
     const normText = normalize(text);
     const ranges: { start: number; end: number }[] = [];
@@ -1111,7 +1122,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                               // A proximity hit's phrase is loose — hand the reader its
                               // significant words (minus stopwords), not "the"/"he".
                               const hq = result.proximity && result.matchPhrase
-                                ? proximityTokens(result.matchPhrase).filter(w => !PROXIMITY_HL_STOP.has(w)).join(' ')
+                                ? dropStopwords(proximityTokens(result.matchPhrase), contentLang).join(' ')
                                 : (result.matchPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim());
                               onOpenBook(result.bookId, result.passageId, hq);
                             }}
