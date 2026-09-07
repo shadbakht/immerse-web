@@ -15,19 +15,14 @@ interface Step {
   captionKey: TranslationKey;
 }
 
-// Ordered intro screenshots (iPad onboarding set), copied to /public/onboarding.
+// Ordered intro screenshots — desktop-web captures, in /public/onboarding.
 // Module level, so the copy is carried as keys and resolved at render.
 const STEPS: Step[] = [
-  { img: '1-Library-main.png',                                titleKey: 'onboarding.libraryTitle',     captionKey: 'onboarding.libraryCaption' },
-  { img: '2-Library-search-results.png',                      titleKey: 'onboarding.searchTitle',      captionKey: 'onboarding.searchCaption' },
-  { img: '3-Library-search-reseults-quick-add-Tag-1.png',     titleKey: 'onboarding.tagAsYouGoTitle',  captionKey: 'onboarding.tagAsYouGoCaption' },
-  { img: '4-Library-search-reseults-quick-add-Tag-2.png',     titleKey: 'onboarding.buildTagsTitle',   captionKey: 'onboarding.buildTagsCaption' },
-  { img: '5-Reader-Screen-selecting-text-action-buttons.png', titleKey: 'onboarding.selectActTitle',   captionKey: 'onboarding.selectActCaption' },
-  { img: '6-Reader-screen-annotations-in-margin.png',         titleKey: 'onboarding.marginTitle',      captionKey: 'onboarding.marginCaption' },
-  { img: '7-Reader-screen-viewing-TOC.png',                   titleKey: 'onboarding.navigateTitle',    captionKey: 'onboarding.navigateCaption' },
-  { img: '8-Tags-screen-main.png',                            titleKey: 'onboarding.yourTagsTitle',    captionKey: 'onboarding.yourTagsCaption' },
-  { img: '9-Xref-screen.png',                                 titleKey: 'onboarding.xrefsTitle',       captionKey: 'onboarding.xrefsCaption' },
-  { img: '10-Share-Tag-screen.png',                           titleKey: 'onboarding.shareTitle',       captionKey: 'onboarding.shareCaption' },
+  { img: 'w1-home.png',            titleKey: 'onboarding.tour.home.label', captionKey: 'onboarding.tour.home.caption' },
+  { img: 'w2-library-reader.png',  titleKey: 'onboarding.libraryTitle',    captionKey: 'onboarding.libraryCaption' },
+  { img: 'w3-select-act.png',      titleKey: 'onboarding.selectActTitle',  captionKey: 'onboarding.selectActCaption' },
+  { img: 'w4-compilations.png',    titleKey: 'onboarding.yourTagsTitle',   captionKey: 'onboarding.yourTagsCaption' },
+  { img: 'w5-xrefs.png',           titleKey: 'onboarding.xrefsTitle',      captionKey: 'onboarding.xrefsCaption' },
 ];
 
 export default function Onboarding({ visible, onClose }: OnboardingProps) {
