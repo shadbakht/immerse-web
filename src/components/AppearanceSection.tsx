@@ -171,7 +171,7 @@ export default function AppearanceSection({
              profiles.font_size and drives quote text on every screen. ── */}
       <Group label={t('appearance.textSize')}>
         <div className="flex gap-2">
-          {fontOptions.map(({ key, size }) => (
+          {fontOptions.map(({ key }) => (
             <button
               key={key}
               onClick={() => onFontChange(key)}
@@ -179,7 +179,9 @@ export default function AppearanceSection({
                 fontSize === key ? PILL_ON : PILL_OFF
               }`}
             >
-              <span className="font-semibold" style={{ fontSize: Math.min(size, 20) }}>A</span>
+              <span className="font-semibold text-[15px] tracking-wide">
+                {t(`appearance.textSize${key}` as TranslationKey)}
+              </span>
             </button>
           ))}
         </div>
