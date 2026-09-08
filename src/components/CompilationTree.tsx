@@ -259,8 +259,10 @@ export function CompilationTree({
 
   return (
     <div>
-      {/* Root compilation's underline — inset to the root checkbox column (RTL-safe) */}
-      <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={{ marginInlineStart: 16 }} />
+      {/* Root compilation's underline — inset to the root checkbox column (RTL-safe).
+          Suppressed in readOnly (share-page) mode, where a bordered container
+          already draws a top edge and this hairline reads as a nick just inside it. */}
+      {!readOnly && <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={{ marginInlineStart: 16 }} />}
       {rootSels.map((sel: any, i: number) => (
         <CommunitySelection key={i} sel={sel} depth={0} onOpenBook={effectiveOpenBook} />
       ))}

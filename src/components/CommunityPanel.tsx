@@ -13,6 +13,7 @@ import {
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow } from '@/lib/tagExport';
 import { createDiscoverBundleShare, revokeSharedSet } from '@/lib/sharedSets';
 import { shareUrl } from '@/lib/shareUrl';
+import { scriptScaleForText, treeDepthWeight } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import {
@@ -144,7 +145,13 @@ function TagCard({
           className="flex-1 min-w-0 cursor-pointer"
           onClick={() => setExpanded(e => !e)}
         >
-          <div className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{ct.name}</div>
+          <div
+            className="text-gray-800 dark:text-[#D2DCE8] truncate leading-5"
+            style={{
+              fontSize: `calc(0.875rem * ${scriptScaleForText(ct.name)})`,
+              fontWeight: treeDepthWeight(0),
+            }}
+          >{ct.name}</div>
           <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5">
             {showAuthor && (
               <>

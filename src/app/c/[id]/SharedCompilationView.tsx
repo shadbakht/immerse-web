@@ -2,6 +2,7 @@
 
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { CompilationTree } from '@/components/CompilationTree';
+import { scriptScaleForText } from '@/lib/readerTypography';
 import SaveOnLoad from './SaveOnLoad';
 
 /**
@@ -26,7 +27,10 @@ export default function SharedCompilationView({
       <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E]">
         {t('sharePage.eyebrow')}
       </p>
-      <h1 className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{name}</h1>
+      <h1
+        className="mt-1 text-2xl font-bold text-gray-900 dark:text-white"
+        style={{ fontSize: `calc(1.5rem * ${scriptScaleForText(name)})` }}
+      >{name}</h1>
 
       <div className="mt-6 rounded-xl border border-gray-100 bg-white dark:border-[#2D4050] dark:bg-[#1B2A38]">
         <CompilationTree payload={payload} readOnly />
