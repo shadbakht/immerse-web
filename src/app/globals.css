@@ -104,6 +104,10 @@
      Set by applyReaderPrefs() in src/lib/readerPrefs.ts. Defaults here mirror
      DEFAULT_READER_PREFS in src/lib/readerTypography.ts — keep them in step. */
   --reader-font-family: 'Literata', Georgia, serif;
+  /* Per-book script scale (Perso-Arabic 1.15, CJK 1.05, else 1). Set by
+     applyReaderPrefs() from scriptScale(bookLanguage) — the ONLY script-scaling
+     factor on .reader-page. buildThemePayload.fontSize is not consumed on web. */
+  --reader-font-scale: 1;
   --reader-line-height: 1.5;
   --reader-bg: #FFFFFF;
   --reader-fg: #1C2B35;
@@ -171,7 +175,7 @@ body {
   background: var(--reader-bg);
   color: var(--reader-fg);
   font-family: var(--reader-font-family);
-  font-size: var(--quote-font-size);
+  font-size: calc(var(--quote-font-size) * var(--reader-font-scale, 1));
   line-height: var(--reader-line-height);
   font-weight: var(--reader-weight);
   letter-spacing: var(--reader-letter-spacing);

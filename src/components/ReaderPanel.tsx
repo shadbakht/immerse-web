@@ -766,12 +766,17 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
     apply(getStoredPrefs());
     initReaderPrefs(supabase, userId ?? null, {
-      fontSizePx: fontPx(), isDark: isDark(),
+      fontSizePx: fontPx(), isDark: isDark(), bookLanguage: book?.language,
     }).then(apply);
 
     const onChange = (e: Event) => apply((e as CustomEvent<ReaderPrefs>).detail);
     window.addEventListener('appearance-changed', onChange);
-    return () => window.removeEventListener('appearance-changed', onChange);
+    return () => {
+      window.removeEventListener('appearance-changed', onChange);
+      // Leaving a Perso-Arabic / CJK book: drop the scale so a Latin view that
+      // briefly mounts a .reader-page before prefs re-apply isn't left scaled.
+      document.documentElement.style.setProperty('--reader-font-scale', '1');
+    };
   }, [userId, book?.language]);
 
   // Pre-compute max sort_order once passages load (for fraction calculation)
