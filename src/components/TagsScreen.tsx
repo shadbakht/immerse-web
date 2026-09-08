@@ -94,17 +94,25 @@ function SortableTagRow({ tag, count, isOpen, hasQuotes, onToggleOpen, canIndent
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tag.id });
   const depth = tag.depth ?? 0;
+  const nameScale = scriptScaleForText(tag.name);
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, paddingLeft: 12 + depth * 16 }}
+      style={{ transform: CSS.Transform.toString(transform), transition, paddingInlineStart: 12 + depth * 16 }}
       className={`flex items-center gap-2 py-3 pe-3 border-b border-gray-100 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
     >
       <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 dark:text-[#5C7A8E] touch-none" aria-label={t('common.dragToReorder')}>
         <DragGrip />
       </button>
       <button onClick={onToggleOpen} className="flex-1 flex items-center gap-2 min-w-0 text-start">
-        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#E2EAF2] truncate">{tag.name}</span>
+        <span
+          className="flex-1 text-gray-800 dark:text-[#E2EAF2] truncate leading-5"
+          style={{
+            fontSize: `calc(0.875rem * ${nameScale})`,
+            fontWeight: treeDepthWeight(depth),
+            color: depth === 0 ? undefined : 'var(--tree-sub)',
+          }}
+        >{tag.name}</span>
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{count}</span>
         {hasQuotes && <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>}
       </button>
@@ -129,7 +137,7 @@ function SortableQuoteRow({ sel, depth }: { sel: SelRow; depth: number }) {
       </button>
       <span
         className="flex-1 text-gray-600 dark:text-[#8FA4B8] truncate italic leading-4"
-        style={{ fontSize: `calc(0.75rem * ${scriptScale(sel.book_language)})` }}
+        style={{ fontSize: `calc(0.75rem * ${sel.book_language ? scriptScale(sel.book_language) : scriptScaleForText(sel.snapshot_text)})` }}
       >{sel.snapshot_text}</span>
     </div>
   );
@@ -197,7 +205,7 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: Se
       <AnnotationCard
         variant="tag"
         quote={sel.snapshot_text}
-        sizeScale={scriptScale(sel.book_language)}
+        sizeScale={sel.book_language ? scriptScale(sel.book_language) : scriptScaleForText(sel.snapshot_text)}
         citation={sel.citation || sel.book_title || ''}
         query={searchQuery}
         clampQuote={!expanded}
@@ -257,8 +265,6 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
       },
     },
   ];
-
-  const indent = (depth ?? 0) * 20;
 
   const d = depth ?? 0;
   const nameScale = scriptScaleForText(tag.name);
