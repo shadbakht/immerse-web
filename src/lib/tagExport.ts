@@ -25,6 +25,8 @@ export interface SelRow {
   book_id: string;
   book_title?: string;
   citation: string;
+  /** Book language for per-script sizing (undefined for imported books). */
+  book_language?: string;
 }
 
 export interface TagRow {

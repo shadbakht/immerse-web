@@ -15,6 +15,9 @@ export interface SelInfo {
   book_id:       string;
   book_title:    string;
   citation:      string;
+  /** The book's language (BCP-47-ish, e.g. 'fa', 'zh'), for per-script sizing.
+   *  Undefined for imported books (no catalog language). */
+  book_language?: string;
   /** True for a selection on a synced imported book: it has a real title to
    *  show, but there is no web reader for it, so "open in reader" must be
    *  suppressed. */
@@ -44,7 +47,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
   const bookIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
   const { data: bookData } = await supabase
     .from('books')
-    .select('id, title, citation_format, authors(name)')
+    .select('id, title, citation_format, language, authors(name)')
     .in('id', bookIds);
   const bookMap: Record<string, any> = {};
   for (const b of (bookData ?? []) as any[]) bookMap[b.id] = b;
@@ -61,6 +64,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
       book_id:       passage?.book_id  ?? '',
       book_title:    book?.title       ?? '',
       citation:      buildCitation(passage, book, (author as any)?.name),
+      book_language: book?.language ?? undefined,
     };
   }
 

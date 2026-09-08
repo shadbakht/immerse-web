@@ -12,6 +12,7 @@ import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow, 
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
+import { scriptScale, scriptScaleForText, treeDepthWeight } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -120,13 +121,16 @@ function SortableQuoteRow({ sel, depth }: { sel: SelRow; depth: number }) {
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition, paddingLeft: 20 + depth * 16 }}
+      style={{ transform: CSS.Transform.toString(transform), transition, paddingInlineStart: 20 + depth * 16 }}
       className={`flex items-center gap-3 py-2 pe-4 border-b border-gray-50 dark:border-[#243543] bg-gray-50/40 dark:bg-[#16232F] ${isDragging ? 'opacity-60 shadow-lg z-10 relative' : ''}`}
     >
       <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-[#3A4D60] touch-none" aria-label={t('common.dragToReorder')}>
         <DragGrip />
       </button>
-      <span className="flex-1 text-xs text-gray-600 dark:text-[#8FA4B8] truncate italic">{sel.snapshot_text}</span>
+      <span
+        className="flex-1 text-gray-600 dark:text-[#8FA4B8] truncate italic leading-4"
+        style={{ fontSize: `calc(0.75rem * ${scriptScale(sel.book_language)})` }}
+      >{sel.snapshot_text}</span>
     </div>
   );
 }
@@ -186,13 +190,14 @@ function PassageRow({ sel, searchQuery, onOpenBook, onRemove, depth }: { sel: Se
   ];
 
   return (
-    <div className="pe-3 py-1.5" style={{ paddingLeft: 36 + depth * 14 }}>
+    <div className="pe-3 py-1.5" style={{ paddingInlineStart: 36 + depth * 14 }}>
       {/* Synced imported books have no web reader (empty passage_id) — the
           citation falls back to the title and the "open in reader" link is
           suppressed. */}
       <AnnotationCard
         variant="tag"
         quote={sel.snapshot_text}
+        sizeScale={scriptScale(sel.book_language)}
         citation={sel.citation || sel.book_title || ''}
         query={searchQuery}
         clampQuote={!expanded}
@@ -255,7 +260,9 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
 
   const indent = (depth ?? 0) * 20;
 
-  const rowPaddingLeft = 12 + (depth ?? 0) * 14;
+  const d = depth ?? 0;
+  const nameScale = scriptScaleForText(tag.name);
+  const rowPaddingLeft = 12 + d * 14;
 
   return (
     <div>
@@ -267,6 +274,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
               autoFocus
               value={newName}
               onChange={e => setNewName(e.target.value)}
+              style={{ fontSize: `calc(0.875rem * ${scriptScaleForText(newName)})` }}
               className="w-full px-3 py-2 border border-gray-200 dark:border-[#2D4050] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 mb-4"
               onKeyDown={e => {
                 if (e.key === 'Enter') {
@@ -287,11 +295,18 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
       )}
       <div
         className="flex items-center py-3.5 pe-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
-        style={{ paddingLeft: rowPaddingLeft }}
+        style={{ paddingInlineStart: rowPaddingLeft }}
         onClick={() => onToggleOpen?.()}
       >
         <Checkbox state={selectState} onChange={onToggleSelect} />
-        <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate ms-1 min-w-0">
+        <span
+          className="flex-1 text-gray-800 dark:text-[#D2DCE8] truncate ms-1 min-w-0 leading-5"
+          style={{
+            fontSize: `calc(0.875rem * ${nameScale})`,
+            fontWeight: treeDepthWeight(d),
+            color: d === 0 ? undefined : 'var(--tree-sub)',
+          }}
+        >
           <Highlight text={tag.name} q={searchQuery} />
         </span>
         {(tag.visibility === 'published' || tag.visibility === 'imported') && (
@@ -980,10 +995,10 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
           <div>
             {filtered.map((tag, i) => {
               const next = filtered[i + 1];
-              // Divider after this tag's subtree: full-width before a top-level
-              // tag, inset before a sub-tag, none at the end.
-              const nextDepth = next ? (next.depth ?? 0) : null;
-              const inset = nextDepth === null ? null : nextDepth === 0 ? 0 : 12 + nextDepth * 14;
+              // Divider under this tag's group: a hairline inset to this tag's
+              // own checkbox column (= rowPaddingLeft, RTL-safe), so each
+              // divider reads as that group's underline. None after the last row.
+              const inset = next ? 12 + (tag.depth ?? 0) * 14 : null;
               return (
                 <div key={tag.id}>
                   <TagCard
@@ -1003,7 +1018,7 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
                     onRemovePassage={handleRemovePassage}
                   />
                   {inset !== null && (
-                    <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: inset }} />
+                    <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginInlineStart: inset }} />
                   )}
                 </div>
               );
