@@ -15,6 +15,7 @@ import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
+import { scriptScale, treeDepthWeight } from '@/lib/readerTypography';
 
 // Categories whose books have no canonical order and should display
 // alphabetically (mirrors the mobile LibraryScreen normalised sort).
@@ -205,6 +206,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     ? contentLanguage
     : 'en';
 
+  // The library is content-language-scoped, so the whole tree renders in one
+  // script — apply the per-script apparent-size correction once, here.
+  const treeScale = scriptScale(contentLang);
+
   // Categories that contain at least one book in the active language, at any
   // depth. Categories are shared across languages, so without this the Spanish
   // scope would still show every empty English branch.
@@ -307,7 +312,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             <Fragment key={book.id}>
             <div
               className="flex items-center hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
-              style={{ paddingLeft: bookPadLeft }}
+              style={{ paddingInlineStart: bookPadLeft }}
             >
               <Checkbox
                 state={isChecked ? 'checked' : 'unchecked'}
@@ -318,7 +323,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 onClick={() => onOpenBook(uuid)}
                 className="flex-1 text-start pe-4 py-2.5 min-w-0"
               >
-                <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
+                <div
+                  className="leading-5 text-gray-800 dark:text-[#D2DCE8] truncate"
+                  style={{ fontSize: `calc(0.875rem * ${treeScale})` }}
+                >{book.title}</div>
               </button>
             </div>
             <Divider id={book.id} />
@@ -336,7 +344,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             <div key={child.id}>
               <div
                 className="flex items-center hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
-                style={{ paddingLeft: catPadLeft }}
+                style={{ paddingInlineStart: catPadLeft }}
               >
                 <Checkbox
                   state={state}
@@ -347,11 +355,21 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                   onClick={() => toggleNode(child.id)}
                   className="flex-1 flex items-center justify-between pe-4 py-3 text-start min-w-0"
                 >
-                  <span className={`truncate ${level === 0 ? 'text-sm font-medium text-gray-800 dark:text-[#D2DCE8]' : 'text-sm text-gray-700 dark:text-[#B8C7D6]'}`}>
+                  <span
+                    className="truncate leading-5 text-gray-800 dark:text-[#D2DCE8]"
+                    style={{
+                      fontSize: `calc(0.875rem * ${treeScale})`,
+                      fontWeight: treeDepthWeight(level),
+                      color: level === 0 ? undefined : 'var(--tree-sub)',
+                    }}
+                  >
                     {child.name}
                   </span>
                   <div className="flex items-center gap-2 shrink-0 ms-2">
-                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{childImmediate}</span>
+                    <span
+                      className="leading-4 text-gray-400 dark:text-[#5C7A8E]"
+                      style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
+                    >{childImmediate}</span>
                     <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </div>
                 </button>
@@ -938,10 +956,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     .filter(c => c.parentId === null && c.kind !== 'imported' && inScopeCats.has(c.id))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
-  // Depth-aware dividers (match the Tags/mobile-Library treatment): a full-width
-  // line only BETWEEN top-level categories; sub-levels get a line inset to the
-  // next row's indentation; none after the last visible row. Built by flattening
-  // the currently-expanded tree so the lookahead crosses subtree boundaries.
+  // Depth-aware dividers (match the Tags/mobile-Library treatment): every row's
+  // hairline is that row's own underline, inset to its checkbox column at every
+  // depth (traditions included — no full-width case); none after the last
+  // visible row. Built by flattening the currently-expanded tree.
   const dividerInset = useMemo(() => {
     const rows: { id: string; level: number }[] = [];
     const walk = (parentId: string, level: number) => {
@@ -957,8 +975,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }
     const map = new Map<string, number | null>();
     for (let i = 0; i < rows.length; i++) {
-      const next = rows[i + 1];
-      map.set(rows[i].id, !next ? null : next.level === 0 ? 0 : 12 + next.level * 14);
+      const cur = rows[i];
+      map.set(cur.id, i === rows.length - 1 ? null : 12 + cur.level * 14);
     }
     return map;
   }, [roots, openNodes, childrenOf, booksInCategory]);
@@ -966,7 +984,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   const Divider = ({ id }: { id: string }) => {
     const inset = dividerInset.get(id);
     if (inset == null) return null;
-    return <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={inset > 0 ? { marginLeft: inset } : undefined} />;
+    return <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={inset > 0 ? { marginInlineStart: inset } : undefined} />;
   };
 
   // The AI leg still working. Every failure is deliberately silent — the keyword
@@ -1112,7 +1130,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         <p className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium mb-1 truncate">
                           {result.semantic ? `${t('library.relatedPrefix')} · ` : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
-                        <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: 'var(--quote-font-size)' }}>
+                        <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: `calc(var(--quote-font-size) * ${treeScale})` }}>
                           {isExpanded ? highlightQuery(result.content, matchQuery, result.proximity) : highlightQuery(snippet, matchQuery, result.proximity)}
                         </p>
                         {isExpanded && (
@@ -1157,9 +1175,15 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     onClick={() => toggleNode(root.id)}
                     className="flex-1 flex items-center justify-between pe-4 py-3.5 text-start min-w-0"
                   >
-                    <span className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{root.name}</span>
+                    <span
+                      className="leading-5 text-gray-800 dark:text-[#D2DCE8] truncate"
+                      style={{ fontSize: `calc(0.875rem * ${treeScale})`, fontWeight: treeDepthWeight(0) }}
+                    >{root.name}</span>
                     <div className="flex items-center gap-2 shrink-0 ms-2">
-                      <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{immediateCount}</span>
+                      <span
+                        className="leading-4 text-gray-400 dark:text-[#5C7A8E]"
+                        style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
+                      >{immediateCount}</span>
                       <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>
