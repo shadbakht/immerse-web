@@ -54,7 +54,7 @@ export function applyReaderPrefs(
   opts: { fontSizePx: number; isDark: boolean; bookLanguage?: string | null } ,
 ) {
   if (typeof document === 'undefined') return;
-  const p = buildThemePayload(prefs, opts.fontSizePx, opts.isDark);
+  const p = buildThemePayload(prefs, opts.fontSizePx, opts.isDark, opts.bookLanguage);
   const s = document.documentElement.style;
 
   s.setProperty('--reader-font-family', stackFor(prefs, opts.bookLanguage));

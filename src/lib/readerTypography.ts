@@ -171,6 +171,94 @@ export function scriptFaceFor(language: string | null | undefined):
   return null;
 }
 
+// ── Per-script apparent-size correction ──────────────────────────────────────
+// At an identical nominal size, Perso-Arabic script occupies a shorter
+// meaningful band with lighter strokes than Latin, so it reads smaller; Han
+// glyphs fill the em but their internal detail muddies at small sizes. This
+// multiplier brings both back toward parity with Latin. Keyed off SCRIPT (via
+// scriptFaceFor), so it stays consistent with the per-book script face.
+// Cyrillic tracks Latin and needs nothing. Starting values — confirmed on a
+// Pixel 8 and an iPhone; see
+// docs/superpowers/plans/2026-09-07-library-depth-and-script-sizing.md.
+//
+// INVARIANT: every key of SCRIPT_FACES must have an entry here — use 1.0 for
+// "no correction needed" — and scriptOf's regex chain must gain a matching
+// branch for any new script in tandem, or a string in that script silently
+// falls through to null / no correction.
+export const SCRIPT_SIZE_SCALE: Record<keyof typeof SCRIPT_FACES, number> = {
+  arabic: 1.15,
+  cjk: 1.05,
+};
+
+/** Apparent-size multiplier for a book's language. 1 = no correction. */
+export function scriptScale(language: string | null | undefined): number {
+  const s = scriptFaceFor(language);
+  return s ? SCRIPT_SIZE_SCALE[s] : 1;
+}
+
+// Arabic = U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF
+// (matches SCRIPT_FACES.arabic.unicodeRange). Escape form, not literal glyphs,
+// so this block copies byte-for-byte into the web mirror with no mojibake risk.
+const ARABIC_TEXT_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+// CJK text: Han ideograph blocks (U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF) plus
+// Kana (U+3040-30FF) and Hangul syllables (U+AC00-D7AF), kept in step with
+// scriptFaceFor routing 'ja'/'ko' to the 'cjk' face. Still deliberately
+// omits the CJK punctuation / fullwidth blocks in SCRIPT_FACES.cjk.unicodeRange
+// — punctuation alone must not classify a string as CJK; Kana and Hangul are
+// included on purpose.
+const CJK_TEXT_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/;
+
+/**
+ * The script of a user-typed string (a compilation name) — for rows that carry
+ * no language metadata. Detects Perso-Arabic, or CJK (Han / Kana / Hangul).
+ * First non-Latin script present wins; a Latin- or Cyrillic-only string
+ * returns null.
+ */
+export function scriptOf(
+  text: string | null | undefined,
+): keyof typeof SCRIPT_FACES | null {
+  if (!text) return null;
+  if (ARABIC_TEXT_RE.test(text)) return 'arabic';
+  if (CJK_TEXT_RE.test(text)) return 'cjk';
+  return null;
+}
+
+/** scriptScale for a user-typed string (compilation headings). */
+export function scriptScaleForText(text: string | null | undefined): number {
+  const s = scriptOf(text);
+  return s ? SCRIPT_SIZE_SCALE[s] : 1;
+}
+
+// ── Tree depth hierarchy ────────────────────────────────────────────────────
+// Library / Compilation trees recede with depth by WEIGHT and colour, never
+// size. Weight ramp is shared so mobile and web can't drift; colour is a
+// semantic role each platform resolves to its own token:
+//   depth 0 → weight TREE_DEPTH_WEIGHT[0], colour = textPrimary
+//   depth 1 → weight TREE_DEPTH_WEIGHT[1], colour = textSecondary
+//   depth ≥2 → weight TREE_DEPTH_WEIGHT[2], colour = textSecondary
+// Colour deliberately stops at textSecondary — textMuted is too faint for a
+// category name.
+// TREE_DEPTH_COLOR_ROLE / treeDepthColorRole express that depth→colour mapping
+// as shared code alongside the weight ramp, so the two platforms can't drift.
+export const TREE_DEPTH_WEIGHT = [600, 500, 400] as const;
+
+/** Font weight for a tree row at the given depth (clamped to the last tier). */
+export function treeDepthWeight(depth: number): number {
+  return TREE_DEPTH_WEIGHT[
+    Math.min(Math.max(Math.floor(depth), 0), TREE_DEPTH_WEIGHT.length - 1)
+  ];
+}
+
+/** Semantic colour role per depth tier — resolved by each platform to its own theme token. */
+export const TREE_DEPTH_COLOR_ROLE = ['textPrimary', 'textSecondary', 'textSecondary'] as const;
+
+/** Colour role for a tree row at the given depth (clamped to the last tier). */
+export function treeDepthColorRole(depth: number): 'textPrimary' | 'textSecondary' {
+  return TREE_DEPTH_COLOR_ROLE[
+    Math.min(Math.max(Math.floor(depth), 0), TREE_DEPTH_COLOR_ROLE.length - 1)
+  ];
+}
+
 // ── Scales ───────────────────────────────────────────────────────────────────
 
 // Line spacing is now INDEPENDENT of font size. It used to be welded to the
@@ -270,6 +358,10 @@ export function buildThemePayload(
   prefs: ReaderPrefs,
   fontSizePx: number,
   isDark: boolean,
+  // Optional per-book script — composes the per-script apparent-size correction
+  // (scriptScale) on top of the per-typeface x-height correction. Omitted /
+  // undefined / null → scriptScale returns 1, so 3-arg callers are unchanged.
+  bookLanguage?: string | null,
 ): ReaderThemePayload {
   const palette = resolveTheme(prefs.theme, isDark);
   const face = TYPEFACES.find(t => t.key === prefs.typeface) ?? TYPEFACES[0];
@@ -278,7 +370,11 @@ export function buildThemePayload(
 
   return {
     fontFamily: face.stack,
-    fontSize: Math.round(fontSizePx * (face.sizeMultiplier ?? 1)),
+    // Per-typeface x-height correction (sizeMultiplier) and per-script
+    // apparent-size correction (scriptScale) compose multiplicatively.
+    fontSize: Math.round(
+      fontSizePx * (face.sizeMultiplier ?? 1) * scriptScale(bookLanguage),
+    ),
     lineHeight: LINE_SPACING[prefs.lineSpacing],
     background: palette.bg,
     text: palette.fg,
