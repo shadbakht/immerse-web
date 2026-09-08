@@ -6,6 +6,7 @@ import { AnnotationCard } from './AnnotationCard';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { openInApp } from '@/lib/openInApp';
 import { loadCatalog, bookLanguage } from '@/lib/catalog';
+import { scriptScale, scriptScaleForText, treeDepthWeight } from '@/lib/readerTypography';
 
 export type OpenBookFn = (
   bookId: string,
@@ -109,10 +110,11 @@ function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBo
   }
 
   return (
-    <div className="pe-4 py-1.5" style={{ paddingLeft: 32 + depth * 16 }}>
+    <div className="pe-4 py-1.5" style={{ paddingInlineStart: 32 + depth * 16 }}>
       <AnnotationCard
         variant="discover"
         quote={sel.snapshotText}
+        sizeScale={resolved?.appLink.lang ? scriptScale(resolved.appLink.lang) : scriptScaleForText(sel.snapshotText)}
         citation={citation}
         clampQuote={!expanded}
         onClick={() => setExpanded(e => !e)}
@@ -198,16 +200,24 @@ function SubTagNode({ node, payload, depth, readOnly, selectedIds, onToggleSelec
   const sels = node.selections ?? [];
   return (
     <div>
-      {/* Sub-level divider: hairline inset to this sub-tag's indentation */}
-      <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 16 + depth * 16 }} />
-      <div className="flex items-center gap-2 py-2 pe-4" style={{ paddingLeft: 16 + depth * 16 }}>
+      <div className="flex items-center gap-2 py-2 pe-4" style={{ paddingInlineStart: 16 + depth * 16 }}>
         {!readOnly && selectedIds && (
           <Checkbox state={nodeCheckState(payload, node.exportId, selectedIds)} onChange={() => onToggleSelect?.(node.exportId)} />
         )}
-        <button className="flex-1 min-w-0 text-start text-sm text-gray-700 dark:text-[#B8C7D6] truncate" onClick={() => setOpen(o => !o)}>{node.name}</button>
+        <button
+          className="flex-1 min-w-0 text-start truncate text-gray-800 dark:text-[#D2DCE8] leading-5"
+          style={{
+            fontSize: `calc(0.875rem * ${scriptScaleForText(node.name)})`,
+            fontWeight: treeDepthWeight(depth),
+            color: depth === 0 ? undefined : 'var(--tree-sub)',
+          }}
+          onClick={() => setOpen(o => !o)}
+        >{node.name}</button>
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{sels.length}</span>
         <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
       </div>
+      {/* Sub-level divider: this row's underline, inset to its checkbox column (RTL-safe) */}
+      <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={{ marginInlineStart: 16 + depth * 16 }} />
       {open && (
         <div>
           {sels.map((sel: any, i: number) => <CommunitySelection key={i} sel={sel} depth={depth} onOpenBook={onOpenBook} />)}
@@ -249,6 +259,8 @@ export function CompilationTree({
 
   return (
     <div>
+      {/* Root compilation's underline — inset to the root checkbox column (RTL-safe) */}
+      <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={{ marginInlineStart: 16 }} />
       {rootSels.map((sel: any, i: number) => (
         <CommunitySelection key={i} sel={sel} depth={0} onOpenBook={effectiveOpenBook} />
       ))}
