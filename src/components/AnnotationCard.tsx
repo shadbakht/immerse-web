@@ -42,6 +42,8 @@ export interface AnnotationCardProps {
   children?:  React.ReactNode;
   /** Slot rendered after the citation row (open-in-reader link…). */
   footer?:    React.ReactNode;
+  /** Per-script size multiplier for the quoted passage (1 = none). */
+  sizeScale?: number;
   className?: string;
 }
 
@@ -50,7 +52,7 @@ export interface AnnotationCardProps {
 // small-caps citation + flexible content slots.
 export function AnnotationCard({
   variant, quote, citation, kicker, date, query = '',
-  clampQuote, quoteLines, citationFirst, action, onClick, belowQuote, children, footer, className = '',
+  clampQuote, quoteLines, citationFirst, action, onClick, belowQuote, children, footer, sizeScale = 1, className = '',
 }: AnnotationCardProps) {
   const a = ACCENT[variant];
   // Tailwind needs literal class names — map explicitly.
@@ -62,9 +64,9 @@ export function AnnotationCard({
   const citeRow = (citation || date) ? (
     <div className="flex items-center justify-between gap-2 mt-1.5">
       {citation
-        ? <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] truncate"><Highlight text={citation} q={query} /></p>
+        ? <p className="uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] truncate" style={{ fontSize: `calc(10px * ${sizeScale})` }}><Highlight text={citation} q={query} /></p>
         : <span />}
-      {date && <p className="text-[10px] text-gray-400 dark:text-[#5C7A8E] shrink-0">{date}</p>}
+      {date && <p className="text-gray-400 dark:text-[#5C7A8E] shrink-0" style={{ fontSize: `calc(10px * ${sizeScale})` }}>{date}</p>}
     </div>
   ) : null;
   return (
@@ -78,7 +80,7 @@ export function AnnotationCard({
                 <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#5C7A8E] truncate block">{kicker}</span>
               </div>
             )}
-            <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${quoteClamp}`} style={{ fontSize: 'var(--quote-font-size)' }}>
+            <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${quoteClamp}`} style={{ fontSize: `calc(var(--quote-font-size) * ${sizeScale})` }}>
               &quot;<Highlight text={quote} q={query} />&quot;
             </p>
             {citationFirst && citeRow}
