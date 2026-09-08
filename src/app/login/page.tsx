@@ -26,6 +26,17 @@ function LoginPageInner() {
   const [showPassword, setShowPassword] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // When set, a 6-digit code panel replaces the form.
+  const [verify, setVerify] = useState<{ email: string; mode: 'signup' | 'recovery' } | null>(null);
+  const [code, setCode] = useState('');
+  const [codeCooldown, setCodeCooldown] = useState(0);
+
+  useEffect(() => {
+    if (codeCooldown <= 0) return;
+    const id = setTimeout(() => setCodeCooldown(s => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [codeCooldown]);
+
   useEffect(() => {
     if (!isSignUp) return;
     const raw = username.toLowerCase().trim();
@@ -53,16 +64,54 @@ function LoginPageInner() {
     if (!email) { setError(t('auth.enterEmailBody')); return; }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) throw error;
-      setSuccess(t('auth.resetLinkSent', { email }));
+      setForgotMode(false);
+      setVerify({ email, mode: 'recovery' });
+      setCode(''); setCodeCooldown(60);
     } catch (err: any) {
       setError(err.message ?? t('common.somethingWrong'));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleVerifyCode() {
+    setError('');
+    const clean = code.replace(/\D/g, '');
+    if (clean.length < 6) { setError(t('auth.codeIncorrect')); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: verify!.email,
+        token: clean,
+        type: verify!.mode === 'signup' ? 'signup' : 'recovery',
+      });
+      if (error) {
+        setError(/rate|too many|429/i.test(error.message ?? '') ? t('auth.tooManyAttempts') : t('auth.codeIncorrect'));
+        return;
+      }
+      if (verify!.mode === 'recovery') { router.push('/auth/reset'); router.refresh(); }
+      else { router.push(redirectTo); router.refresh(); }
+    } catch (err: any) {
+      setError(err.message ?? t('common.somethingWrong'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendCode() {
+    if (codeCooldown > 0 || !verify) return;
+    setError(''); setSuccess('');
+    const { error } = verify.mode === 'recovery'
+      ? await supabase.auth.resetPasswordForEmail(verify.email)
+      : await supabase.auth.resend({ type: 'signup', email: verify.email });
+    if (error) {
+      setError(/rate|too many|429/i.test(error.message ?? '') ? t('auth.tooManyAttempts') : t('auth.codeIncorrect'));
+      return;
+    }
+    setSuccess(t('auth.codeResent'));
+    setCodeCooldown(60);
   }
 
   async function handleSubmit() {
@@ -83,7 +132,15 @@ function LoginPageInner() {
     try {
       if (!isSignUp) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          if (/email not confirmed/i.test(error.message ?? '')) {
+            await supabase.auth.resend({ type: 'signup', email });
+            setVerify({ email, mode: 'signup' });
+            setCode(''); setCodeCooldown(60);
+            return;
+          }
+          throw error;
+        }
         router.push(redirectTo);
         router.refresh();
       } else {
@@ -101,7 +158,8 @@ function LoginPageInner() {
             full_name:  fullName || email,
           }).then(() => {}); // best-effort; doesn't block the signup flow
         }
-        setSuccess(t('auth.checkEmailBody', { email }));
+        setVerify({ email, mode: 'signup' });
+        setCode(''); setCodeCooldown(60);
       }
     } catch (err: any) {
       setError(err.message ?? t('common.somethingWrong'));
@@ -122,13 +180,41 @@ function LoginPageInner() {
           <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">{t('auth.tagline')}</p>
         </div>
 
-        {success ? (
-          <div className="text-center space-y-4">
-            <div className="text-4xl">📬</div>
-            <p className="text-white font-semibold text-lg">{t('auth.checkEmail')}</p>
-            <p className="text-gray-400 dark:text-[#5C7A8E] text-sm leading-relaxed">{success}</p>
-            <button onClick={() => { setSuccess(''); setIsSignUp(false); setForgotMode(false); }} className="text-[#1B6B7B] dark:text-[#2D9DB3] text-sm hover:underline">
-              {t('auth.backToSignIn')}
+        {verify ? (
+          <div className="space-y-3">
+            <p className="text-white font-semibold text-lg text-center">{t('auth.enterCode')}</p>
+            <p className="text-gray-400 dark:text-[#5C7A8E] text-sm text-center">{t('auth.enterCodeBody', { email: verify.email })}</p>
+            <input
+              inputMode="numeric"
+              maxLength={6}
+              placeholder={t('auth.codePlaceholder')}
+              value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onKeyDown={e => { if (e.key === 'Enter') handleVerifyCode(); }}
+              autoFocus
+              className="w-full bg-white/10 text-white text-center text-2xl tracking-[0.5em] placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
+            />
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {success && <p className="text-green-400 text-sm">{success}</p>}
+            <button
+              onClick={handleVerifyCode}
+              disabled={loading}
+              className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition disabled:opacity-50"
+            >
+              {loading ? t('auth.verifying') : t('auth.verify')}
+            </button>
+            <button
+              onClick={handleResendCode}
+              disabled={codeCooldown > 0}
+              className="w-full text-center text-[#1B6B7B] dark:text-[#2D9DB3] text-sm py-1 hover:underline disabled:opacity-50 disabled:no-underline"
+            >
+              {codeCooldown > 0 ? t('auth.resendCodeIn', { seconds: codeCooldown }) : t('auth.resendCode')}
+            </button>
+            <button
+              onClick={() => { setVerify(null); setCode(''); setError(''); setSuccess(''); setIsSignUp(false); }}
+              className="w-full text-center text-gray-400 dark:text-[#5C7A8E] text-sm py-2 hover:text-white transition"
+            >
+              {t('auth.wrongEmailBack')}
             </button>
           </div>
         ) : forgotMode ? (
