@@ -18,6 +18,7 @@ import SignInPrompt from './SignInPrompt';
 import CommunityPanel from './CommunityPanel';
 import TagsScreen from './TagsScreen';
 import XRefsScreen from './XRefsScreen';
+import ProTrialWelcome from './ProTrialWelcome';
 import { useTranslation } from '@/contexts/LanguageProvider';
 
 export type NavTab = 'home' | 'library' | 'tags' | 'notes' | 'xrefs' | 'community' | 'settings';
@@ -226,6 +227,7 @@ export default function AppShell({ user, initialBookId, initialPassageId, initia
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8F7F4] dark:bg-[#0F1923]">
       <Sidebar activeTab={activeTab} onTabChange={handleTabChange} user={user} />
+      {!initialBookId && <ProTrialWelcome user={user} />}
 
       {isFullWidth ? (
         <div className="flex-1 overflow-hidden">
