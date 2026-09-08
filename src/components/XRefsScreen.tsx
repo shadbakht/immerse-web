@@ -6,6 +6,7 @@ import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushXref, deleteRemote } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogBook } from '@/lib/catalog';
+import { scriptScale } from '@/lib/readerTypography';
 import { makeTraditionResolver } from '@/lib/tradition';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
@@ -29,6 +30,8 @@ interface XRefRow {
   snapshotB:  string; citationB:  string; bookIdB:  string; passageIdB: string;
   bookTitleA: string;
   bookTitleB: string;
+  bookLanguageA: string;  // BCP-47; 'en' when unknown (drives per-script sizing)
+  bookLanguageB: string;
   pairKey:    string;  // sorted tradId1+'↔'+tradId2
   pairName:   string;  // "Bahá'í ↔ Christianity"
 }
@@ -90,8 +93,8 @@ function XRefCard({
   }
 
   const sides = [
-    { key: 'a', snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA, bookTitle: row.bookTitleA },
-    { key: 'b', snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB, bookTitle: row.bookTitleB },
+    { key: 'a', snapshot: row.snapshotA, citation: row.citationA, bookId: row.bookIdA, passageId: row.passageIdA, bookTitle: row.bookTitleA, lang: row.bookLanguageA },
+    { key: 'b', snapshot: row.snapshotB, citation: row.citationB, bookId: row.bookIdB, passageId: row.passageIdB, bookTitle: row.bookTitleB, lang: row.bookLanguageB },
   ];
 
   const menuOptions: MenuOption[] = [
@@ -145,10 +148,10 @@ function XRefCard({
       >
         {sides.map(side => (
           <div key={side.key} className="px-4 py-4 flex flex-col gap-2">
-            <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: 'var(--quote-font-size)' }}>
+            <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-3'}`} style={{ fontSize: `calc(var(--quote-font-size) * ${scriptScale(side.lang)})` }}>
               "<Highlight text={side.snapshot} q={searchQuery} />"
             </p>
-            <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] leading-snug">
+            <p className="uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] leading-snug" style={{ fontSize: `calc(10px * ${scriptScale(side.lang)})` }}>
               <Highlight text={side.citation || side.bookTitle} q={searchQuery} />
             </p>
             {/* Synced imported books have no web reader (empty passage_id). */}
@@ -257,6 +260,11 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
         return (slug ? bookMap.get(slug)?.title : '') ?? '';
       };
 
+      const bookLang = (bookUuid: string): string => {
+        const slug = uuidToSlug.get(bookUuid) ?? '';
+        return (slug ? bookMap.get(slug)?.language : '') || 'en';
+      };
+
       const loaded: XRefRow[] = (xrefData ?? []).map((x: any) => {
         const a    = getSel(x.selection_a_id);
         const b    = getSel(x.selection_b_id);
@@ -277,6 +285,8 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
           snapshotB: b.snapshot,  citationB:  b.citation,  bookIdB:  b.bookId,  passageIdB: b.passageId,
           bookTitleA: bookTitle(a.bookId) || a.bookTitle,
           bookTitleB: bookTitle(b.bookId) || b.bookTitle,
+          bookLanguageA: bookLang(a.bookId),
+          bookLanguageB: bookLang(b.bookId),
           pairKey,
           pairName,
         };

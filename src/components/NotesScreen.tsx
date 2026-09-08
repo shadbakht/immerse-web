@@ -8,6 +8,7 @@ import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
 import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
+import { scriptScale } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 
@@ -22,6 +23,7 @@ interface NoteRow {
   bookId:       string;   // Supabase UUID
   bookSlug:     string;   // corpus slug (catalog key)
   bookTitle:    string;
+  bookLanguage: string;   // BCP-47; 'en' when unknown (drives per-script sizing)
   rootCatId:    string;
   rootCatName:  string;
   rootCatSort:  number;
@@ -92,6 +94,7 @@ function NoteItem({
       <AnnotationCard
         variant="note"
         quote={note.snapshotText}
+        sizeScale={scriptScale(note.bookLanguage)}
         citation={note.citation}
         date={formatDate(dateIso ?? note.updatedAt, t, uiLanguage)}
         query={searchQuery}
@@ -205,6 +208,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
           bookId:      bookUuid,
           bookSlug,
           bookTitle:   catBook?.title ?? sel.book_title ?? '',
+          bookLanguage: catBook?.language ?? 'en',
           rootCatId:   root?.id   ?? 'uncategorized',
           rootCatName: root?.name ?? t('common.otherTradition'),
           rootCatSort: root?.sortOrder ?? 9999,
