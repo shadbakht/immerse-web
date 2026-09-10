@@ -633,6 +633,28 @@ export function flashPassageWhenReady(passageId: string) {
   tick();
 }
 
+/** How long a book must stay open before it counts as "recently viewed" — a
+ *  brief open to check a reference should not evict something from the Home
+ *  list. Mirrors the mobile reader's rule. */
+export const RECENTLY_VIEWED_MS = 20_000;
+
+/** The reading_progress row for "opened this book": the passage the user is
+ *  parked on (or the book's first passage) plus its progress fraction. Null for
+ *  an empty book. */
+export function recentlyViewedProgressRow(
+  passages: { id: string; sort_order: number }[],
+  preferredPid: string | null,
+): { passage_id: string; passage_sort_order: number; fraction: number } | null {
+  if (passages.length === 0) return null;
+  const p = passages.find(x => x.id === preferredPid) ?? passages[0];
+  const maxSo = passages[passages.length - 1].sort_order;
+  return {
+    passage_id: p.id,
+    passage_sort_order: p.sort_order,
+    fraction: p.sort_order / Math.max(maxSo, 1),
+  };
+}
+
 export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone, xrefSuggestions, setXrefSuggestions, xrefSuggestSource, setXrefSuggestSource }: ReaderPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
@@ -831,14 +853,39 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     }
 
     container.addEventListener('scroll', scheduleProgressSave, { passive: true });
-    // Also fire once on setup so a stationary reader still saves after 3s
-    scheduleProgressSave();
+    // No initial save for a stationary reader — that is the recently-viewed
+    // recorder's job (20s), so a brief open never lands in the Home list. A
+    // reader who actually scrolls writes their real position at the 3s debounce.
 
     return () => {
       container.removeEventListener('scroll', scheduleProgressSave);
       if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
     };
   }, [passages, userId, saveProgress]);
+
+  // Record this book as "recently viewed" once it has been open for 20s — the
+  // web mirror of the mobile reader's rule. Ordering on Home is pure recency,
+  // so an unwanted 0% entry is removed by hand (which deletes the cloud row).
+  useEffect(() => {
+    const bookId = target?.bookId;
+    if (!userId || !bookId || passages.length === 0) return;
+    const timer = setTimeout(() => {
+      const row = recentlyViewedProgressRow(passages, lastSavedPidRef.current);
+      if (!row) return;
+      lastSavedPidRef.current = row.passage_id;
+      void supabase.from('reading_progress').upsert(
+        { user_id: userId, book_id: bookId, updated_at: new Date().toISOString(), ...row },
+        { onConflict: 'user_id,book_id' },
+      ).then(({ error }) => {
+        if (error) console.error('[ReadingProgress] recently-viewed record failed:', error.message);
+      });
+    }, RECENTLY_VIEWED_MS);
+    return () => clearTimeout(timer);
+    // supabase (createBrowserClient) is a browser-singleton — omitted from deps
+    // like every other effect in this file, so the 20s timer isn't reset on
+    // each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, target?.bookId, passages]);
 
   // Fetch annotation state for current passages — shared by initial load + Realtime handler.
   const loadAnnotations = useCallback(async (passageIds: string[]) => {
@@ -1245,24 +1292,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         scrollRef.current?.scrollTo({ top: 0 });
       }
 
-      // Fire-and-forget: record this book open so it appears in Recently Read
-      if (userId && ps.length > 0) {
-        const pidToSave = resolvedScrollId ?? ps[0].id;
-        const p = ps.find(p => p.id === pidToSave) ?? ps[0];
-        const maxSo = ps[ps.length - 1].sort_order;
-        lastSavedPidRef.current = pidToSave;
-        await supabase.from('reading_progress').upsert(
-          {
-            user_id:            userId,
-            book_id:            bookId,
-            passage_id:         pidToSave,
-            passage_sort_order: p.sort_order,
-            fraction:           p.sort_order / Math.max(maxSo, 1),
-            updated_at:         new Date().toISOString(),
-          },
-          { onConflict: 'user_id,book_id' },
-        );
-      }
+      // The "recently viewed" reading_progress row is written by the 20s timer
+      // effect below, not here — a brief open to check a reference should not
+      // land in the Home list. Scrolling writes the real position sooner, via
+      // saveProgress(). (lastSavedPidRef is already set above when there is a
+      // resolved scroll target.)
     } catch (err) {
       console.error('[ReaderPanel] cloud book load error:', err);
       setPassages([]);
