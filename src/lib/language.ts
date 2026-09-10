@@ -10,6 +10,7 @@
 // Spanish underneath them.
 
 import { SUPPORTED_UI_LANGUAGES, directionOf } from '@immerse/i18n';
+import { uiScriptScale } from './readerTypography';
 
 const STORAGE_KEY = 'immerse_ui_language';
 
@@ -112,6 +113,9 @@ export function applyUiLanguage(lang: string) {
   if (typeof document === 'undefined') return;
   document.documentElement.lang = lang;
   document.documentElement.dir = directionOf(lang);
+  // Arabic/Persian chrome reads ~8% larger; applyFontSize() multiplies the root
+  // rem base by this. Content (.reader-page body) is unaffected — it is px-based.
+  document.documentElement.style.setProperty('--ui-script-scale', String(uiScriptScale(lang)));
 }
 
 /** Record a UI language the user chose, or one adopted from their account. */

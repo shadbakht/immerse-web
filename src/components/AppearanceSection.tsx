@@ -15,15 +15,16 @@
 
 import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { useTranslation } from '@/contexts/LanguageProvider';
-import { directionOf, type TranslationKey } from '@immerse/i18n';
+import { useTranslation, useLanguage } from '@/contexts/LanguageProvider';
+import { directionOf, translate, type TranslationKey } from '@immerse/i18n';
 import {
   TYPEFACES, LINE_SPACING, MARGINS, LETTER_SPACING_RANGE, WORD_SPACING_RANGE,
   WEIGHT_RANGE, DEFAULT_READER_PREFS, resolveTheme,
+  SCRIPT_FACES, scriptFaceFor, scriptFaceStack,
   type ReaderPrefs, type LineSpacing, type Margins, type ParagraphStyle,
   type ReaderThemeKey, type Typeface,
 } from '@/lib/readerTypography';
-import { getStoredPrefs, saveReaderPrefs } from '@/lib/readerPrefs';
+import { getStoredPrefs, saveReaderPrefs, stackFor } from '@/lib/readerPrefs';
 import { type ColorMode } from '@/lib/colorMode';
 import { type FontSize, FONT_SIZE_PX } from '@/lib/fontSize';
 
@@ -57,7 +58,8 @@ export default function AppearanceSection({
   supabase, userId, fontSize, onFontChange, fontOptions,
   colorMode, onColorModeChange, appearanceKeys,
 }: Props) {
-  const { t, uiLanguage } = useTranslation();
+  const { t } = useTranslation();
+  const { contentLanguage } = useLanguage();
   const [prefs, setPrefsState] = useState<ReaderPrefs>(DEFAULT_READER_PREFS);
   const [fineOpen, setFineOpen] = useState(false);
 
@@ -77,7 +79,24 @@ export default function AppearanceSection({
 
   const palette = resolveTheme(prefs.theme, isDark());
   const bodyPx = FONT_SIZE_PX[fontSize];
-  const face = TYPEFACES.find(f => f.key === prefs.typeface) ?? TYPEFACES[0];
+
+  // The typeface picker follows the SELECTED LIBRARY LANGUAGE: a Perso-Arabic or
+  // CJK library swaps the Latin face list for that script's face list, and the
+  // choice is stored on its own pref (scriptFaceArabic / scriptFaceCjk) so
+  // switching libraries doesn't disturb the Latin selection.
+  const scriptKey = scriptFaceFor(contentLanguage);          // 'arabic' | 'cjk' | null
+  const faceOptions = scriptKey ? SCRIPT_FACES[scriptKey] : TYPEFACES;
+  const selectedFaceKey = scriptKey === 'arabic' ? prefs.scriptFaceArabic
+    : scriptKey === 'cjk' ? prefs.scriptFaceCjk
+    : prefs.typeface;
+  const writeFace = (key: string) => update(
+    scriptKey === 'arabic' ? { scriptFaceArabic: key }
+    : scriptKey === 'cjk' ? { scriptFaceCjk: key }
+    : { typeface: key as Typeface },
+  );
+  const faceStackOf = (key: string) => scriptKey
+    ? scriptFaceStack(scriptKey, key)
+    : (TYPEFACES.find(f => f.key === key)?.stack ?? TYPEFACES[0].stack);
 
   return (
     <section className={CARD}>
@@ -88,13 +107,13 @@ export default function AppearanceSection({
       <div className="px-5 pt-4">
         <div
           className="appearance-specimen rounded-xl border px-6 py-5"
-          lang={uiLanguage}
-          dir={directionOf(uiLanguage)}
+          lang={contentLanguage}
+          dir={directionOf(contentLanguage)}
           style={{
             background: palette.bg,
             borderColor: palette.rule,
             color: palette.fg,
-            fontFamily: face.stack,
+            fontFamily: stackFor(prefs, contentLanguage),
             fontSize: bodyPx,
             lineHeight: LINE_SPACING[prefs.lineSpacing],
             fontWeight: prefs.weight,
@@ -129,15 +148,15 @@ export default function AppearanceSection({
             }}
           >
             <span className="flex-1 h-px" style={{ background: palette.rule }} />
-            {t('appearance.previewHeading')}
+            {translate(contentLanguage, 'appearance.previewHeading')}
             <span className="flex-1 h-px" style={{ background: palette.rule }} />
           </div>
-          <p className="dropcap-open">{t('appearance.previewText')}</p>
+          <p className="dropcap-open">{translate(contentLanguage, 'appearance.previewText')}</p>
           <p style={{
             textIndent: prefs.paragraphStyle === 'indented' ? '1.4em' : 0,
             marginTop: prefs.paragraphStyle === 'indented' ? 0 : '1em',
           }}>
-            {t('appearance.previewText')}
+            {translate(contentLanguage, 'appearance.previewText')}
           </p>
         </div>
       </div>
@@ -145,19 +164,19 @@ export default function AppearanceSection({
       {/* ── Typeface ── */}
       <Group label={t('appearance.typeface')}>
         <div className="grid grid-cols-2 gap-2">
-          {TYPEFACES.map(f => (
+          {faceOptions.map((f: { key: string; label: string; blurbKey: string; labelKey?: string; stack?: string }) => (
             <button
               key={f.key}
-              onClick={() => update({ typeface: f.key as Typeface })}
+              onClick={() => writeFace(f.key)}
               className={`text-start px-3.5 py-2.5 rounded-xl border transition-colors ${
-                prefs.typeface === f.key ? PILL_ON : PILL_OFF
+                selectedFaceKey === f.key ? PILL_ON : PILL_OFF
               }`}
             >
               <span
                 className="block text-[15px] font-semibold"
-                style={{ fontFamily: f.stack }}
+                style={{ fontFamily: faceStackOf(f.key) }}
               >
-                {f.labelKey ? t(f.labelKey as TranslationKey) : f.label}
+                {('labelKey' in f && f.labelKey) ? t(f.labelKey as TranslationKey) : f.label}
               </span>
               <span className="block text-[11px] opacity-70 mt-0.5 leading-snug">
                 {t(f.blurbKey as TranslationKey)}

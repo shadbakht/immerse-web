@@ -18,7 +18,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   DEFAULT_READER_PREFS, buildThemePayload, normalizePrefs, TYPEFACES,
-  SCRIPT_FACES, scriptFaceFor, scriptScale, type ReaderPrefs,
+  scriptFaceFor, scriptFaceStack, scriptScale, type ReaderPrefs,
 } from './readerTypography';
 
 const STORAGE_KEY = 'immerse_reader_prefs';
@@ -45,7 +45,9 @@ export function stackFor(prefs: ReaderPrefs, bookLanguage?: string | null): stri
   const def = TYPEFACES.find(t => t.key === prefs.typeface) ?? TYPEFACES[0];
   const script = scriptFaceFor(bookLanguage);
   if (!script) return def.stack;
-  return `${def.stack.replace(/, serif$/, '')}, '${SCRIPT_FACES[script].family}', serif`;
+  const family = scriptFaceStack(script, script === 'arabic' ? prefs.scriptFaceArabic : prefs.scriptFaceCjk)
+    .replace(/, serif$/, '');
+  return `${def.stack.replace(/, serif$/, '')}, ${family}, serif`;
 }
 
 /** Write the resolved values onto :root. Safe to call on every change. */

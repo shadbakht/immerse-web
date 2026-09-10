@@ -42,7 +42,13 @@ export function applyFontSize(size: FontSize) {
   if (typeof document === 'undefined') return;
   document.documentElement.style.setProperty('--quote-font-size', `${FONT_SIZE_PX[size]}px`);
   // Root scale → grows nav/menu/tag UI text app-wide (rem-based Tailwind utils).
-  document.documentElement.style.fontSize = `${ROOT_FONT_PX[size]}px`;
+  // The calc() folds in the Arabic/Persian UI bump (--ui-script-scale, set by
+  // applyUiLanguage from uiScriptScale). Whichever of the two runs last, the
+  // var + calc resolve together, and a UI-language change re-resolves it live.
+  // .reader-page body text is unaffected (it sizes from --quote-font-size in px);
+  // rem-based reader HEADINGS do pick this factor up — an accepted minor
+  // over-reach, since the reader body (the bulk) does not.
+  document.documentElement.style.fontSize = `calc(${ROOT_FONT_PX[size]}px * var(--ui-script-scale, 1))`;
   try { localStorage.setItem(STORAGE_KEY, size); } catch {}
 }
 

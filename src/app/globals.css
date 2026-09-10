@@ -85,6 +85,72 @@
   unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
 }
 
+/* Per-script reader typeface options (SCRIPT_FACES in readerTypography.ts), one
+   picked per library by the reader. Same unicode-range contract as the two
+   blocks above — the Arabic range for Amiri/Scheherazade, the CJK range for
+   LXGW WenKai — so a chosen Latin face still wins for ordinary English text.
+
+   ⚠️ STUB: the seven woff2 below are NOT shipped in public/fonts/ yet (the
+   mobile side is a stub too). Until they land these @font-face rules 404
+   silently and the browser falls back to the generic `serif` every stack
+   ends in — the intended interim state. */
+@font-face {
+  font-family: 'Amiri';
+  src: url('/fonts/amiri-roman.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Amiri';
+  src: url('/fonts/amiri-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Amiri';
+  src: url('/fonts/amiri-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Scheherazade New';
+  src: url('/fonts/scheherazade-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Scheherazade New';
+  src: url('/fonts/scheherazade-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'LXGW WenKai';
+  src: url('/fonts/lxgw-wenkai-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'LXGW WenKai';
+  src: url('/fonts/lxgw-wenkai-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+
 /* Class-based dark mode: `dark:` utilities apply when a `.dark` ancestor exists.
    The Settings panel toggles `.dark` on <html> (light / dark / system). */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -94,6 +160,11 @@
   --foreground: #171717;
   /* Reading/quote font size, controlled by Settings (default = Large). */
   --quote-font-size: 20px;
+  /* Set by applyUiLanguage() from uiScriptScale(uiLanguage) — 1.08 for ar/fa,
+     1 otherwise. applyFontSize() folds it into the chrome's rem base (root
+     font-size); it does NOT touch .reader-page body text, which is px-based
+     off --quote-font-size. */
+  --ui-script-scale: 1;
 
   /* Sub-category text in Library / Compilation trees (depth >= 1). One shared
      token so every sub-level matches — mirrors mobile's textSecondary role.
