@@ -1,5 +1,6 @@
 import {
   SCRIPT_SIZE_SCALE, scriptScale, scriptOf, scriptScaleForText,
+  uiScriptScale, UI_SCRIPT_SCALE,
   TREE_DEPTH_WEIGHT, treeDepthWeight,
   TREE_DEPTH_COLOR_ROLE, treeDepthColorRole,
   buildThemePayload, DEFAULT_READER_PREFS,
@@ -102,6 +103,25 @@ describe('buildThemePayload — script size', () => {
     const en = buildThemePayload(DEFAULT_READER_PREFS, 18, false, 'en');
     const fa = buildThemePayload(DEFAULT_READER_PREFS, 18, false, 'fa');
     expect(fa.fontSize).toBe(Math.round(en.fontSize * SCRIPT_SIZE_SCALE.arabic));
+  });
+});
+
+describe('uiScriptScale', () => {
+  it('enlarges Arabic and Persian chrome by 8%', () => {
+    expect(uiScriptScale('ar')).toBe(1.08);
+    expect(uiScriptScale('fa')).toBe(1.08);
+    expect(uiScriptScale('fa-IR')).toBe(1.08);
+    expect(uiScriptScale('AR')).toBe(1.08);
+  });
+  it('leaves every other UI language at 1', () => {
+    expect(uiScriptScale('en')).toBe(1);
+    expect(uiScriptScale('zh')).toBe(1);
+    expect(uiScriptScale('de')).toBe(1);
+    expect(uiScriptScale(null)).toBe(1);
+    expect(uiScriptScale(undefined)).toBe(1);
+  });
+  it('UI_SCRIPT_SCALE is gentler than the reader content scale', () => {
+    expect(UI_SCRIPT_SCALE.ar).toBeLessThan(1.15);
   });
 });
 

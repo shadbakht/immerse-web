@@ -260,6 +260,19 @@ export function scriptScale(language: string | null | undefined): number {
   return s ? SCRIPT_SIZE_SCALE[s] : 1;
 }
 
+// Chrome text at Arabic/Persian UI sizes reads smaller than Latin at the same
+// px — the same reason SCRIPT_SIZE_SCALE.arabic exists for reader CONTENT.
+// Gentler than the reader's 1.15: chrome is short labels and the system Arabic
+// UI face (SF Arabic / Roboto) is already fairly generous. Keyed off the UI
+// language, NOT the content language or a book.
+export const UI_SCRIPT_SCALE: Record<string, number> = { ar: 1.08, fa: 1.08 };
+
+/** Chrome font-size multiplier for a UI language. 1 = no correction. */
+export function uiScriptScale(uiLanguage: string | null | undefined): number {
+  const base = (uiLanguage ?? '').toLowerCase().split('-')[0];
+  return UI_SCRIPT_SCALE[base] ?? 1;
+}
+
 // Arabic = U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF
 // (matches SCRIPT_FACES.arabic.unicodeRange). Escape form, not literal glyphs,
 // so this block copies byte-for-byte into the web mirror with no mojibake risk.
