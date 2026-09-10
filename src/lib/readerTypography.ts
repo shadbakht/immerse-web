@@ -148,8 +148,7 @@ export const TYPEFACES: TypefaceDef[] = [
 // Script faces are chosen per book by the book's language, then per library by
 // the reader (Appearance shows the set for the selected content language).
 // A LIST per script: index 0 is the default. unicodeRange is per script and
-// shared by that script's faces. sizeMultiplier is measured from each font's
-// own OS/2 sxHeight/unitsPerEm, same contract as TypefaceDef.
+// shared by that script's faces.
 export interface ScriptFaceDef {
   key: string;
   label: string;            // proper noun — never translated
@@ -157,6 +156,20 @@ export interface ScriptFaceDef {
   family: string;
   files: { roman: string; bold?: string; italic?: string };
   unicodeRange: string;
+  /**
+   * Per-FACE apparent-size correction, on top of the per-SCRIPT
+   * SCRIPT_SIZE_SCALE — the alternate face for a script can sit larger or
+   * smaller on the line than that script's default. Same contract as
+   * TypefaceDef.sizeMultiplier, normalised to the script's default face
+   * (index 0, so it is `1`/omitted). It is applied by `scriptFaceScale` →
+   * `buildThemePayload` (mobile) / `applyReaderPrefs` (web).
+   *
+   * All current faces are left unset: measured from each bundled woff2's own
+   * glyph metrics, Amiri vs Scheherazade New and LXGW WenKai vs Noto Serif SC
+   * differ by less than the ~5% at which the Latin side leaves Charis SIL
+   * uncorrected. Set a value here (with an on-device check) if a real
+   * difference is later seen — the plumbing composes it immediately.
+   */
   sizeMultiplier?: number;
 }
 
@@ -258,6 +271,23 @@ export const SCRIPT_SIZE_SCALE: Record<keyof typeof SCRIPT_FACES, number> = {
 export function scriptScale(language: string | null | undefined): number {
   const s = scriptFaceFor(language);
   return s ? SCRIPT_SIZE_SCALE[s] : 1;
+}
+
+/**
+ * Per-FACE apparent-size correction for the reader's chosen script face on a
+ * book — composes multiplicatively with `scriptScale` (the per-SCRIPT one).
+ * Returns 1 for a Latin/unknown language or a face with no `sizeMultiplier`.
+ * See ScriptFaceDef.sizeMultiplier — every current face returns 1.
+ */
+export function scriptFaceScale(
+  prefs: Pick<ReaderPrefs, 'scriptFaceArabic' | 'scriptFaceCjk'>,
+  language: string | null | undefined,
+): number {
+  const script = scriptFaceFor(language);
+  if (!script) return 1;
+  const key = script === 'arabic' ? prefs.scriptFaceArabic : prefs.scriptFaceCjk;
+  const def = SCRIPT_FACES[script].find(f => f.key === resolveScriptFaceKey(script, key));
+  return def?.sizeMultiplier ?? 1;
 }
 
 // Chrome text at Arabic/Persian UI sizes reads smaller than Latin at the same
@@ -435,9 +465,10 @@ export function buildThemePayload(
   prefs: ReaderPrefs,
   fontSizePx: number,
   isDark: boolean,
-  // Optional per-book script — composes the per-script apparent-size correction
-  // (scriptScale) on top of the per-typeface x-height correction. Omitted /
-  // undefined / null → scriptScale returns 1, so 3-arg callers are unchanged.
+  // Optional per-book script — composes the per-script (scriptScale) and
+  // per-script-face (scriptFaceScale) apparent-size corrections on top of the
+  // per-typeface x-height correction. Omitted / undefined / null → both return
+  // 1, so 3-arg callers are unchanged.
   bookLanguage?: string | null,
 ): ReaderThemePayload {
   const palette = resolveTheme(prefs.theme, isDark);
@@ -447,10 +478,12 @@ export function buildThemePayload(
 
   return {
     fontFamily: face.stack,
-    // Per-typeface x-height correction (sizeMultiplier) and per-script
-    // apparent-size correction (scriptScale) compose multiplicatively.
+    // Per-typeface x-height correction (sizeMultiplier), per-script
+    // apparent-size correction (scriptScale) and per-script-face correction
+    // (scriptFaceScale) compose multiplicatively.
     fontSize: Math.round(
-      fontSizePx * (face.sizeMultiplier ?? 1) * scriptScale(bookLanguage),
+      fontSizePx * (face.sizeMultiplier ?? 1)
+        * scriptScale(bookLanguage) * scriptFaceScale(prefs, bookLanguage),
     ),
     lineHeight: LINE_SPACING[prefs.lineSpacing],
     background: palette.bg,

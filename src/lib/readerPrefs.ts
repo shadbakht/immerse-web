@@ -18,7 +18,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   DEFAULT_READER_PREFS, buildThemePayload, normalizePrefs, TYPEFACES,
-  scriptFaceFor, scriptFaceStack, scriptScale, type ReaderPrefs,
+  scriptFaceFor, scriptFaceStack, scriptScale, scriptFaceScale,
+  type ReaderPrefs,
 } from './readerTypography';
 
 const STORAGE_KEY = 'immerse_reader_prefs';
@@ -60,9 +61,13 @@ export function applyReaderPrefs(
   const s = document.documentElement.style;
 
   s.setProperty('--reader-font-family', stackFor(prefs, opts.bookLanguage));
-  // The ONLY script-scaling factor on .reader-page. p.fontSize also folds in
-  // scriptScale, but web never reads it — surfacing it here would double-scale.
-  s.setProperty('--reader-font-scale', String(scriptScale(opts.bookLanguage)));
+  // The ONLY script-scaling factor on .reader-page: the per-script correction
+  // times the per-script-face one (every current face contributes 1). p.fontSize
+  // folds in the same two, but web never reads it — surfacing it would double-scale.
+  s.setProperty(
+    '--reader-font-scale',
+    String(scriptScale(opts.bookLanguage) * scriptFaceScale(prefs, opts.bookLanguage)),
+  );
   s.setProperty('--reader-line-height', String(p.lineHeight));
   s.setProperty('--reader-bg', p.background);
   s.setProperty('--reader-fg', p.text);

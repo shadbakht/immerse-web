@@ -59,23 +59,12 @@
   font-weight: 400 800; font-style: italic; font-display: swap;
 }
 
-/* Script faces. Chosen by the BOOK's language, never by the reader — a Persian
-   book needs naskh whichever Latin face is selected.
+/* Noto Serif SC — CJK option 2 (SCRIPT_FACES.cjk[1]). Chosen by the BOOK's
+   language, then per library by the reader.
 
-   ⚠️ The unicode-range on this one is NOT optional. Noto Naskh Arabic contains
-   Latin glyphs; without the range it would win over the chosen reading face for
-   ordinary English text. The range covers Arabic + Supplement + Extended-A +
-   both Presentation Forms blocks, which is what holds Persian's پ چ ژ گ, farsi
-   yeh U+06CC, keheh U+06A9 and the Persian digits U+06F0-06F9 — none of which
-   are in the Arabic alphabet proper. */
-@font-face {
-  font-family: 'Noto Naskh Arabic';
-  src: url('/fonts/noto-naskh-arabic.woff2') format('woff2');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
-}
+   ⚠️ The unicode-range is NOT optional on any script face: it contains Latin
+   glyphs that would otherwise win over the chosen reading face for ordinary
+   English text. Same contract applies to every @font-face in the block below. */
 @font-face {
   font-family: 'Noto Serif SC';
   src: url('/fonts/noto-serif-sc.woff2') format('woff2');
@@ -86,14 +75,12 @@
 }
 
 /* Per-script reader typeface options (SCRIPT_FACES in readerTypography.ts), one
-   picked per library by the reader. Same unicode-range contract as the two
-   blocks above — the Arabic range for Amiri/Scheherazade, the CJK range for
-   LXGW WenKai — so a chosen Latin face still wins for ordinary English text.
-
-   ⚠️ STUB: the seven woff2 below are NOT shipped in public/fonts/ yet (the
-   mobile side is a stub too). Until they land these @font-face rules 404
-   silently and the browser falls back to the generic `serif` every stack
-   ends in — the intended interim state. */
+   picked per library by the reader. Same unicode-range contract as the block
+   above — the Arabic range for Amiri/Scheherazade, the CJK range for LXGW WenKai
+   — so a chosen Latin face still wins for ordinary English text. The Arabic
+   range covers Arabic + Supplement + Extended-A + both Presentation Forms
+   blocks, which is what holds Persian's پ چ ژ گ, farsi yeh U+06CC, keheh U+06A9
+   and the Persian digits U+06F0-06F9. */
 @font-face {
   font-family: 'Amiri';
   src: url('/fonts/amiri-roman.woff2') format('woff2');
@@ -175,9 +162,11 @@
      Set by applyReaderPrefs() in src/lib/readerPrefs.ts. Defaults here mirror
      DEFAULT_READER_PREFS in src/lib/readerTypography.ts — keep them in step. */
   --reader-font-family: 'Literata', Georgia, serif;
-  /* Per-book script scale (Perso-Arabic 1.15, CJK 1.05, else 1). Set by
-     applyReaderPrefs() from scriptScale(bookLanguage) — the ONLY script-scaling
-     factor on .reader-page. buildThemePayload.fontSize is not consumed on web. */
+  /* Per-book script scale (Perso-Arabic 1.15, CJK 1.05, else 1) times the
+     per-script-face correction (1 for every current face). Set by
+     applyReaderPrefs() from scriptScale(bookLanguage) * scriptFaceScale(prefs,
+     bookLanguage) — the ONLY script-scaling factor on .reader-page.
+     buildThemePayload.fontSize is not consumed on web. */
   --reader-font-scale: 1;
   --reader-line-height: 1.5;
   --reader-bg: #FFFFFF;

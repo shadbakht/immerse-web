@@ -1,6 +1,6 @@
 import {
-  SCRIPT_SIZE_SCALE, scriptScale, scriptOf, scriptScaleForText,
-  uiScriptScale, UI_SCRIPT_SCALE,
+  SCRIPT_SIZE_SCALE, scriptScale, scriptFaceScale, scriptOf, scriptScaleForText,
+  uiScriptScale, UI_SCRIPT_SCALE, SCRIPT_FACES,
   TREE_DEPTH_WEIGHT, treeDepthWeight,
   TREE_DEPTH_COLOR_ROLE, treeDepthColorRole,
   buildThemePayload, DEFAULT_READER_PREFS,
@@ -93,6 +93,29 @@ describe('tree depth weight ramp', () => {
   });
 });
 
+describe('scriptFaceScale (per-face correction)', () => {
+  it('returns 1 for a Latin / unknown language', () => {
+    expect(scriptFaceScale(DEFAULT_READER_PREFS, 'en')).toBe(1);
+    expect(scriptFaceScale(DEFAULT_READER_PREFS, null)).toBe(1);
+  });
+  it('returns each face definition\'s sizeMultiplier, defaulting to 1', () => {
+    for (const script of ['arabic', 'cjk'] as const) {
+      const lang = script === 'arabic' ? 'fa' : 'zh';
+      for (const face of SCRIPT_FACES[script]) {
+        const prefs = {
+          ...DEFAULT_READER_PREFS,
+          ...(script === 'arabic' ? { scriptFaceArabic: face.key } : { scriptFaceCjk: face.key }),
+        };
+        expect(scriptFaceScale(prefs, lang)).toBe(face.sizeMultiplier ?? 1);
+      }
+    }
+  });
+  it('every current face contributes no correction (1)', () => {
+    expect(scriptFaceScale({ ...DEFAULT_READER_PREFS, scriptFaceArabic: 'scheherazade' }, 'fa')).toBe(1);
+    expect(scriptFaceScale({ ...DEFAULT_READER_PREFS, scriptFaceCjk: 'noto-serif-sc' }, 'zh')).toBe(1);
+  });
+});
+
 describe('buildThemePayload — script size', () => {
   it('is unchanged when no language is passed (back-compat)', () => {
     const a = buildThemePayload(DEFAULT_READER_PREFS, 18, false);
@@ -103,6 +126,18 @@ describe('buildThemePayload — script size', () => {
     const en = buildThemePayload(DEFAULT_READER_PREFS, 18, false, 'en');
     const fa = buildThemePayload(DEFAULT_READER_PREFS, 18, false, 'fa');
     expect(fa.fontSize).toBe(Math.round(en.fontSize * SCRIPT_SIZE_SCALE.arabic));
+  });
+  it('composes the per-script and per-script-face corrections multiplicatively', () => {
+    for (const [lang, faceKey] of [['fa', 'scheherazade'], ['zh', 'noto-serif-sc']] as const) {
+      const prefs = {
+        ...DEFAULT_READER_PREFS,
+        ...(lang === 'fa' ? { scriptFaceArabic: faceKey } : { scriptFaceCjk: faceKey }),
+      };
+      const p = buildThemePayload(prefs, 18, false, lang);
+      expect(p.fontSize).toBe(
+        Math.round(18 * scriptScale(lang) * scriptFaceScale(prefs, lang)),
+      );
+    }
   });
 });
 

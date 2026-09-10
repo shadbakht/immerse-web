@@ -741,7 +741,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
   // ── Reader typography ──────────────────────────────────────────────────────
   // Re-applied whenever the book changes as well as on mount, because the font
-  // stack depends on the BOOK's language: a Persian book needs Noto Naskh
+  // stack depends on the BOOK's language: a Persian book needs a naskh face
   // appended whichever Latin face the reader chose.
   //
   // `appearance-changed` is dispatched by the Settings panel. A CustomEvent
