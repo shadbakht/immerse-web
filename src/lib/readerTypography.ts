@@ -141,34 +141,94 @@ export const TYPEFACES: TypefaceDef[] = [
   },
 ];
 
-// Script faces are not chosen by the user — they are selected per book, by the
-// book's language, and composed with the Latin face via unicode-range.
-export const SCRIPT_FACES = {
-  arabic: {
-    family: 'Noto Naskh Arabic',
-    file: 'noto-naskh-arabic.woff2',
-    // Arabic + Supplement + Extended-A + both Presentation Forms blocks. This
-    // covers Persian's پ چ ژ گ, farsi yeh U+06CC, keheh U+06A9 and the Persian
-    // digits U+06F0-06F9 — all of which are OUTSIDE what "Arabic" colloquially
-    // means. See assets/fonts/README.md.
-    unicodeRange:
-      'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
-  },
-  cjk: {
-    family: 'Noto Serif SC',
-    file: 'noto-serif-sc.woff2',
-    unicodeRange:
-      'U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF',
-  },
-} as const;
+// Script faces are chosen per book by the book's language, then per library by
+// the reader (Appearance shows the set for the selected content language).
+// A LIST per script: index 0 is the default. unicodeRange is per script and
+// shared by that script's faces. sizeMultiplier is measured from each font's
+// own OS/2 sxHeight/unitsPerEm, same contract as TypefaceDef.
+export interface ScriptFaceDef {
+  key: string;
+  label: string;            // proper noun — never translated
+  blurbKey: string;         // i18n key for the one-line description
+  family: string;
+  files: { roman: string; bold?: string; italic?: string };
+  unicodeRange: string;
+  sizeMultiplier?: number;
+}
 
-/** Which script face a book needs, from `books.language`. */
+export const SCRIPT_FACES: Record<'arabic' | 'cjk', ScriptFaceDef[]> = {
+  arabic: [
+    {
+      key: 'amiri',
+      label: 'Amiri',
+      blurbKey: 'appearance.faceAmiriBlurb',
+      family: 'Amiri',
+      files: { roman: 'amiri-roman.woff2', bold: 'amiri-bold.woff2', italic: 'amiri-italic.woff2' },
+      unicodeRange: 'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
+    },
+    {
+      key: 'scheherazade',
+      label: 'Scheherazade New',
+      blurbKey: 'appearance.faceScheherazadeBlurb',
+      family: 'Scheherazade New',
+      files: { roman: 'scheherazade-regular.woff2', bold: 'scheherazade-bold.woff2' },
+      unicodeRange: 'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
+    },
+  ],
+  cjk: [
+    {
+      key: 'lxgw',
+      label: 'LXGW WenKai',
+      blurbKey: 'appearance.faceLxgwBlurb',
+      family: 'LXGW WenKai',
+      files: { roman: 'lxgw-wenkai-regular.woff2', bold: 'lxgw-wenkai-bold.woff2' },
+      unicodeRange:
+        'U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF',
+    },
+    {
+      key: 'noto-serif-sc',
+      label: 'Noto Serif SC',
+      blurbKey: 'appearance.faceNotoSerifScBlurb',
+      family: 'Noto Serif SC',
+      files: { roman: 'noto-serif-sc.woff2' },
+      unicodeRange:
+        'U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF',
+    },
+  ],
+};
+
+/** Which script a book's / library's language needs, or null for Latin. */
 export function scriptFaceFor(language: string | null | undefined):
     keyof typeof SCRIPT_FACES | null {
   const l = (language ?? '').toLowerCase();
   if (l.startsWith('fa') || l.startsWith('ar') || l.startsWith('ur')) return 'arabic';
   if (l.startsWith('zh') || l.startsWith('ja') || l.startsWith('ko')) return 'cjk';
   return null;
+}
+
+/** That script's face list, or null for Latin / unknown. */
+export function scriptFacesFor(language: string | null | undefined): ScriptFaceDef[] | null {
+  const s = scriptFaceFor(language);
+  return s ? SCRIPT_FACES[s] : null;
+}
+
+/** The valid face key for a script, falling back to the list default (index 0). */
+export function resolveScriptFaceKey(
+  script: keyof typeof SCRIPT_FACES,
+  key: string | null | undefined,
+): string {
+  const list = SCRIPT_FACES[script];
+  return list.some(f => f.key === key) ? (key as string) : list[0].key;
+}
+
+/** CSS font-family stack for a resolved script face: the family then a generic serif. */
+export function scriptFaceStack(
+  script: keyof typeof SCRIPT_FACES,
+  key: string | null | undefined,
+): string {
+  const resolved = resolveScriptFaceKey(script, key);
+  const def = SCRIPT_FACES[script].find(f => f.key === resolved)!;
+  return `'${def.family}', serif`;
 }
 
 // ── Per-script apparent-size correction ──────────────────────────────────────
