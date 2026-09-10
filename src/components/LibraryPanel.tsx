@@ -189,11 +189,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   const bookLang = (b: CatalogBook) => b.language ?? 'en';
 
-  // Content languages present in the catalog, English first, then the rest by count.
+  // Content languages present in the catalog, alphabetical by language code —
+  // matching the mobile scope sheet (`getLanguages()` → `ORDER BY language`) and
+  // the Settings "App Language" list.
   const availableLanguages = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const b of catalog?.books ?? []) counts.set(bookLang(b), (counts.get(bookLang(b)) ?? 0) + 1);
-    return [...counts.keys()].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : a.localeCompare(b)));
+    const present = new Set<string>();
+    for (const b of catalog?.books ?? []) present.add(bookLang(b));
+    return [...present].sort((a, b) => a.localeCompare(b));
   }, [catalog]);
 
   // The language the tree actually renders in, which is the account's choice

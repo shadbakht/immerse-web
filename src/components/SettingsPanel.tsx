@@ -12,6 +12,10 @@ import Onboarding from './Onboarding';
 import type { User } from '@supabase/supabase-js';
 import pkg from '../../package.json';
 
+// Alphabetical by language code, so this "App Language" list matches the order
+// of the library's content-language switcher (LibraryPanel's availableLanguages).
+const APP_LANGUAGES = [...UI_LANGUAGES].sort((a, b) => a.code.localeCompare(b.code));
+
 // Single source of truth for the displayed version: package.json.
 const APP_VERSION = pkg.version;
 
@@ -315,7 +319,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                     would be squeezed once the library grows past a handful of
                     languages. Mirrors the mobile Settings list. */}
                 <div role="radiogroup" className="flex flex-col">
-                  {UI_LANGUAGES.map(({ code, label }) => {
+                  {APP_LANGUAGES.map(({ code, label }) => {
                     const active = uiLanguage === code;
                     return (
                       <button
