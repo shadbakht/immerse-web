@@ -33,6 +33,8 @@ export interface ReaderPrefs {
   weight: number;                 // variable-font weight axis
   theme: ReaderThemeKey;
   showParagraphNumbers: boolean;
+  scriptFaceArabic: string;   // key within SCRIPT_FACES.arabic
+  scriptFaceCjk: string;      // key within SCRIPT_FACES.cjk
 }
 
 // ⚠️ NEVER give profiles.reader_prefs a DB default. NULL means "this user has
@@ -50,6 +52,8 @@ export const DEFAULT_READER_PREFS: ReaderPrefs = {
   weight: 400,
   theme: 'system',
   showParagraphNumbers: true,
+  scriptFaceArabic: 'amiri',
+  scriptFaceCjk: 'lxgw',
 };
 
 // ── Typefaces ────────────────────────────────────────────────────────────────
@@ -479,5 +483,7 @@ export function normalizePrefs(raw: unknown): ReaderPrefs {
     theme: oneOf(p.theme, ['light', 'sepia', 'quiet', 'dark', 'night', 'system'] as const, DEFAULT_READER_PREFS.theme),
     showParagraphNumbers: typeof p.showParagraphNumbers === 'boolean'
       ? p.showParagraphNumbers : DEFAULT_READER_PREFS.showParagraphNumbers,
+    scriptFaceArabic: resolveScriptFaceKey('arabic', (p as any).scriptFaceArabic),
+    scriptFaceCjk: resolveScriptFaceKey('cjk', (p as any).scriptFaceCjk),
   };
 }
