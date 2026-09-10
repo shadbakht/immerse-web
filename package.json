@@ -49,7 +49,11 @@
       "Get help with Immerse: contact us, manage your account and subscription, and find answers to common questions.",
       "Literata",
       "Charis",
-      "EB Garamond"
+      "EB Garamond",
+      "Amiri",
+      "Scheherazade New",
+      "LXGW WenKai",
+      "Noto Serif SC"
     ],
     "ignorePaths": [
       "legalContent.ts",
