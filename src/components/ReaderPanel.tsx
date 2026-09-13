@@ -36,6 +36,14 @@ interface Passage {
   // there — baked as a "kf" span in the mobile corpus HTML). Backfilled by
   // scripts/markExcerptDividersWeb.mjs; absent on every other passage.
   opens_excerpt?: boolean;
+  // Footnote text scoped to THIS passage only ({displayNumber: text}), set by
+  // the Immerse repo's scripts/syncCorpusParity.mjs and
+  // scripts/backfillPassageFootnotes.mjs. Preferred over the book-wide
+  // books.footnotes map (see resolveFootnoteText) because that map collides
+  // when a book's footnote numbering resets per chapter/section — most books
+  // don't have this column populated yet and fall through to the old map,
+  // which is unaffected.
+  footnotes?: Record<string, string> | null;
 }
 
 /**
@@ -307,6 +315,17 @@ function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp:
     }
     return prayerBreaks ? renderPrayerText(part, kp + i) : <span key={kp + i}>{part}</span>;
   });
+}
+
+// Resolve a tapped footnote's text: prefer the passage's own scoped map
+// (immune to numbering resets), fall back to the book-wide map that every
+// book not yet migrated to per-passage footnotes still relies on.
+export function resolveFootnoteText(
+  passage: { footnotes?: Record<string, string> | null },
+  num: string,
+  bookFootnotes: Record<string, string>,
+): string {
+  return passage.footnotes?.[num] ?? bookFootnotes[num] ?? '';
 }
 
 function PassageContent({ text, onFootnoteClick, highlight, highlightExact, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string; highlightExact?: boolean; prayerBreaks?: boolean }) {
@@ -1141,7 +1160,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       // first page, collectPassages fetches the rest in parallel waves instead
       // of one serial round trip each (Phase 4d).
       const BATCH = 1000;
-      const PASSAGE_SELECT = 'id, content, chapter_label, section_title, paragraph_number, sort_order, opens_excerpt';
+      const PASSAGE_SELECT = 'id, content, chapter_label, section_title, paragraph_number, sort_order, opens_excerpt, footnotes';
       const fetchPage: FetchPage = async (from, to) => {
         const run = () => supabase
           .from('passages')
@@ -2468,7 +2487,7 @@ async function handleCopy() {
                     <PassageContent
                       text={bodyText}
                       onFootnoteClick={n => {
-                        setActiveFootnote({ num: n, text: footnoteMap[n] ?? '' });
+                        setActiveFootnote({ num: n, text: resolveFootnoteText(passage, n, footnoteMap) });
                       }}
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                       highlightExact={searchHighlight?.passageId === passage.id ? searchHighlight.exact : undefined}
