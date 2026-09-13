@@ -170,14 +170,12 @@ export interface ScriptFaceDef {
    * measured from each bundled woff2's own glyph metrics, they differ by less
    * than the ~5% at which the Latin side leaves Charis SIL uncorrected.
    *
-   * ⚠️ IranNastaliq is ALSO left unset, but that is NOT the same claim — it has
-   * not been measured or checked on a device. Nastaliq's thin diagonal strokes
-   * and sloped baseline are widely documented to read smaller than Naskh at an
-   * identical nominal size, so an apparent-size gap here is plausible, not
-   * ruled out; a reliable glyph-metric comparison wasn't achievable against
-   * Amiri/Scheherazade (their scripts sit on a level baseline; IranNastaliq's
-   * doesn't, so a simple bounding-box ratio isn't a fair comparison). Give this
-   * an on-device check before trusting it at face value.
+   * IranNastaliq is also left unset — a reliable glyph-metric comparison
+   * against Amiri/Scheherazade wasn't achievable (their scripts sit on a
+   * level baseline; IranNastaliq's doesn't, so a simple bounding-box ratio
+   * isn't a fair comparison), so this was checked on-device instead: user
+   * confirmed 2026-09-13 that IranNastaliq's apparent size on web reads fine
+   * against the Latin/Naskh faces at the default size. No correction needed.
    *
    * Set a value here (with an on-device check) if a real difference is
    * confirmed for any face — the plumbing composes it immediately.
