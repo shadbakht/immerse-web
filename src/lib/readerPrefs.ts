@@ -46,8 +46,9 @@ export function stackFor(prefs: ReaderPrefs, bookLanguage?: string | null): stri
   const def = TYPEFACES.find(t => t.key === prefs.typeface) ?? TYPEFACES[0];
   const script = scriptFaceFor(bookLanguage);
   if (!script) return def.stack;
-  const family = scriptFaceStack(script, script === 'arabic' ? prefs.scriptFaceArabic : prefs.scriptFaceCjk)
-    .replace(/, serif$/, '');
+  const key = script === 'persian' ? prefs.scriptFacePersian
+    : script === 'arabic' ? prefs.scriptFaceArabic : prefs.scriptFaceCjk;
+  const family = scriptFaceStack(script, key).replace(/, serif$/, '');
   return `${def.stack.replace(/, serif$/, '')}, ${family}, serif`;
 }
 

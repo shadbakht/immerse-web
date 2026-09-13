@@ -84,13 +84,15 @@ export default function AppearanceSection({
   // CJK library swaps the Latin face list for that script's face list, and the
   // choice is stored on its own pref (scriptFaceArabic / scriptFaceCjk) so
   // switching libraries doesn't disturb the Latin selection.
-  const scriptKey = scriptFaceFor(contentLanguage);          // 'arabic' | 'cjk' | null
+  const scriptKey = scriptFaceFor(contentLanguage);          // 'arabic' | 'persian' | 'cjk' | null
   const faceOptions = scriptKey ? SCRIPT_FACES[scriptKey] : TYPEFACES;
-  const selectedFaceKey = scriptKey === 'arabic' ? prefs.scriptFaceArabic
+  const selectedFaceKey = scriptKey === 'persian' ? prefs.scriptFacePersian
+    : scriptKey === 'arabic' ? prefs.scriptFaceArabic
     : scriptKey === 'cjk' ? prefs.scriptFaceCjk
     : prefs.typeface;
   const writeFace = (key: string) => update(
-    scriptKey === 'arabic' ? { scriptFaceArabic: key }
+    scriptKey === 'persian' ? { scriptFacePersian: key }
+    : scriptKey === 'arabic' ? { scriptFaceArabic: key }
     : scriptKey === 'cjk' ? { scriptFaceCjk: key }
     : { typeface: key as Typeface },
   );

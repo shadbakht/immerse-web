@@ -121,6 +121,17 @@
   font-display: swap;
   unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
+/* Persian-only 3rd option (SCRIPT_FACES.persian) — never offered for Arabic/Urdu
+   books, so it is not part of the shared Amiri/Scheherazade block above even
+   though it uses the same unicode-range. One weight only, no bold cut. */
+@font-face {
+  font-family: 'IranNastaliq';
+  src: url('/fonts/irannastaliq-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
 @font-face {
   font-family: 'LXGW WenKai';
   src: url('/fonts/lxgw-wenkai-regular.woff2') format('woff2');

@@ -35,6 +35,7 @@ export interface ReaderPrefs {
   showParagraphNumbers: boolean;
   scriptFaceArabic: string;   // key within SCRIPT_FACES.arabic
   scriptFaceCjk: string;      // key within SCRIPT_FACES.cjk
+  scriptFacePersian: string;  // key within SCRIPT_FACES.persian
 }
 
 // ⚠️ NEVER give profiles.reader_prefs a DB default. NULL means "this user has
@@ -54,6 +55,7 @@ export const DEFAULT_READER_PREFS: ReaderPrefs = {
   showParagraphNumbers: true,
   scriptFaceArabic: 'amiri',
   scriptFaceCjk: 'lxgw',
+  scriptFacePersian: 'amiri',
 };
 
 // ── Typefaces ────────────────────────────────────────────────────────────────
@@ -164,16 +166,26 @@ export interface ScriptFaceDef {
    * (index 0, so it is `1`/omitted). It is applied by `scriptFaceScale` →
    * `buildThemePayload` (mobile) / `applyReaderPrefs` (web).
    *
-   * All current faces are left unset: measured from each bundled woff2's own
-   * glyph metrics, Amiri vs Scheherazade New and LXGW WenKai vs Noto Serif SC
-   * differ by less than the ~5% at which the Latin side leaves Charis SIL
-   * uncorrected. Set a value here (with an on-device check) if a real
-   * difference is later seen — the plumbing composes it immediately.
+   * Amiri vs Scheherazade New and LXGW WenKai vs Noto Serif SC are left unset:
+   * measured from each bundled woff2's own glyph metrics, they differ by less
+   * than the ~5% at which the Latin side leaves Charis SIL uncorrected.
+   *
+   * ⚠️ IranNastaliq is ALSO left unset, but that is NOT the same claim — it has
+   * not been measured or checked on a device. Nastaliq's thin diagonal strokes
+   * and sloped baseline are widely documented to read smaller than Naskh at an
+   * identical nominal size, so an apparent-size gap here is plausible, not
+   * ruled out; a reliable glyph-metric comparison wasn't achievable against
+   * Amiri/Scheherazade (their scripts sit on a level baseline; IranNastaliq's
+   * doesn't, so a simple bounding-box ratio isn't a fair comparison). Give this
+   * an on-device check before trusting it at face value.
+   *
+   * Set a value here (with an on-device check) if a real difference is
+   * confirmed for any face — the plumbing composes it immediately.
    */
   sizeMultiplier?: number;
 }
 
-export const SCRIPT_FACES: Record<'arabic' | 'cjk', ScriptFaceDef[]> = {
+export const SCRIPT_FACES: Record<'arabic' | 'persian' | 'cjk', ScriptFaceDef[]> = {
   arabic: [
     {
       key: 'amiri',
@@ -189,6 +201,38 @@ export const SCRIPT_FACES: Record<'arabic' | 'cjk', ScriptFaceDef[]> = {
       blurbKey: 'appearance.faceScheherazadeBlurb',
       family: 'Scheherazade New',
       files: { roman: 'scheherazade-regular.woff2', bold: 'scheherazade-bold.woff2' },
+      unicodeRange: 'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
+    },
+  ],
+  // Persian gets its own list, not a 3rd entry appended to `arabic` — Nastaliq
+  // is the Persian literary hand and is not how Arabic or Urdu books are
+  // normally set, so it should never appear as an option for those. Amiri and
+  // Scheherazade New are repeated here (same families, same files) so a
+  // Persian reader keeps the Naskh choice too; `scriptFaceFor` is what keeps
+  // Arabic/Urdu books routed to the `arabic` list instead of this one.
+  persian: [
+    {
+      key: 'amiri',
+      label: 'Amiri',
+      blurbKey: 'appearance.faceAmiriBlurb',
+      family: 'Amiri',
+      files: { roman: 'amiri-roman.woff2', bold: 'amiri-bold.woff2', italic: 'amiri-italic.woff2' },
+      unicodeRange: 'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
+    },
+    {
+      key: 'scheherazade',
+      label: 'Scheherazade New',
+      blurbKey: 'appearance.faceScheherazadeBlurb',
+      family: 'Scheherazade New',
+      files: { roman: 'scheherazade-regular.woff2', bold: 'scheherazade-bold.woff2' },
+      unicodeRange: 'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
+    },
+    {
+      key: 'irannastaliq',
+      label: 'IranNastaliq',
+      blurbKey: 'appearance.faceIranNastaliqBlurb',
+      family: 'IranNastaliq',
+      files: { roman: 'irannastaliq-regular.woff2' },
       unicodeRange: 'U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF',
     },
   ],
@@ -218,7 +262,8 @@ export const SCRIPT_FACES: Record<'arabic' | 'cjk', ScriptFaceDef[]> = {
 export function scriptFaceFor(language: string | null | undefined):
     keyof typeof SCRIPT_FACES | null {
   const l = (language ?? '').toLowerCase();
-  if (l.startsWith('fa') || l.startsWith('ar') || l.startsWith('ur')) return 'arabic';
+  if (l.startsWith('fa')) return 'persian';
+  if (l.startsWith('ar') || l.startsWith('ur')) return 'arabic';
   if (l.startsWith('zh') || l.startsWith('ja') || l.startsWith('ko')) return 'cjk';
   return null;
 }
@@ -264,6 +309,7 @@ export function scriptFaceStack(
 // falls through to null / no correction.
 export const SCRIPT_SIZE_SCALE: Record<keyof typeof SCRIPT_FACES, number> = {
   arabic: 1.15,
+  persian: 1.15,
   cjk: 1.05,
 };
 
@@ -280,12 +326,13 @@ export function scriptScale(language: string | null | undefined): number {
  * See ScriptFaceDef.sizeMultiplier — every current face returns 1.
  */
 export function scriptFaceScale(
-  prefs: Pick<ReaderPrefs, 'scriptFaceArabic' | 'scriptFaceCjk'>,
+  prefs: Pick<ReaderPrefs, 'scriptFaceArabic' | 'scriptFaceCjk' | 'scriptFacePersian'>,
   language: string | null | undefined,
 ): number {
   const script = scriptFaceFor(language);
   if (!script) return 1;
-  const key = script === 'arabic' ? prefs.scriptFaceArabic : prefs.scriptFaceCjk;
+  const key = script === 'persian' ? prefs.scriptFacePersian
+    : script === 'arabic' ? prefs.scriptFaceArabic : prefs.scriptFaceCjk;
   const def = SCRIPT_FACES[script].find(f => f.key === resolveScriptFaceKey(script, key));
   return def?.sizeMultiplier ?? 1;
 }
@@ -531,5 +578,13 @@ export function normalizePrefs(raw: unknown): ReaderPrefs {
       ? p.showParagraphNumbers : DEFAULT_READER_PREFS.showParagraphNumbers,
     scriptFaceArabic: resolveScriptFaceKey('arabic', (p as any).scriptFaceArabic),
     scriptFaceCjk: resolveScriptFaceKey('cjk', (p as any).scriptFaceCjk),
+    // Falls back to the OLD shared scriptFaceArabic value when scriptFacePersian
+    // has never been written (every account from before this field existed) —
+    // Amiri/Scheherazade New resolve identically either way, so a Persian
+    // reader's prior choice carries over instead of silently reverting to the
+    // list default.
+    scriptFacePersian: resolveScriptFaceKey(
+      'persian', (p as any).scriptFacePersian ?? (p as any).scriptFaceArabic,
+    ),
   };
 }
