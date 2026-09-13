@@ -165,7 +165,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
       <div key={tag.id}>
         <div
           className="flex items-center gap-2 px-5 py-2.5 hover:bg-gray-50 dark:hover:bg-[#243040]"
-          style={{ paddingLeft: 20 + tag.depth * 20 }}
+          style={{ paddingInlineStart: 20 + tag.depth * 20 }}
         >
           {/* Checkbox */}
           <button
@@ -189,7 +189,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
             className="flex-1 flex items-center gap-1.5 min-w-0 text-start cursor-pointer"
           >
             <span className="truncate text-sm text-gray-800 dark:text-[#D2DCE8]">{tag.name}</span>
-            <span className={`inline-block text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+            <span className={`inline-block rtl:-scale-x-100 text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
           </button>
 
           {/* Add child button */}
@@ -214,7 +214,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
         {/* Inline "create a sub-compilation" editor — appears directly under
             THIS row, not in the input that used to sit above the tag list. */}
         {creatorOpenFor === tag.id && (
-          <div style={{ paddingLeft: 20 + tag.depth * 20 }} className="pe-5">
+          <div style={{ paddingInlineStart: 20 + tag.depth * 20 }} className="pe-5">
             <InlineCompilationCreator
               parentName={tag.name}
               onSave={name => handleCreateTag(tag.id, name)}
@@ -226,7 +226,7 @@ export default function TagPanel({ visible, onClose, userId, selectionText, onSa
         {/* Inline quote reveal — this tag's existing selections (mobile parity).
             Loaded-and-empty renders nothing at all. */}
         {isOpen && tagQuotes[tag.id]?.length !== 0 && (
-          <div className="pe-5 pb-1" style={{ paddingLeft: 20 + tag.depth * 20 + 28 }}>
+          <div className="pe-5 pb-1" style={{ paddingInlineStart: 20 + tag.depth * 20 + 28 }}>
             {tagQuotes[tag.id] === undefined ? (
               <p className="text-xs text-gray-400 dark:text-[#5C7A8E] py-1">…</p>
             ) : (

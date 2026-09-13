@@ -367,7 +367,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
             >
               <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{trad.name}</span>
               <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{totalNotes}</span>
-              <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${tradOpen ? 'rotate-90' : ''}`}>›</span>
+              <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block rtl:-scale-x-100 ${tradOpen ? 'rotate-90' : ''}`}>›</span>
             </button>
 
             {tradOpen && trad.books.map(book => {
@@ -375,7 +375,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
               return (
                 <div key={book.bookKey}>
                   {/* Inset divider above each book (sub-level) */}
-                  <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginLeft: 32 }} />
+                  <div className="bg-gray-100 dark:bg-[#2D4050]" style={{ height: 1, marginInlineStart: 32 }} />
                   {/* Book sub-header */}
                   <button
                     className="w-full flex items-center gap-2 ps-8 pe-4 py-3 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors text-start select-none"
@@ -383,7 +383,7 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
                   >
                     <span className="flex-1 text-sm text-gray-700 dark:text-[#B8C7D6] truncate">{book.title}</span>
                     <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{book.notes.length}</span>
-                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${bookOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block rtl:-scale-x-100 ${bookOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
 
                   {/* Note items */}

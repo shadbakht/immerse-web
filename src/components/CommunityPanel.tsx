@@ -191,7 +191,7 @@ function TagCard({
           <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{ct.selection_count}</span>
 
           <span
-            className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform cursor-pointer ${expanded ? 'rotate-90' : ''}`}
+            className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform cursor-pointer rtl:-scale-x-100 ${expanded ? 'rotate-90' : ''}`}
             onClick={() => setExpanded(e => !e)}
           >
             ›

@@ -214,7 +214,7 @@ function SubTagNode({ node, payload, depth, readOnly, selectedIds, onToggleSelec
           onClick={() => setOpen(o => !o)}
         >{node.name}</button>
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{sels.length}</span>
-        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform cursor-pointer ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
+        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform cursor-pointer rtl:-scale-x-100 ${open ? 'rotate-90' : ''}`} onClick={() => setOpen(o => !o)}>›</span>
       </div>
       {/* Sub-level divider: this row's underline, inset to its checkbox column (RTL-safe) */}
       <div className="h-px bg-gray-100 dark:bg-[#2D4050]" style={{ marginInlineStart: 16 + depth * 16 }} />

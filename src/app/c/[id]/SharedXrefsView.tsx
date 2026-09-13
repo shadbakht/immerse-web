@@ -196,7 +196,7 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
                     )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:divide-x sm:divide-gray-300 dark:sm:divide-[#2D4050]">
                       {[entry.a, entry.b].map((side, i) => (
-                        <div key={i} className={i === 1 ? 'sm:pl-4' : 'sm:pr-4'}>
+                        <div key={i} className={i === 1 ? 'sm:ps-4' : 'sm:pe-4'}>
                           <p className="font-serif leading-relaxed text-gray-700 dark:text-[#B8C7D6]">
                             {`“${side.snapshot}”`}
                           </p>

@@ -413,7 +413,7 @@ function TagViewNode({ tag, allTags, depth, fetchQuotes, onOpenBook }: {
       >
         <TagIcon size={16} />
         <span className="flex-1 text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{tag.name}</span>
-        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
       </button>
       {open && (
         <div>
@@ -481,7 +481,7 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
             <p className={`flex-1 font-serif text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
               "{entry.otherSnapshotText}"
             </p>
-            <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''}`}>›</span>
+            <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 mt-0.5 transition-transform duration-150 inline-block ${expanded ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
           </div>
           {expanded && entry.otherBookId && onOpenBook && (
             <button
@@ -2107,7 +2107,7 @@ async function handleCopy() {
                     title={collapsedToc.has(key) ? t('reader.expand') : t('reader.collapse')}
                     aria-label={collapsedToc.has(key) ? t('reader.expandSection') : t('reader.collapseSection')}
                   >
-                    <span className={`text-base inline-block transition-transform duration-150 ${collapsedToc.has(key) ? '' : 'rotate-90'}`}>›</span>
+                    <span className={`text-base inline-block transition-transform duration-150 ${collapsedToc.has(key) ? '' : 'rotate-90'} rtl:-scale-x-100`}>›</span>
                   </button>
                 )}
               </div>

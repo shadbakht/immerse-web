@@ -61,7 +61,7 @@ export default function AppearanceSection({
   const { t } = useTranslation();
   const { contentLanguage } = useLanguage();
   const [prefs, setPrefsState] = useState<ReaderPrefs>(DEFAULT_READER_PREFS);
-  const [fineOpen, setFineOpen] = useState(false);
+  const [fineOpen, setFineOpen] = useState(true);
 
   useEffect(() => { setPrefsState(getStoredPrefs()); }, []);
 
@@ -283,7 +283,7 @@ export default function AppearanceSection({
           className="w-full flex items-center justify-between text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]"
         >
           {t('appearance.fineTuning')}
-          <span className={`transition-transform ${fineOpen ? 'rotate-90' : ''}`}>›</span>
+          <span className={`transition-transform rtl:-scale-x-100 ${fineOpen ? 'rotate-90' : ''}`}>›</span>
         </button>
         {fineOpen && (
           <div className="mt-4 space-y-3">

@@ -114,7 +114,7 @@ function SortableTagRow({ tag, count, isOpen, hasQuotes, onToggleOpen, canIndent
           }}
         >{tag.name}</span>
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0">{count}</span>
-        {hasQuotes && <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>}
+        {hasQuotes && <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>}
       </button>
       <button onClick={onOutdent} disabled={!canOutdent} title={t('tags.outdent')} className={`px-1.5 text-lg leading-none ${canOutdent ? 'text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70' : 'text-gray-200 dark:text-[#2D4050] cursor-default'}`}>⇤</button>
       <button onClick={onIndent} disabled={!canIndent} title={t('tags.indent')} className={`px-1.5 text-lg leading-none ${canIndent ? 'text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70' : 'text-gray-200 dark:text-[#2D4050] cursor-default'}`}>⇥</button>
@@ -321,7 +321,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
             : 'text-[#1B6B7B] dark:text-[#2D9DB3]'} />
         )}
         <span className="text-xs text-gray-400 dark:text-[#5C7A8E] shrink-0 mx-2">{count ?? tag.selections.length}</span>
-        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''}`}>›</span>
+        <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm shrink-0 transition-transform duration-150 inline-block ${open ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
         <div onClick={e => e.stopPropagation()} className="ms-2">
           <ContextMenu options={menuOptions} />
         </div>

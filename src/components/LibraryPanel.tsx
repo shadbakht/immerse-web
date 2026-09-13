@@ -372,7 +372,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                       className="leading-4 text-gray-400 dark:text-[#5C7A8E]"
                       style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
                     >{childImmediate}</span>
-                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
                   </div>
                 </button>
               </div>
@@ -1186,7 +1186,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                         className="leading-4 text-gray-400 dark:text-[#5C7A8E]"
                         style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
                       >{immediateCount}</span>
-                      <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                      <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
                     </div>
                   </button>
                 </div>
@@ -1214,7 +1214,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     {importedBooks.length > 0 && (
                       <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{importedBooks.length}</span>
                     )}
-                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''}`}>›</span>
+                    <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
                   </div>
                 </button>
               </div>
@@ -1313,7 +1313,7 @@ function ImportedBookRow({ book, onOpen, onDelete }: {
   return (
     <div
       className="flex items-center border-b border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors group"
-      style={{ paddingLeft: 36 }}
+      style={{ paddingInlineStart: 36 }}
     >
       <button onClick={onOpen} className="flex-1 text-start py-2.5 min-w-0 pe-2">
         <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
