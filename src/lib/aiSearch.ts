@@ -138,3 +138,34 @@ export function weightedRankFusion<T>(
 export function fusionWeights(isQuestion: boolean): { keyword: number; ai: number } {
   return isQuestion ? { keyword: 1, ai: 3 } : { keyword: 3, ai: 1 };
 }
+
+/**
+ * Final on-screen order, applied AFTER weightedRankFusion.
+ *
+ * RRF consensus is real signal — several independently-guessed AI phrases
+ * converging on one passage is genuine evidence it's relevant — but for a
+ * plain LOOKUP that consensus can still outscore a single top literal match:
+ * a passage that's the #1 hit for just three of Claude's phrase guesses
+ * already out-scores the #1 keyword hit, weights and all (see
+ * `weightedRankFusion`'s "rewards a passage several lists agree on" case).
+ * Measured live (mobile): "kill" scoped to Bahá'í books found 60 literal
+ * matches (Kitáb-i-Aqdas, Lights of Guidance, UHJ messages…), all real — yet
+ * enough of Claude's related phrases ("put to death", "shed blood"…) agreed
+ * with each other that the fused order buried every one of them under
+ * AI-"Related" results, which carry no checkbox — so the reader had nothing
+ * to select into a compilation. Mirrors mobile's `src/services/aiSearch.ts`.
+ *
+ * A QUESTION keeps the fused order exactly as scored — there the keyword
+ * list itself is the noise (it matched incidental words like "God" across
+ * the whole library) and AI results earning the top spots is correct. Only
+ * for a lookup do literal (non-`semantic`) hits move ahead of every
+ * AI-only one — each side keeps its own fused-score order internally, so
+ * the "several phrasings agree" signal still decides ranking within it.
+ */
+export function orderForDisplay<T extends { semantic?: boolean }>(
+  fused: T[],
+  isQuestion: boolean,
+): T[] {
+  if (isQuestion) return fused;
+  return [...fused.filter((r) => !r.semantic), ...fused.filter((r) => !!r.semantic)];
+}

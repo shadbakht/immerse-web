@@ -10,7 +10,7 @@ import { logEvent } from '@/lib/analytics';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
-import { planAiSearch, weightedRankFusion, fusionWeights, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
+import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
@@ -595,10 +595,14 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         // expects the passages containing it first, with the AI phrases merely
         // widening the net. A passage both lists agree on rises above either.
         const w = fusionWeights(outcome.plan.isQuestion);
-        setSearchResults(weightedRankFusion(
+        const fused = weightedRankFusion(
           [{ items: keyword, weight: w.keyword }, ...aiLists.map(items => ({ items, weight: w.ai }))],
           r => r.passageId,
-        ));
+        );
+        // See orderForDisplay: a lookup's literal matches must never be buried
+        // under AI-"Related" results (no checkbox) just because several of
+        // Claude's guessed phrases happened to agree with each other.
+        setSearchResults(orderForDisplay(fused, outcome.plan.isQuestion));
       }
       setAiLoading(false);
     } finally {
