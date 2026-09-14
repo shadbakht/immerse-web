@@ -215,6 +215,15 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Shaykh Ahmad al-Ahsai / Siyyid Kazim Rashti collections (ar + fa) ───────
+  // One book per author per language; cite by the collection's own title
+  // (already names the author) plus the individual work's own title. Mirrors
+  // mobile's citation.ts.
+  if (fmt === 'shaykhi_collection') {
+    const parts = [book?.title, passage?.chapter_label];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Imported books ─────────────────────────────────────────────────────────
   // Just the title: a user's own upload has no author or paragraph numbering
   // worth citing. Mobile has always done this; web used to fall through to the
