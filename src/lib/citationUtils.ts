@@ -207,6 +207,14 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Sahifa al-Sajjadiyya (ar) ────────────────────────────────────────────────
+  // Item label only, no paragraph number — each chunk is one undivided
+  // supplication. Mirrors mobile's citation.ts.
+  if (fmt === 'sahifa_sajjadiyya_ar') {
+    const parts = ['الصحيفة السجادية', passage?.chapter_label];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Imported books ─────────────────────────────────────────────────────────
   // Just the title: a user's own upload has no author or paragraph numbering
   // worth citing. Mobile has always done this; web used to fall through to the
