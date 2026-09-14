@@ -18,7 +18,7 @@ import { loadSlugMaps } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { directionOf } from '@immerse/i18n';
 import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerPrefs';
-import { collectPassages, getCachedBook, putCachedBook, type FetchPage } from '@/lib/bookFetch';
+import { collectPassages, getCachedBook, putCachedBook, type FetchPage, type OnPage } from '@/lib/bookFetch';
 import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
 import { resolveSelectionPassages } from '@/lib/selectionRange';
 import { fetchXrefSuggestions, type XrefSuggestion } from '@/lib/xrefSuggest';
@@ -686,6 +686,14 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // things React actually needs to branch on are held in state.
   const [readerSmoothing, setReaderSmoothing] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Live count of passages fetched so far during a cold (uncached) book load —
+  // null when not mid-load. Drives the "Loading… (N so far)" text so a big
+  // book's open doesn't read as hung; see loadBook's streaming logic below.
+  const [streamProgress, setStreamProgress] = useState<number | null>(null);
+  // True once the reader has been revealed early (page 1 rendered) while the
+  // rest of a large book is still streaming in behind it — shows a small
+  // "loading more" banner rather than nothing. False once the load completes.
+  const [isStreamingMore, setIsStreamingMore] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [toc, setToc] = useState<TocEntry[]>([]);
   // Section keys (depth-0 passageIds) collapsed in the TOC. Default expanded;
@@ -732,6 +740,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // Reading progress tracking
   const progressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedPidRef   = useRef<string | null>(null);
+  // True once the currently-open book's passages are ALL in `passages` — used
+  // to stop saveProgress / the recently-viewed timer from writing a fraction
+  // computed against a partially-streamed array (its own last passage isn't
+  // really the end of the book). See loadBook's streaming logic.
+  const bookFullyLoadedRef = useRef(false);
   // Tracks which book loadBook() has actually fetched, distinct from
   // target?.bookId itself — lets the effect below tell "book changed" apart
   // from "same book, new passage/search target" without a second effect.
@@ -829,6 +842,13 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // Save reading progress to Supabase (debounced — called by IntersectionObserver)
   const saveProgress = useCallback(async (passageId: string) => {
     if (!userId || !target?.bookId) return;
+    // A book still streaming in (progressive reveal — see loadBook) has its
+    // last-loaded passage as `passages[passages.length - 1]`, NOT the book's
+    // real last passage — writing a fraction against that would understate
+    // progress. In practice a scroll this early is rare (the whole fetch is
+    // now a few seconds at most, even for the two biggest books), but skip
+    // rather than write a wrong number.
+    if (!bookFullyLoadedRef.current) return;
     const passage = passages.find(p => p.id === passageId);
     const fraction = passage ? passage.sort_order / Math.max(maxSortOrder, 1) : 0;
     const { error } = await supabase.from('reading_progress').upsert(
@@ -889,6 +909,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     const bookId = target?.bookId;
     if (!userId || !bookId || passages.length === 0) return;
     const timer = setTimeout(() => {
+      // Same reasoning as saveProgress above: don't write a fraction computed
+      // against a still-streaming (progressive reveal) passage array.
+      if (!bookFullyLoadedRef.current) return;
       const row = recentlyViewedProgressRow(passages, lastSavedPidRef.current);
       if (!row) return;
       lastSavedPidRef.current = row.passage_id;
@@ -1037,6 +1060,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
     setLoading(true);
     setPassages([]);
+    setStreamProgress(null);
+    setIsStreamingMore(false);
+    bookFullyLoadedRef.current = false;
     setBook(null);
     setPdfUrl(null);
     setIsImported(false);
@@ -1053,6 +1079,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
     // ── Local (IndexedDB) imported book ──────────────────────────────────────
     if (bookId.startsWith('imported:')) {
+      // Imported books load atomically (no streaming), so they're "fully
+      // loaded" the instant they're set below.
+      bookFullyLoadedRef.current = true;
       const localId = bookId.slice('imported:'.length);
       try {
         const record = await getLocalBook(localId);
@@ -1176,7 +1205,49 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         if (res.error) throw res.error;
         return { rows: res.data ?? [] };
       };
-      const fetchAllPassages = () => collectPassages(fetchPage, BATCH);
+
+      // Resolve the scroll target concurrently with the passage fetch, rather
+      // than after it (as this used to do further down). Knowing this EARLY
+      // is what lets us decide whether it's safe to stream passages into view
+      // as they arrive below: landing at the top has nothing to jump to later
+      // and can stream freely, but a book reopened at a saved position would
+      // flash its opening lines before jumping — so that path keeps waiting
+      // for the complete fetch, same as before this change.
+      const scrollTargetPromise: Promise<string | undefined> = scrollToId
+        ? Promise.resolve(scrollToId)
+        : userId
+          ? Promise.resolve(
+              supabase.from('reading_progress').select('passage_id').eq('user_id', userId).eq('book_id', bookId).maybeSingle(),
+            ).then(({ data }) => (data as any)?.passage_id ?? undefined)
+          : Promise.resolve(undefined);
+
+      // Progressive reveal (2026-09-14, following the WAVE bump above): once
+      // it's known we're landing at the top, render each wave's passages as
+      // it lands instead of blocking on the whole book — دیوان شمس/شاهنامه
+      // (45k/50k passages, this corpus's two largest books by far) still take
+      // a few seconds even at WAVE=16, and a bare spinner for that whole span
+      // reads as hung. `revealed` and `streaming` are plain closure vars, not
+      // state — they're written from a synchronous callback (`onPage`, fired
+      // from inside collectPassages' own synchronous per-wave loop) and read
+      // by scrollTargetPromise's own handler; either can settle first.
+      let streamingKnown = false, streaming = false, revealed = false;
+      const revealIfReady = (rows: Passage[]) => {
+        if (!streamingKnown || !streaming) return;
+        setPassages(rows.slice());
+        if (!revealed) { revealed = true; setLoading(false); setIsStreamingMore(true); }
+      };
+      let latestRows: Passage[] = [];
+      const onPage: OnPage = (_rows, allSoFar) => {
+        latestRows = allSoFar as Passage[];
+        setStreamProgress(latestRows.length);
+        revealIfReady(latestRows);
+      };
+      scrollTargetPromise.then(target => {
+        streamingKnown = true;
+        streaming = !target;
+        revealIfReady(latestRows);
+      });
+      const fetchAllPassages = () => collectPassages(fetchPage, BATCH, onPage);
 
       // Last 2 opened cloud books are cached so a return from Settings / Notes /
       // Tags / X-Refs (which unmount the reader) doesn't re-fetch the whole book.
@@ -1186,12 +1257,23 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         bookData = cachedBook.bookData;
         passageData = cachedBook.passageData as any[];
       } else {
-        [bookData, passageData] = await Promise.all([
-          withSessionRetry(() => supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single()),
-          fetchAllPassages(),
-        ]);
+        const bookDataPromise = withSessionRetry(() => supabase.from('books').select('title, citation_format, language, authors(name), footnotes').eq('id', bookId).single());
+        // Reveal the title as soon as it's ready rather than waiting on the
+        // full passage fetch too — a single-row query, always fast, and
+        // harmless to set again from the unconditional block below once
+        // everything settles.
+        bookDataPromise.then(bd => {
+          if (bd) {
+            setBook({ title: bd.title, authorName: (bd.authors as any)?.name ?? '', citationFormat: (bd as any).citation_format ?? 'author_book_paragraph', language: bcp47((bd as any).language) });
+            setFootnoteMap((bd as any).footnotes ?? {});
+          }
+        }).catch(() => {});
+        [bookData, passageData] = await Promise.all([bookDataPromise, fetchAllPassages()]);
         putCachedBook(bookId, { bookData, passageData });
       }
+      bookFullyLoadedRef.current = true;
+      setStreamProgress(null);
+      setIsStreamingMore(false);
 
       if (bookData) {
         setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language) });
@@ -1267,8 +1349,15 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       setToc(tocEntries);
       tocForBookRef.current = bookId;
 
-      // Resolve scroll target: explicit passageId > saved cloud progress > top
-      let resolvedScrollId = scrollToId;
+      // Resolve scroll target: explicit passageId > saved cloud progress > top.
+      // When no explicit scrollToId was given, scrollTargetPromise (kicked off
+      // concurrently with the passage fetch, above) already queried
+      // reading_progress — reuse it instead of re-querying. `??` short-
+      // circuits, so the promise is never even awaited when scrollToId IS
+      // given. An explicit scrollToId that turns out invalid still needs its
+      // own saved-position fallback query below, since that outcome couldn't
+      // be known until the passages were in.
+      let resolvedScrollId = scrollToId ?? await scrollTargetPromise;
       if (resolvedScrollId && !ps.some(p => p.id === resolvedScrollId)) {
         // Graceful degradation: an annotation's target passage no longer
         // exists in this book (content moved or was edited during a
@@ -2043,8 +2132,15 @@ async function handleCopy() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center gap-3">
         <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
+        {/* Only shown once a book's fetch has actually paged past its first
+         *  1000 passages — an ordinary book resolves before this ever renders. */}
+        {!!streamProgress && streamProgress > 1000 && (
+          <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">
+            {t('reader.loadingCount', { count: streamProgress })}
+          </p>
+        )}
       </div>
     );
   }
@@ -2083,6 +2179,18 @@ async function handleCopy() {
 
   return (
     <div className="h-full flex flex-col relative" ref={readerRef}>
+      {/* Progressive-reveal banner: the book's start is already visible below,
+       *  the rest is still streaming in behind it (see loadBook). Only ever
+       *  shown for a book whose fetch spans more than one page — see the
+       *  streaming-eligibility check in loadBook (no saved position to jump
+       *  to, so there's nothing for this to visually interrupt). */}
+      {isStreamingMore && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 bg-white/95 dark:bg-[#1B2A38]/95 border border-gray-200 dark:border-[#2D4050] rounded-full shadow-sm text-xs text-gray-500 dark:text-[#8FA4B8]">
+          <div className="w-3 h-3 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
+          {t('reader.loadingMoreBanner')}
+        </div>
+      )}
+
       {/* TOC button */}
       {toc.length > 0 && (
         <button
