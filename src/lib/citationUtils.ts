@@ -171,6 +171,16 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Al-Kafi (ar) ─────────────────────────────────────────────────────────────
+  // Cite by chapter (بَابُ …) and the printed hadith number within it, not by
+  // a category-name author — same reason the Qur'an and Nahj al-Balagha above
+  // skip it. Mirrors mobile's citation.ts.
+  if (fmt === 'kafi_ar') {
+    const parts = ['الكافي', passage?.chapter_label,
+      passage?.paragraph_number ? `ح ${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Imported books ─────────────────────────────────────────────────────────
   // Just the title: a user's own upload has no author or paragraph numbering
   // worth citing. Mobile has always done this; web used to fall through to the
