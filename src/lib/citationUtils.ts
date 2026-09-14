@@ -162,6 +162,15 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Nahj al-Balagha (ar, the original) ──────────────────────────────────────
+  // Same shape as the Persian translation above, minus a page number — this
+  // ingest doesn't print one, chapter_label (خطبة/كتاب/حكمة N) already carries
+  // the item's own address in full. Mirrors mobile's citation.ts.
+  if (fmt === 'nahj_albalagha_ar') {
+    const parts = ['نهج البلاغة', passage?.chapter_label];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Imported books ─────────────────────────────────────────────────────────
   // Just the title: a user's own upload has no author or paragraph numbering
   // worth citing. Mobile has always done this; web used to fall through to the
