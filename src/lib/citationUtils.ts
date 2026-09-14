@@ -181,6 +181,32 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Man Lā Yaḥḍuruhu al-Faqīh (ar) ───────────────────────────────────────────
+  // Same shape as Al-Kafi above — cite by chapter (باب …) and the printed
+  // hadith number within it. Mirrors mobile's citation.ts.
+  if (fmt === 'faqih_ar') {
+    const parts = ['من لا يحضره الفقيه', passage?.chapter_label,
+      passage?.paragraph_number ? `ح ${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
+  // ── Tahdhib al-Ahkam (ar) ────────────────────────────────────────────────────
+  // Same shape as Al-Kafi/Faqih above — cite by chapter (باب …) and the printed
+  // hadith number. Mirrors mobile's citation.ts.
+  if (fmt === 'tahdhib_ar') {
+    const parts = ['تهذيب الأحكام', passage?.chapter_label,
+      passage?.paragraph_number ? `ح ${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
+  // ── Al-Istibsar (ar) ─────────────────────────────────────────────────────────
+  // Same shape as Al-Kafi/Faqih/Tahdhib above. Mirrors mobile's citation.ts.
+  if (fmt === 'istibsar_ar') {
+    const parts = ['الاستبصار', passage?.chapter_label,
+      passage?.paragraph_number ? `ح ${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Imported books ─────────────────────────────────────────────────────────
   // Just the title: a user's own upload has no author or paragraph numbering
   // worth citing. Mobile has always done this; web used to fall through to the
