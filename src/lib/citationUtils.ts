@@ -224,6 +224,17 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Ganjoor poetry shelf (fa) ────────────────────────────────────────────────
+  // Ḥāfeẓ/Rūmī/Saʿdī/ʿAṭṭār (cat-fa-islamic-poetry) and Ferdowsī's Shāhnāmeh
+  // (cat-fa-more): book title, then the passage's own section_title (the
+  // poem's divan/dafter/bāb sub-shelf, or a Shāhnāmeh reign/episode
+  // section), then chapter_label (the individual poem's own title). Mirrors
+  // mobile's citation.ts — see scripts/lib/ganjoorCorpus.mjs there.
+  if (fmt === 'ganjoor_poem') {
+    const parts = [book?.title, passage?.section_title, passage?.chapter_label];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Imported books ─────────────────────────────────────────────────────────
   // Just the title: a user's own upload has no author or paragraph numbering
   // worth citing. Mobile has always done this; web used to fall through to the
