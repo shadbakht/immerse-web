@@ -20,7 +20,7 @@ import { directionOf, translate, type TranslationKey } from '@immerse/i18n';
 import {
   TYPEFACES, LINE_SPACING, MARGINS, LETTER_SPACING_RANGE, WORD_SPACING_RANGE,
   WEIGHT_RANGE, DEFAULT_READER_PREFS, resolveTheme,
-  SCRIPT_FACES, scriptFaceFor, scriptFaceStack,
+  SCRIPT_FACES, scriptFaceFor, scriptFaceStack, scriptNeedsHeadingLetterSpacingDisabled,
   type ReaderPrefs, type LineSpacing, type Margins, type ParagraphStyle,
   type ReaderThemeKey, type Typeface,
 } from '@/lib/readerTypography';
@@ -144,7 +144,9 @@ export default function AppearanceSection({
               color: palette.accent,
               fontSize: '0.85em',
               fontWeight: 600,
-              letterSpacing: '0.14em',
+              // Perso-Arabic joining breaks under any nonzero letter-spacing,
+              // in any face — see scriptNeedsHeadingLetterSpacingDisabled.
+              letterSpacing: scriptNeedsHeadingLetterSpacingDisabled(contentLanguage) ? '0' : '0.14em',
               lineHeight: 1.4,
               margin: '0.4em 0 1.1em',
             }}

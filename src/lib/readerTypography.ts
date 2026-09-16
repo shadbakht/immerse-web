@@ -335,6 +335,21 @@ export function scriptFaceScale(
   return def?.sizeMultiplier ?? 1;
 }
 
+/**
+ * Whether a book's script joins its letters (Perso-Arabic) and so cannot
+ * tolerate the reader's decorative heading letter-spacing. See mobile's own
+ * copy of this function for the full 2026-09-16 diagnosis (a per-face "GPOS
+ * cursive attachment" theory, based on a desktop-Chromium repro, was wrong —
+ * a real device showed the same break in a plain Naskh face). CJK is
+ * untouched — Han glyphs don't join.
+ */
+export function scriptNeedsHeadingLetterSpacingDisabled(
+  language: string | null | undefined,
+): boolean {
+  const script = scriptFaceFor(language);
+  return script === 'persian' || script === 'arabic';
+}
+
 // Chrome text at Arabic/Persian UI sizes reads smaller than Latin at the same
 // px — the same reason SCRIPT_SIZE_SCALE.arabic exists for reader CONTENT.
 // Gentler than the reader's 1.15: chrome is short labels and the system Arabic
@@ -504,6 +519,10 @@ export interface ReaderThemePayload {
   /** Dark themes get antialiased smoothing; light ones must NOT — it
    *  under-weights serif stems on a light ground. */
   darkSmoothing: boolean;
+  /** 1 = normal; 0 for a Perso-Arabic book — see
+   *  scriptNeedsHeadingLetterSpacingDisabled for why letter-spacing on the
+   *  reader's decorative headings breaks joining there, regardless of face. */
+  headingLetterSpacingScale: number;
 }
 
 export function buildThemePayload(
@@ -551,6 +570,7 @@ export function buildThemePayload(
     weight: face.weightAxis ? prefs.weight : (prefs.weight >= 550 ? 700 : 400),
     showParagraphNumbers: prefs.showParagraphNumbers,
     darkSmoothing: palette.isDarkChrome,
+    headingLetterSpacingScale: scriptNeedsHeadingLetterSpacingDisabled(bookLanguage) ? 0 : 1,
   };
 }
 

@@ -19,7 +19,7 @@ import { useTranslation } from '@/contexts/LanguageProvider';
 import { directionOf } from '@immerse/i18n';
 import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerPrefs';
 import { collectPassages, getCachedBook, putCachedBook, type FetchPage, type OnPage } from '@/lib/bookFetch';
-import { resolveTheme, type ReaderPrefs } from '@/lib/readerTypography';
+import { resolveTheme, scriptNeedsHeadingLetterSpacingDisabled, type ReaderPrefs } from '@/lib/readerTypography';
 import { resolveSelectionPassages } from '@/lib/selectionRange';
 import { fetchXrefSuggestions, type XrefSuggestion } from '@/lib/xrefSuggest';
 import { seedCollapsedToc, TOC_EXPAND_ROW_BUDGET } from '@/lib/tocCollapse';
@@ -2150,6 +2150,12 @@ async function handleCopy() {
   const isPrayerStyle = !!target?.bookId && PRAYER_STYLE_BOOKS.has(target.bookId);
   const hasParagraphBreaks = isPrayerStyle || (!!target?.bookId && PARAGRAPH_BREAK_BOOKS.has(target.bookId));
   const isLayoutStyle = !isPrayerStyle && !!target?.bookId && PRAYER_LAYOUT_BOOKS.has(target.bookId);
+  // 2026-09-16: a fixed heading tracking value (Tailwind's tracking-[0.14em]/
+  // tracking-wide below) breaks Perso-Arabic letter joining, in any face —
+  // see scriptNeedsHeadingLetterSpacingDisabled's own doc comment. Computed
+  // once per book, reused by every eyebrow/prayer-title/section-title span
+  // below rather than per passage.
+  const disableHeadingTracking = scriptNeedsHeadingLetterSpacingDisabled(book?.language);
   const hasTabletDividers = !!target?.bookId && TABLET_DIVIDER_BOOKS.has(target.bookId);
   const hasTdNumbers = !!target?.bookId && TD_NUMBER_BOOKS.has(target.bookId);
   let lastPrayerSection = '';
@@ -2472,7 +2478,7 @@ async function handleCopy() {
                     {showPrayerDivider && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
-                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B] dark:text-[#2D9DB3]">{prayerSection}</span>
+                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{prayerSection}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
@@ -2482,7 +2488,7 @@ async function handleCopy() {
                       </h2>
                     )}
                     {showSection && (
-                      <h3 className="text-center text-xs font-normal text-gray-400 dark:text-[#5C7A8E] uppercase tracking-wide mb-5">
+                      <h3 className={`text-center text-xs font-normal text-gray-400 dark:text-[#5C7A8E] uppercase mb-5${disableHeadingTracking ? '' : ' tracking-wide'}`}>
                         {passage.section_title}
                       </h3>
                     )}
@@ -2495,7 +2501,7 @@ async function handleCopy() {
                     {showChapter && passage.chapter_label && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
-                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B] dark:text-[#2D9DB3]">{passage.chapter_label}</span>
+                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{passage.chapter_label}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
@@ -2510,7 +2516,7 @@ async function handleCopy() {
                     {showChapter && (
                       <div className="flex items-center gap-3 mt-12 mb-4">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
-                        <span className="text-sm font-semibold uppercase tracking-[0.14em] text-[#1B6B7B] dark:text-[#2D9DB3]">{passage.chapter_label}</span>
+                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{passage.chapter_label}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
@@ -2518,7 +2524,7 @@ async function handleCopy() {
                       <div className="h-px w-16 mx-auto my-10" style={{ background: 'var(--reader-rule)' }} />
                     )}
                     {showSection && (
-                      <h3 className="text-sm font-medium text-gray-400 dark:text-[#5C7A8E] uppercase tracking-wide text-center mt-8 mb-3">
+                      <h3 className={`text-sm font-medium text-gray-400 dark:text-[#5C7A8E] uppercase text-center mt-8 mb-3${disableHeadingTracking ? '' : ' tracking-wide'}`}>
                         {passage.section_title}
                       </h3>
                     )}
