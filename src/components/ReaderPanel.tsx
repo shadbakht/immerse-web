@@ -297,23 +297,51 @@ function renderPrayerText(text: string, kp: string) {
   );
 }
 
+type FootnoteSegment = { text: string } | { marker: string };
+
+// Split text into plain runs and footnote markers.
+//
+// An ASCII [N] is always a marker (unchanged behaviour). A [N] written in
+// Persian (۰-۹) or Arabic-Indic (٠-٩) digits is a marker ONLY when the passage
+// actually has a footnote for that number: `\d` never matched those digits, so
+// fa/ar footnotes were never tappable — but a literal Persian "[۱]" can also be a
+// compilation reference number, which must stay plain text (bahai.org
+// formatting), and the two look identical. Having a note for it is what tells
+// them apart.
+export function splitFootnoteMarkers(text: string, hasNote: (n: string) => boolean): FootnoteSegment[] {
+  const out: FootnoteSegment[] = [];
+  let run = '';
+  for (const part of text.split(/(\[[0-9\u06F0-\u06F9\u0660-\u0669]+\])/g)) {
+    const m = part.match(/^\[([0-9\u06F0-\u06F9\u0660-\u0669]+)\]$/);
+    const isMarker = !!m && (/^[0-9]+$/.test(m[1]) || hasNote(m[1]));
+    if (isMarker) {
+      if (run) { out.push({ text: run }); run = ''; }
+      out.push({ marker: m![1] });
+    } else {
+      run += part;
+    }
+  }
+  if (run) out.push({ text: run });
+  return out;
+}
+
 // Render a text fragment, turning [N] markers into tappable footnote sups.
-function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp: string, prayerBreaks?: boolean) {
-  return text.split(/(\[\d+\])/g).map((part, i) => {
-    const m = part.match(/^\[(\d+)\]$/);
-    if (m) {
+function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp: string, prayerBreaks?: boolean, hasNote: (n: string) => boolean = () => false) {
+  return splitFootnoteMarkers(text, hasNote).map((seg, i) => {
+    if ('marker' in seg) {
+      const n = seg.marker;
       return (
         <sup
           key={kp + i}
-          onClick={e => { e.stopPropagation(); onFootnoteClick(m[1]); }}
+          onClick={e => { e.stopPropagation(); onFootnoteClick(n); }}
           className="text-[10px] text-[#1B6B7B] dark:text-[#2D9DB3] font-medium ms-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
-          title={`Footnote ${m[1]}`}
+          title={`Footnote ${n}`}
         >
-          {m[1]}
+          {n}
         </sup>
       );
     }
-    return prayerBreaks ? renderPrayerText(part, kp + i) : <span key={kp + i}>{part}</span>;
+    return prayerBreaks ? renderPrayerText(seg.text, kp + i) : <span key={kp + i}>{seg.text}</span>;
   });
 }
 
@@ -328,7 +356,7 @@ export function resolveFootnoteText(
   return passage.footnotes?.[num] ?? bookFootnotes[num] ?? '';
 }
 
-function PassageContent({ text, onFootnoteClick, highlight, highlightExact, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; highlight?: string; highlightExact?: boolean; prayerBreaks?: boolean }) {
+function PassageContent({ text, onFootnoteClick, hasFootnote, highlight, highlightExact, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; hasFootnote?: (n: string) => boolean; highlight?: string; highlightExact?: boolean; prayerBreaks?: boolean }) {
   const clean = text.replace(/\/\*[^*]*\*\//g, '');
   if (highlight && highlightExact) {
     // A tap-and-hold quote (Compilations/Notes/XRef/Discover) or a daily-verse
@@ -373,8 +401,8 @@ function PassageContent({ text, onFootnoteClick, highlight, highlightExact, pray
     <>
       {segs.map((seg, i) =>
         i % 2 === 1
-          ? <em key={`i${i}`}>{renderFootnotes(seg, onFootnoteClick, `i${i}-`, prayerBreaks)}</em>
-          : <span key={`n${i}`}>{renderFootnotes(seg, onFootnoteClick, `n${i}-`, prayerBreaks)}</span>
+          ? <em key={`i${i}`}>{renderFootnotes(seg, onFootnoteClick, `i${i}-`, prayerBreaks, hasFootnote)}</em>
+          : <span key={`n${i}`}>{renderFootnotes(seg, onFootnoteClick, `n${i}-`, prayerBreaks, hasFootnote)}</span>
       )}
     </>
   );
@@ -2603,6 +2631,7 @@ async function handleCopy() {
                       onFootnoteClick={n => {
                         setActiveFootnote({ num: n, text: resolveFootnoteText(passage, n, footnoteMap) });
                       }}
+                      hasFootnote={n => !!resolveFootnoteText(passage, n, footnoteMap)}
                       highlight={searchHighlight?.passageId === passage.id ? searchHighlight.query : undefined}
                       highlightExact={searchHighlight?.passageId === passage.id ? searchHighlight.exact : undefined}
                       prayerBreaks={hasParagraphBreaks}
