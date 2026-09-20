@@ -334,7 +334,7 @@ function renderFootnotes(text: string, onFootnoteClick: (n: string) => void, kp:
         <sup
           key={kp + i}
           onClick={e => { e.stopPropagation(); onFootnoteClick(n); }}
-          className="text-[10px] text-[#1B6B7B] dark:text-[#2D9DB3] font-medium ms-0.5 cursor-pointer hover:text-[#0f4a56] select-none"
+          className="text-[11px] font-bold underline text-[color:var(--reader-footnote,#0F5BDB)] ms-0.5 cursor-pointer hover:opacity-75 select-none"
           title={`Footnote ${n}`}
         >
           {n}

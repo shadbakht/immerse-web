@@ -75,6 +75,10 @@ export function applyReaderPrefs(
   s.setProperty('--reader-muted', p.muted);
   s.setProperty('--reader-rule', p.rule);
   s.setProperty('--reader-accent', p.accent);
+  // Footnote number: vivid royal blue on light pages, lighter blue on dark ones
+  // (royal blue on #0F1923 / black would vanish). Same rule as the mobile reader's
+  // applyTheme, keyed off the same flag — keep the two in step.
+  s.setProperty('--reader-footnote', p.darkSmoothing ? '#8CB8FF' : '#0F5BDB');
   s.setProperty('--reader-pad', `${p.padding}px`);
   s.setProperty('--reader-max-width', `${p.maxWidth}px`);
   s.setProperty('--reader-gutter', `${p.gutter}px`);
