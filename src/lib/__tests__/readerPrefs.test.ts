@@ -36,10 +36,10 @@ describe('applyReaderPrefs — footnote marker colour (--reader-footnote)', () =
 
   it.each(['light', 'sepia', 'quiet'] as const)('%s theme: royal blue', (t) => {
     apply(t);
-    expect(read().toUpperCase()).toBe('#0F5BDB');
+    expect(read().toUpperCase()).toBe('#4F8AE6');
   });
   it.each(['dark', 'night'] as const)('%s theme: lighter blue', (t) => {
     apply(t);
-    expect(read().toUpperCase()).toBe('#8CB8FF');
+    expect(read().toUpperCase()).toBe('#7EA8EA');
   });
 });
