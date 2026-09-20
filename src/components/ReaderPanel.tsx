@@ -59,9 +59,8 @@ interface Passage {
  * existing saved-progress/top default, same as before this existed.
  */
 function findNearestPassageId(snapshotText: string, passages: Passage[]): string | null {
-  const words = snapshotText
+  const words = stripFootnoteMarkers(snapshotText) // footnote markers, if present in the snapshot
     .replace(/[“”‘’]/g, '"')
-    .replace(/\[\d+\]/g, '') // footnote markers, if present in the snapshot
     .split(/\s+/)
     .map(w => w.toLowerCase().replace(/[.,;:!?"'()]/g, ''))
     .filter(w => w.length >= 3)
@@ -295,6 +294,14 @@ function renderPrayerText(text: string, kp: string) {
       ))}
     </span>
   );
+}
+
+// Remove bracketed footnote numbers — ASCII, Persian (۰-۹) and Arabic-Indic (٠-٩) —
+// from text that is matched against the document or shown outside the reader
+// (snapshots, xref suggestions, xref source text). These have no per-passage note
+// context, so unlike splitFootnoteMarkers every bracketed number goes.
+export function stripFootnoteMarkers(text: string): string {
+  return text.replace(/\[[0-9\u06F0-\u06F9\u0660-\u0669]+\]/g, '');
 }
 
 type FootnoteSegment = { text: string } | { marker: string };
@@ -557,7 +564,7 @@ function SuggestionCard({ suggestion, onAccept }: {
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const text = suggestion.text.replace(/\[\d+\]/g, '');
+  const text = stripFootnoteMarkers(suggestion.text);
   const badge =
     suggestion.annotated == null
       ? null
@@ -1844,7 +1851,7 @@ async function handleCopy() {
     if (!bar || !target || !userId || !setXrefSuggestions) return;
 
     const sourcePassageId = bar.startPassageId;
-    const sourceText = bar.text.replace(/\[\d+\]/g, '');
+    const sourceText = stripFootnoteMarkers(bar.text);
 
     // Stash the pick-from endpoint before clearing the bar — acceptSuggestion
     // needs the offsets/text and the bar is about to go away.

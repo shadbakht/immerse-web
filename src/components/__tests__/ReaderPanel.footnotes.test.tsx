@@ -3,7 +3,7 @@
 // jest 'test' environment. Stub it so we can import the pure helper.
 jest.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 
-import { resolveFootnoteText, splitFootnoteMarkers } from '../ReaderPanel';
+import { resolveFootnoteText, splitFootnoteMarkers, stripFootnoteMarkers } from '../ReaderPanel';
 
 describe('resolveFootnoteText', () => {
   it('prefers the passage\'s own scoped footnote map when present', () => {
@@ -58,5 +58,23 @@ describe('splitFootnoteMarkers', () => {
     expect(splitFootnoteMarkers('a[۱]b[۲]', n => n === '۲')).toEqual([
       { text: 'a[۱]b' }, { marker: '۲' },
     ]);
+  });
+});
+
+// Snapshot / suggestion / xref-source text can carry footnote markers in any of
+// the three digit systems; the strips used to be ASCII-only (`\[\d+\]`), so a
+// Persian or Arabic passage kept its `[۲]` in text that is matched against the
+// document or shown to the user.
+describe('stripFootnoteMarkers', () => {
+  it('removes ASCII, Persian and Arabic-Indic bracketed numbers', () => {
+    expect(stripFootnoteMarkers('a[1] b[۲] c[٣] d[12]e')).toBe('a b c de');
+  });
+
+  it('leaves brackets around anything that is not a number', () => {
+    expect(stripFootnoteMarkers('see [Note] and [1a] and []')).toBe('see [Note] and [1a] and []');
+  });
+
+  it('is a no-op on text without markers', () => {
+    expect(stripFootnoteMarkers('plain text')).toBe('plain text');
   });
 });
