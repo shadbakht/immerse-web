@@ -21,7 +21,7 @@ const APP_VERSION = pkg.version;
 
 // Full feature walkthrough on YouTube (About → "Watch Full Feature Video").
 // Same constant exists in the mobile repo: src/screens/SettingsScreen.js.
-const FEATURE_VIDEO_URL = 'https://youtu.be/z4pgyDj5QFY';
+const FEATURE_VIDEO_URL = 'https://youtu.be/6LfBemF6O30';
 
 // Module-level so the light/dark/system buttons can name themselves without a
 // switch at the call site.
