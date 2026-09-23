@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, Suspense } from 'react';
+import { AppleLogo, GoogleLogo, DiscordLogo } from '@/components/SocialLogos';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -199,23 +200,23 @@ function LoginPageInner() {
       <button
         onClick={() => handleSocial('apple')}
         disabled={socialLoading !== null}
-        className="w-full bg-black text-white font-semibold py-3.5 rounded-xl hover:bg-black/85 transition disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2.5 bg-black text-white font-semibold py-3.5 rounded-xl hover:bg-black/85 transition disabled:opacity-50"
       >
-        {socialLoading === 'apple' ? t('common.pleaseWait') : t('auth.continueWithApple')}
+        {socialLoading === 'apple' ? t('common.pleaseWait') : (<><AppleLogo />{t('auth.continueWithApple')}</>)}
       </button>
       <button
         onClick={() => handleSocial('google')}
         disabled={socialLoading !== null}
-        className="w-full bg-white text-gray-900 font-semibold py-3.5 rounded-xl border border-white/15 hover:bg-white/90 transition disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2.5 bg-white text-gray-900 font-semibold py-3.5 rounded-xl border border-white/15 hover:bg-white/90 transition disabled:opacity-50"
       >
-        {socialLoading === 'google' ? t('common.pleaseWait') : t('auth.continueWithGoogle')}
+        {socialLoading === 'google' ? t('common.pleaseWait') : (<><GoogleLogo />{t('auth.continueWithGoogle')}</>)}
       </button>
       <button
         onClick={() => handleSocial('discord')}
         disabled={socialLoading !== null}
-        className="w-full bg-[#5865F2] text-white font-semibold py-3.5 rounded-xl hover:bg-[#4752C4] transition disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2.5 bg-[#5865F2] text-white font-semibold py-3.5 rounded-xl hover:bg-[#4752C4] transition disabled:opacity-50"
       >
-        {socialLoading === 'discord' ? t('common.pleaseWait') : t('auth.continueWithDiscord')}
+        {socialLoading === 'discord' ? t('common.pleaseWait') : (<><DiscordLogo />{t('auth.continueWithDiscord')}</>)}
       </button>
     </>
   );
