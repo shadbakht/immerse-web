@@ -65,6 +65,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [isTrial, setIsTrial] = useState(false);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
@@ -91,10 +92,11 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('font_size, is_pro, full_name, username')
+      .select('font_size, is_pro, full_name, username, avatar_url')
       .eq('id', user.id)
       .single();
     if (data) {
+      setAvatarUrl(data.avatar_url ?? null);
       const loadedSize = (data.font_size as FontSize) ?? 'Large';
       setFontSize(loadedSize);
       applyFontSize(loadedSize);
@@ -180,16 +182,21 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">{t('nav.settings')}</h1>
 
         {/* Profile header — mirrors mobile's avatar + name/Edit atop Settings
-            (src/screens/SettingsScreen.js). There is no avatar image anywhere
-            in this app, mobile or web: profiles carries full_name/username but
-            no avatar_url, so initials are the whole identity, same as mobile's
-            AvatarButton. Full Name's row (and Edit) and the Username row both
-            moved up here from the Account section below, since the name would
-            otherwise show twice on the page. */}
+            (src/screens/SettingsScreen.js). `avatar_url` is only ever
+            populated from a Google Sign-In account's own photo (seeded once
+            at signup — see the handle_new_user migration; Apple provides no
+            photo, so those users always fall through to initials). Everyone
+            else's identity is initials, same as mobile's AvatarButton. Full
+            Name's row (and Edit) and the Username row both moved up here from
+            the Account section below, since the name would otherwise show
+            twice on the page. */}
         {!loading && (
           <div className="flex flex-col items-center gap-1.5 mb-8">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/15 border border-[#1B6B7B]/20 dark:border-[#2D9DB3]/25">
-              {isGuest ? (
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/15 border border-[#1B6B7B]/20 dark:border-[#2D9DB3]/25 overflow-hidden">
+              {!isGuest && avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : isGuest ? (
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#1B6B7B] dark:text-[#2D9DB3]" aria-hidden="true">
                   <path d="M20 21a8 8 0 0 0-16 0" />
                   <circle cx="12" cy="7" r="4" />

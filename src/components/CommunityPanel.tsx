@@ -53,13 +53,14 @@ function payloadToTagRows(ct: CommunityTag, exportIds: Set<string>): TagRow[] {
 
 interface CommunityTag extends CommunityTagRow {
   import_count: number;
-  profiles: { full_name: string | null; username: string | null } | null;
+  profiles: { full_name: string | null; username: string | null; avatar_url: string | null } | null;
 }
 
 interface ProfileUser {
   userId:      string;
   displayName: string;
   username:    string | null;
+  avatarUrl:   string | null;
 }
 
 interface CommunityPanelProps {
@@ -317,7 +318,7 @@ function ProfileView({
   useEffect(() => {
     supabase
       .from('community_tags')
-      .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
+      .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username, avatar_url)')
       .eq('user_id', profile.userId)
       .eq('listed', true)
       .order('updated_at', { ascending: false })
@@ -375,8 +376,13 @@ function ProfileView({
         </button>
 
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-base">{initials}</span>
+          <div className="w-10 h-10 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] flex items-center justify-center shrink-0 overflow-hidden">
+            {profile.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white font-bold text-base">{initials}</span>
+            )}
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-gray-900 dark:text-[#E2EAF2] truncate">{profile.displayName}</div>
@@ -588,7 +594,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     try {
       const { data } = await supabase
         .from('community_tags')
-        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
+        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username, avatar_url)')
         .eq('listed', true)
         .order('published_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
@@ -603,7 +609,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     try {
       const { data } = await (supabase
         .from('community_tags')
-        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username)')
+        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username, avatar_url)')
         .eq('listed', true)
         .order('import_count', { ascending: false }) as any)
         .order('published_at', { ascending: false })
@@ -636,7 +642,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
 
   const handleProfilePress = useCallback((ct: CommunityTag) => {
     const displayName = ct.profiles?.username ?? t('discover.anonymous');
-    setProfileView({ userId: ct.user_id, displayName, username: ct.profiles?.username ?? null });
+    setProfileView({ userId: ct.user_id, displayName, username: ct.profiles?.username ?? null, avatarUrl: ct.profiles?.avatar_url ?? null });
   }, [t]);
 
   // ── Profile view ────────────────────────────────────────────────────────────

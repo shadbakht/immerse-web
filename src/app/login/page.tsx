@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useTranslation } from '@/contexts/LanguageProvider';
 
+// 'choose' = the 3-button landing screen (Sign in / Sign up / Guest access, no
+// fields). 'signin' / 'signup' expand into the matching form, each ending in
+// the same Apple/Google row — those two do the exact same thing regardless of
+// which panel they're tapped from (OAuth doesn't distinguish signing in from
+// signing up). Mirrors the mobile LoginScreen redesign.
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -13,7 +18,8 @@ function LoginPageInner() {
   const supabase = createClient();
   const { t } = useTranslation();
 
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [screenMode, setScreenMode] = useState<'choose' | 'signin' | 'signup'>('choose');
+  const isSignUp = screenMode === 'signup';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -22,6 +28,7 @@ function LoginPageInner() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<null | 'google' | 'apple' | 'discord'>(null);
   const [forgotMode, setForgotMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -50,14 +57,6 @@ function LoginPageInner() {
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [username, isSignUp]);
-
-  function switchMode() {
-    setIsSignUp(v => !v);
-    setError('');
-    setSuccess('');
-    setUsername('');
-    setUsernameStatus(null);
-  }
 
   async function handleForgot() {
     setError('');
@@ -168,6 +167,59 @@ function LoginPageInner() {
     }
   }
 
+  // Web has no App Store native-button requirement, so Google and Apple both
+  // go through the same generic browser-redirect OAuth flow — the provider's
+  // own page, then back to /auth/callback, which already does
+  // exchangeCodeForSession for the email-confirmation link case too. `next`
+  // carries the post-login destination through that round trip; the callback
+  // route also checks profiles.username_confirmed and detours to
+  // /auth/choose-username first when it's false (fresh Google/Apple signups
+  // only — email signup already collects a real username in this form).
+  async function handleSocial(provider: 'google' | 'apple' | 'discord') {
+    setError('');
+    setSocialLoading(provider);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}` },
+    });
+    if (error) {
+      setError(error.message);
+      setSocialLoading(null);
+    }
+    // On success the browser navigates away — no further state update needed.
+  }
+
+  const SocialButtons = (
+    <>
+      <div className="flex items-center gap-3 my-1">
+        <div className="flex-1 h-px bg-white/10" />
+        <span className="text-xs text-gray-600 dark:text-[#8FA4B8]">{t('auth.orContinueWith')}</span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+      <button
+        onClick={() => handleSocial('apple')}
+        disabled={socialLoading !== null}
+        className="w-full bg-black text-white font-semibold py-3.5 rounded-xl hover:bg-black/85 transition disabled:opacity-50"
+      >
+        {socialLoading === 'apple' ? t('common.pleaseWait') : t('auth.continueWithApple')}
+      </button>
+      <button
+        onClick={() => handleSocial('google')}
+        disabled={socialLoading !== null}
+        className="w-full bg-white text-gray-900 font-semibold py-3.5 rounded-xl border border-white/15 hover:bg-white/90 transition disabled:opacity-50"
+      >
+        {socialLoading === 'google' ? t('common.pleaseWait') : t('auth.continueWithGoogle')}
+      </button>
+      <button
+        onClick={() => handleSocial('discord')}
+        disabled={socialLoading !== null}
+        className="w-full bg-[#5865F2] text-white font-semibold py-3.5 rounded-xl hover:bg-[#4752C4] transition disabled:opacity-50"
+      >
+        {socialLoading === 'discord' ? t('common.pleaseWait') : t('auth.continueWithDiscord')}
+      </button>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-[#0F1923] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -211,7 +263,7 @@ function LoginPageInner() {
               {codeCooldown > 0 ? t('auth.resendCodeIn', { seconds: codeCooldown }) : t('auth.resendCode')}
             </button>
             <button
-              onClick={() => { setVerify(null); setCode(''); setError(''); setSuccess(''); setIsSignUp(false); }}
+              onClick={() => { setVerify(null); setCode(''); setError(''); setSuccess(''); setScreenMode('choose'); }}
               className="w-full text-center text-gray-400 dark:text-[#5C7A8E] text-sm py-2 hover:text-white transition"
             >
               {t('auth.wrongEmailBack')}
@@ -249,8 +301,37 @@ function LoginPageInner() {
               {t('auth.backToSignIn')}
             </button>
           </div>
+        ) : screenMode === 'choose' ? (
+          <div className="space-y-3">
+            <button
+              onClick={() => setScreenMode('signin')}
+              className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition"
+            >
+              {t('auth.signIn')}
+            </button>
+            <button
+              onClick={() => setScreenMode('signup')}
+              className="w-full border border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 dark:hover:bg-[#2D9DB3]/10 transition"
+            >
+              {t('auth.signUp')}
+            </button>
+            <a
+              href="/"
+              className="block w-full text-center text-white/70 font-medium py-3 hover:text-white transition"
+            >
+              {t('auth.guestAccess')}
+            </a>
+          </div>
         ) : (
           <div className="space-y-3">
+            <button
+              onClick={() => { setScreenMode('choose'); setError(''); }}
+              className="flex items-center gap-1 text-gray-400 dark:text-[#5C7A8E] text-sm hover:text-white transition mb-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              {t('common.back')}
+            </button>
+
             {/* Sign-up only fields */}
             {isSignUp && (
               <>
@@ -345,29 +426,7 @@ function LoginPageInner() {
               </button>
             )}
 
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-
-            <button
-              onClick={switchMode}
-              className="w-full border border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] font-semibold py-3.5 rounded-xl hover:bg-[#1B6B7B]/10 dark:hover:bg-[#2D9DB3]/10 transition"
-            >
-              {isSignUp ? t('auth.signIn') : t('auth.signUp')}
-            </button>
-
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs text-gray-600 dark:text-[#8FA4B8]">{t('common.or')}</span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-
-            <a
-              href="/"
-              className="block w-full text-center border border-white/15 text-white/70 font-medium py-3.5 rounded-xl hover:bg-white/5 hover:text-white transition"
-            >
-              {t('auth.browseWithout')}
-            </a>
+            {SocialButtons}
           </div>
         )}
       </div>
