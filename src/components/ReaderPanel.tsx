@@ -14,7 +14,7 @@ import { TagIcon, NoteIcon, XRefIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
 import { logEvent } from '@/lib/analytics';
-import { loadSlugMaps } from '@/lib/catalog';
+import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { directionOf } from '@immerse/i18n';
 import { applyReaderPrefs, getStoredPrefs, initReaderPrefs } from '@/lib/readerPrefs';
@@ -87,6 +87,24 @@ interface BookMeta {
   // BCP-47 tag from books.language. Optional because imported books are held in
   // IndexedDB and carry no language of their own; those fall back to English.
   language?: string;
+  // Whether this book's catalog.json categoryId is under the Bahá'í tree —
+  // gates the AI Summary disclaimer. Undefined/false for imported books,
+  // which have no catalog entry.
+  isBahai?: boolean;
+}
+
+/** catalog.json's categoryId for a book, by its Supabase uuid — resolved via the
+ * uuid→slug map, then a catalog lookup by slug. Both are module-cached after
+ * their first load, so repeat calls (one per book open) are effectively free. */
+async function resolveIsBahai(uuid: string, supabase: ReturnType<typeof createClient>): Promise<boolean> {
+  try {
+    const [{ uuidToSlug }, catalog] = await Promise.all([loadSlugMaps(supabase), loadCatalog()]);
+    const slug = uuidToSlug.get(uuid);
+    const categoryId = slug ? catalog.books.find(b => b.id === slug)?.categoryId : undefined;
+    return !!categoryId?.includes('bahai');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1200,6 +1218,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         return;
       }
     }
+    const isBahaiPromise = resolveIsBahai(bookId, supabase);
     try {
       // A tab that sat backgrounded for a while can wake up with an access token
       // that expired while its refresh timer was throttled — the very next query
@@ -1297,9 +1316,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         // full passage fetch too — a single-row query, always fast, and
         // harmless to set again from the unconditional block below once
         // everything settles.
-        bookDataPromise.then(bd => {
+        bookDataPromise.then(async bd => {
           if (bd) {
-            setBook({ title: bd.title, authorName: (bd.authors as any)?.name ?? '', citationFormat: (bd as any).citation_format ?? 'author_book_paragraph', language: bcp47((bd as any).language) });
+            setBook({ title: bd.title, authorName: (bd.authors as any)?.name ?? '', citationFormat: (bd as any).citation_format ?? 'author_book_paragraph', language: bcp47((bd as any).language), isBahai: await isBahaiPromise });
             setFootnoteMap((bd as any).footnotes ?? {});
           }
         }).catch(() => {});
@@ -1311,7 +1330,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       setIsStreamingMore(false);
 
       if (bookData) {
-        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language) });
+        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language), isBahai: await isBahaiPromise });
         setFootnoteMap((bookData as any).footnotes ?? {});
       }
 
@@ -2720,6 +2739,7 @@ async function handleCopy() {
         bookTitle={book?.title ?? ''}
         authorName={book?.authorName ?? ''}
         bookLanguage={book?.language}
+        isBahai={!!book?.isBahai}
         isPro={isPro}
         userId={userId || null}
       />

@@ -18,11 +18,12 @@ interface AiPanelProps {
   bookTitle:     string;
   authorName:    string;
   bookLanguage?: string;
+  isBahai:       boolean;
   isPro:         boolean;
   userId?:       string | null;
 }
 
-export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, bookLanguage, isPro, userId }: AiPanelProps) {
+export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, bookLanguage, isBahai, isPro, userId }: AiPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [result, setResult] = useState<AiResult | null>(null);
@@ -97,6 +98,11 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
             {/* AI result */}
             <h3 className="text-base font-bold text-[#1B6B7B] dark:text-[#2D9DB3] mb-2">{result.title}</h3>
             <p className="text-sm text-gray-700 dark:text-[#B8C7D6] leading-relaxed">{result.explanation}</p>
+            {isBahai && (
+              <p className="mt-3.5 text-xs italic text-gray-400 dark:text-[#5C7A8E] leading-relaxed">
+                {t('ai.bahaiDisclaimer')}
+              </p>
+            )}
 
             {/* Copy button */}
             <button
