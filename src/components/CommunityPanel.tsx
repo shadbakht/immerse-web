@@ -775,9 +775,9 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       {/* Two-column split */}
       <div className="flex-1 flex overflow-hidden">
         <FeedColumn
-          title={t('discover.recent')}
-          tags={recentTags}
-          loading={recentLoading}
+          title={t('discover.trending')}
+          tags={trendingTags}
+          loading={trendingLoading}
           searchQuery={searchQuery}
           subscribedIds={subscribedIds}
           onImport={handleImport}
@@ -789,9 +789,9 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         />
         <div className="w-px bg-gray-200 dark:bg-[#354759] shrink-0" />
         <FeedColumn
-          title={t('discover.trending')}
-          tags={trendingTags}
-          loading={trendingLoading}
+          title={t('discover.recent')}
+          tags={recentTags}
+          loading={recentLoading}
           searchQuery={searchQuery}
           subscribedIds={subscribedIds}
           onImport={handleImport}
