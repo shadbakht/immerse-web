@@ -641,7 +641,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, [user?.id]);
 
   const handleProfilePress = useCallback((ct: CommunityTag) => {
-    const displayName = ct.profiles?.username ?? t('discover.anonymous');
+    const displayName = ct.profiles?.full_name?.trim() || ct.profiles?.username || t('discover.anonymous');
     setProfileView({ userId: ct.user_id, displayName, username: ct.profiles?.username ?? null, avatarUrl: ct.profiles?.avatar_url ?? null });
   }, [t]);
 
