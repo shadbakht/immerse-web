@@ -10,7 +10,7 @@ import { logEvent } from '@/lib/analytics';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
-import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
+import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, traditionsForSlugs, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
@@ -543,7 +543,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       await new Promise(r => setTimeout(r, 500));
       if (isStale()) { setAiLoading(false); return; }
 
-      const outcome = await planAiSearch(supabase, q, contentLanguage);
+      const outcome = await planAiSearch(
+        supabase, q, contentLanguage,
+        traditionsForSlugs(selectedSlugs, catalog?.books ?? [], catalog?.categories ?? []),
+      );
       if (isStale()) return;
 
       if (outcome.status !== 'ok') {

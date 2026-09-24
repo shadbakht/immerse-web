@@ -71,17 +71,18 @@ export async function planAiSearch(
   supabase: SupabaseClient,
   query: string,
   language: string,
+  traditions: string[] = [],
 ): Promise<AiSearchOutcome> {
   const q = (query ?? '').trim();
   if (q.length < 3) return { status: 'unavailable' };
 
-  const key = `${language}|${q.toLowerCase()}`;
+  const key = `${language}|${traditions.join(',')}|${q.toLowerCase()}`;
   const hit = memo.get(key);
   if (hit) return { status: 'ok', plan: hit };
 
   try {
     const { data, error } = await supabase.functions.invoke('ai-search', {
-      body: { query: q, language: language || 'en' },
+      body: { query: q, language: language || 'en', traditions },
     });
 
     if (error || !data || data.degraded) return { status: 'unavailable' };
@@ -97,6 +98,28 @@ export async function planAiSearch(
   } catch {
     return { status: 'unavailable' };
   }
+}
+
+/**
+ * The top-level traditions ("Bahá'í", "Hindu"…) the reader's book selection falls
+ * in, sorted. Empty selection = whole library = empty list. Sent to the planner so
+ * it guesses wording from THOSE texts instead of defaulting to Bible verses.
+ */
+export function traditionsForSlugs(
+  selectedSlugs: Set<string>,
+  books: Array<{ id: string; categoryId: string }>,
+  cats: Array<{ id: string; parentId: string | null; name: string }>,
+): string[] {
+  if (selectedSlugs.size === 0) return [];
+  const byId = new Map(cats.map(c => [c.id, c]));
+  const roots = new Map<string, string>();
+  for (const b of books) {
+    if (!selectedSlugs.has(b.id)) continue;
+    let cur = byId.get(b.categoryId);
+    for (let i = 0; cur?.parentId && i < 20; i++) cur = byId.get(cur.parentId) ?? cur;
+    if (cur) roots.set(cur.id, cur.name);
+  }
+  return [...roots.values()].sort();
 }
 
 // ─── Ranking ──────────────────────────────────────────────────────────────────

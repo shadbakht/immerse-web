@@ -1,6 +1,6 @@
 // Pure ranking helpers only — planAiSearch pulls in the Supabase client, which
 // isn't needed to test the fusion/ordering logic itself.
-import { weightedRankFusion, fusionWeights, orderForDisplay } from '../aiSearch';
+import { weightedRankFusion, fusionWeights, orderForDisplay, traditionsForSlugs } from '../aiSearch';
 
 // Mirrors mobile's src/services/__tests__/aiSearch.test.ts — keep both in step.
 
@@ -69,5 +69,27 @@ describe('weightedRankFusion', () => {
       keyOf,
     );
     expect(fused[0].id).toBe('agreed');
+  });
+});
+
+describe('traditionsForSlugs', () => {
+  // The planner guesses WORDING; told nothing about the scope it recalls Bible
+  // verses, which match nothing when the search is restricted to another shelf.
+  const cats = [
+    { id: 'cat-bahai', parentId: null, name: "Bahá'í" },
+    { id: 'cat-bahai-abdulbah', parentId: 'cat-bahai', name: "'Abdu'l-Bahá" },
+    { id: 'cat-hindu', parentId: null, name: 'Hindu' },
+    { id: 'cat-hindu-up', parentId: 'cat-hindu', name: 'Upanishads' },
+  ];
+  const books = [
+    { id: 'a', categoryId: 'cat-bahai-abdulbah' },
+    { id: 'b', categoryId: 'cat-hindu-up' },
+  ];
+  it('names each selected book\'s root tradition once, sorted', () => {
+    expect(traditionsForSlugs(new Set(['b', 'a']), books, cats)).toEqual(['Bahá\'í', 'Hindu']);
+  });
+  it('is empty for no selection or only imported books', () => {
+    expect(traditionsForSlugs(new Set(), books, cats)).toEqual([]);
+    expect(traditionsForSlugs(new Set(['imported:x']), books, cats)).toEqual([]);
   });
 });
