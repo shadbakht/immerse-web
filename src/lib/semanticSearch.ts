@@ -6,10 +6,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-/** Flip off to disable the semantic path without a redeploy.
- *  Currently OFF: the `semantic-search` edge function + embeddings aren't live
- *  yet (pending Supabase Pro). Flip to true once the backend is deployed. */
-export const SEMANTIC_SEARCH_ENABLED = false;
+/** Flip off to disable the semantic path without a redeploy. Best-effort: any
+ *  failure resolves to no semantic rows and the other result lists stand alone. */
+export const SEMANTIC_SEARCH_ENABLED = true;
 
 export interface SemanticResult {
   passageId: string;   // Supabase passage UUID
@@ -24,12 +23,13 @@ export async function semanticSearch(
   query: string,
   scope?: string[],
   limit = 40,
+  language = 'en',
 ): Promise<SemanticResult[]> {
   const q = query.trim();
   if (!SEMANTIC_SEARCH_ENABLED || q.length < 2) return [];
   try {
     const { data, error } = await supabase.functions.invoke('semantic-search', {
-      body: { query: q, scope: scope && scope.length ? scope : undefined, limit },
+      body: { query: q, scope: scope && scope.length ? scope : undefined, limit, language },
     });
     if (error || !data || data.degraded || !Array.isArray(data.results)) return [];
     return data.results

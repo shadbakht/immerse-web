@@ -10,6 +10,7 @@ import { logEvent } from '@/lib/analytics';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
 import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
+import { semanticSearch } from '@/lib/semanticSearch';
 import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, traditionsForSlugs, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
 import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
@@ -49,6 +50,7 @@ interface SearchResult {
   sectionTitle: string | null;
   content:      string;
   semantic?:    boolean;  // meaning-based ("Related") hit
+  vector?:      boolean;  // found by embedding similarity: a whole passage, nothing to highlight
   matchPhrase?: string;   // the AI phrase that found it, if any
   proximity?:   boolean;  // matched loosely (bag / cross-row) — cluster-anchor its snippet + highlight
 }
@@ -543,22 +545,35 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       await new Promise(r => setTimeout(r, 500));
       if (isStale()) { setAiLoading(false); return; }
 
+      // Meaning-based leg, started alongside Claude's phrase planning so the two
+      // round trips overlap. It finds passages that never use the reader's words
+      // ("devotional quotes about light" that say "radiance"). Skipped when only
+      // imported books are selected — those never reach the server.
+      const semanticP: Promise<SearchResult[]> = (onlyImportedSelected ? Promise.resolve([]) :
+        semanticSearch(supabase, q, remoteScope ?? undefined, 40, contentLanguage)
+          .then(hits => hits.map(h => ({
+            passageId: h.passageId, bookId: h.bookId, bookTitle: h.bookTitle,
+            authorName: '', chapterLabel: null, sectionTitle: null,
+            content: h.snippet, semantic: true, vector: true,
+          } as SearchResult)))
+          .catch(() => [] as SearchResult[]));
+
       const outcome = await planAiSearch(
         supabase, q, contentLanguage,
         traditionsForSlugs(selectedSlugs, catalog?.books ?? [], catalog?.categories ?? []),
       );
       if (isStale()) return;
 
-      if (outcome.status !== 'ok') {
-        // Silent by design: offline, rate limit, budget, an unparseable reply —
-        // none of them are the reader's problem, and the keyword results are
-        // already on screen and still correct.
-        setAiLoading(false);
-        return;
-      }
+      // Offline, rate limit, budget or an unparseable reply are silent — the
+      // keyword results are already on screen and still correct. Semantic rows
+      // can still arrive without a plan; then three or more words read as a
+      // question (its meaning matters), fewer as a lookup.
+      const plan = outcome.status === 'ok'
+        ? outcome.plan
+        : { isQuestion: q.split(/\s+/).length >= 3, phrases: [] as string[], terms: [] as string[] };
 
       const perPhrase = await Promise.all(
-        outcome.plan.phrases.map(phrase =>
+        plan.phrases.map(phrase =>
           runAiPhraseSearch(phrase, remoteScope, localBookIds)
             // Carry the phrase that found each hit. It, not the reader's
             // question, is what actually matched — so it is what the snippet
@@ -576,36 +591,43 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         .filter(hits => hits.length > 0)
         .map(hits => hits.map(h => ({ ...h, semantic: true })));
 
-      if (aiLists.length === 0 && outcome.plan.terms.length > 0) {
+      if (aiLists.length === 0 && plan.terms.length > 0) {
         // No phrase landed: fall back to the distinctive single words. Joined
         // with " or " because websearch_to_tsquery reads that as a real OR —
         // requiring all of them (its default) would be stricter than the
         // phrases that already failed.
-        const hits = await runFtsSearch(outcome.plan.terms.join(' or '), remoteScope)
+        const hits = await runFtsSearch(plan.terms.join(' or '), remoteScope)
           .catch(() => [] as SearchResult[]);
         if (hits.length) {
-          aiLists.push(hits.map(h => ({ ...h, semantic: true, matchPhrase: outcome.plan.terms[0] })));
+          aiLists.push(hits.map(h => ({ ...h, semantic: true, matchPhrase: plan.terms[0] })));
         }
       }
 
+      const semRows = await semanticP;
       if (isStale()) return;
 
-      if (aiLists.length > 0) {
+      if (aiLists.length > 0 || semRows.length > 0) {
         // Which list to trust is Claude's own call, not a local heuristic. For a
         // QUESTION the keyword list mostly matched incidental words ("God",
         // "oppression") across the whole library and must not outrank the
         // passages that answer it; for a LOOKUP the reader typed a word and
         // expects the passages containing it first, with the AI phrases merely
         // widening the net. A passage both lists agree on rises above either.
-        const w = fusionWeights(outcome.plan.isQuestion);
+        const w = fusionWeights(plan.isQuestion);
         const fused = weightedRankFusion(
-          [{ items: keyword, weight: w.keyword }, ...aiLists.map(items => ({ items, weight: w.ai }))],
+          [
+            { items: keyword, weight: w.keyword },
+            ...aiLists.map(items => ({ items, weight: w.ai })),
+            // One list, but a genuinely independent signal — worth more than any
+            // single guessed phrase.
+            ...(semRows.length ? [{ items: semRows, weight: w.ai * 2 }] : []),
+          ],
           r => r.passageId,
         );
         // See orderForDisplay: a lookup's literal matches must never be buried
         // under AI-"Related" results (no checkbox) just because several of
         // Claude's guessed phrases happened to agree with each other.
-        setSearchResults(orderForDisplay(fused, outcome.plan.isQuestion));
+        setSearchResults(orderForDisplay(fused, plan.isQuestion));
       }
       setAiLoading(false);
     } finally {
@@ -1121,8 +1143,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               {searchResults.map(result => {
                 const isExpanded = expandedResults.has(result.passageId);
                 const isChecked  = checkedResultIds.has(result.passageId);
-                const matchQuery = result.matchPhrase ?? searchQuery;
-                const snippet    = getSnippet(result.content, matchQuery, result.proximity);
+                const matchQuery = result.vector ? '' : (result.matchPhrase ?? searchQuery);
+                const snippet    = result.vector ? result.content : getSnippet(result.content, matchQuery, result.proximity);
                 const location   = result.chapterLabel || result.sectionTitle;
                 return (
                   <div key={result.passageId} className={`border-b border-gray-100 dark:border-[#2D4050] ${isChecked ? 'bg-[#1B6B7B]/5 dark:bg-[#2D9DB3]/5' : ''}`}>
@@ -1148,7 +1170,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                               e.stopPropagation();
                               // A proximity hit's phrase is loose — hand the reader its
                               // significant words (minus stopwords), not "the"/"he".
-                              const hq = result.proximity && result.matchPhrase
+                              const hq = result.vector ? '' : result.proximity && result.matchPhrase
                                 ? dropStopwords(proximityTokens(result.matchPhrase), contentLang).join(' ')
                                 : (result.matchPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim());
                               onOpenBook(result.bookId, result.passageId, hq);
