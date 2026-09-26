@@ -12,7 +12,7 @@ import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { semanticSearch } from '@/lib/semanticSearch';
 import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, traditionsForSlugs, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
-import { stitchPhraseAcrossRows } from '@/lib/crossRowPhrase';
+import { hasExactPhrase } from '@/lib/exactPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS } from '@immerse/i18n';
@@ -36,10 +36,6 @@ const titleSortKey = (s: string): string => (s || '')
   .replace(/\p{M}/gu, '')
   .replace(/^[^\p{L}\p{N}]+/u, '')
   .toLowerCase();
-
-/** Run the quoted-phrase proximity fallback only when the strict phrase search
- *  returned fewer than this many rows (4f spec: Option B, "few"). */
-const PROXIMITY_THRESHOLD = 5;
 
 interface SearchResult {
   passageId:    string;
@@ -482,22 +478,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       const onlyImportedSelected = selectedSlugs.size > 0 && importedSelected.length === selectedSlugs.size;
       if (!onlyImportedSelected) {
         if (exactPhrase) {
-          const strict = await runExactPhraseSearch(exactPhrase, regularUUIDs);
-          remoteResults = strict;
-          // 4f — proximity recall when the literal phrase matched few / nothing.
-          // Reader's own words only; ranked below the verbatim hits.
-          if (strict.length < PROXIMITY_THRESHOLD) {
-            const [tier1, tier2] = await Promise.all([
-              runAiPhraseSearch(exactPhrase, regularUUIDs, []).catch(() => [] as SearchResult[]),
-              runCrossRowPhraseSearch(exactPhrase, regularUUIDs).catch(() => [] as SearchResult[]),
-            ]);
-            const seen = new Set(strict.map(r => r.passageId));
-            for (const r of [...tier1, ...tier2]) {
-              if (seen.has(r.passageId)) continue;
-              seen.add(r.passageId);
-              remoteResults.push(r);
-            }
-          }
+          // A quoted search is EXACT: case + diacritics tolerant only, punctuation literal, word
+          // order exact. No proximity / cross-paragraph fallback — if the reader wants a flexible
+          // search they type it without quotes.
+          remoteResults = await runExactPhraseSearch(exactPhrase, regularUUIDs);
         } else {
           remoteResults = await runFtsSearch(q, regularUUIDs);
           if (remoteResults.length === 0) remoteResults = await runFuzzySearch(q, regularUUIDs);
@@ -649,7 +633,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       for (let i = 0; i < record.paragraphs.length; i++) {
         const para = record.paragraphs[i];
         const matches = foldedPhrase
-          ? foldPunctuation(para).toLowerCase().includes(foldedPhrase)
+          ? hasExactPhrase(para, exactPhrase as string)
           : words.every(w => normalize(para).includes(normalize(w)));
         if (matches) {
           results.push({
@@ -709,7 +693,27 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   // comment above already flags for this corpus's size. So: reuse the fast
   // indexed bag-of-words search to fetch candidates, then verify the exact
   // phrase actually appears, client-side, before returning a row.
+  // The reader's QUOTED search. Candidate lookup AND exact verification both run in SQL
+  // (search_phrase_exact): the old fetch-40-unranked-rows-then-filter-in-JS flow could never be
+  // accent-tolerant (the index keeps diacritics) and silently dropped real matches whenever the
+  // 40 candidates were common ones. Punctuation is part of the index (exact_tokens), so
+  // "Baha i" and "Baha’i" are different phrases even at the candidate stage.
   async function runExactPhraseSearch(phrase: string, scope: string[] | null): Promise<SearchResult[]> {
+    if (scope !== null && scope.length === 0) return [];
+    const { data } = await supabase
+      .rpc('search_phrase_exact', {
+        p_phrase: phrase,
+        book_scope: scope && scope.length > 0 ? scope : null,
+        lang: contentLang,
+        p_limit: 200,
+      })
+      .select('id, content, chapter_label, section_title, books(id, title, authors(name))');
+    return mapResults((data as any[]) ?? []);
+  }
+
+  // Loose fetch-then-verify for AI search's guessed phrases ONLY (its job is recall, not
+  // exactness — a guess with an inserted comma should still land). Not used for quoted searches.
+  async function runLiteralPhraseForAi(phrase: string, scope: string[] | null): Promise<SearchResult[]> {
     if (scope !== null && scope.length === 0) return [];
     const words = phrase.split(/\s+/).filter(w => w.length >= 2);
     const bagQuery = words.length > 0 ? words.join(' ') : phrase;
@@ -729,7 +733,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   // One of AI search's guessed phrases, looked up in two tiers.
   //
-  // Tier 1 is the literal phrase, reusing runExactPhraseSearch's fetch-then-
+  // Tier 1 is the literal phrase, reusing runLiteralPhraseForAi's fetch-then-
   // verify approach — when Claude guesses the translation's actual words that is
   // the most precise thing available.
   //
@@ -748,7 +752,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     localIds: string[],
   ): Promise<SearchResult[]> {
     const local = await searchLocalBooks(phrase, localIds, phrase);
-    const exact = await runExactPhraseSearch(phrase, scope);
+    const exact = await runLiteralPhraseForAi(phrase, scope);
     if (exact.length > 0 || local.length > 0) return [...local, ...exact];
 
     if (scope !== null && scope.length === 0) return local; // remote skipped
@@ -789,76 +793,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     // The bag-ranked rows matched loosely — flag them so the snippet + highlight
     // anchor on the word cluster, not on the first "the" in the paragraph.
     return [...local, ...mapResults(scored.map(s => s.row)).map(h => ({ ...h, proximity: true }))];
-  }
-
-  // Cross-row proximity: a quoted phrase split across a paragraph break matches
-  // no single `passages` row. Fetch the bag-of-words candidates, pull the small
-  // window of rows around each (via `sort_order`), and stitch consecutive rows.
-  // 4f — runs only on the < PROXIMITY_THRESHOLD quoted-phrase path.
-  async function runCrossRowPhraseSearch(phrase: string, scope: string[] | null): Promise<SearchResult[]> {
-    if (scope !== null && scope.length === 0) return [];
-    const words = phrase.split(/\s+/)
-      .map(w => foldPunctuation(w).replace(/"/g, ''))
-      .filter(Boolean);
-    // Too short to meaningfully straddle a paragraph break.
-    if (words.length < 3) return [];
-
-    // The words are split across the break BY DEFINITION, so a bag query
-    // requiring all of them in one row finds nothing. Look instead for either
-    // half of the phrase as a contiguous sub-phrase: whichever side of the
-    // break is the longer fragment lands intact in one row, so at least one
-    // half always hits. `websearch_to_tsquery` reads "..." as a phrase and `or`
-    // as a real OR. search_passages RETURNS SETOF passages, so sort_order /
-    // book_id select fine.
-    const mid = Math.floor(words.length / 2);
-    const firstHalf = words.slice(0, mid).join(' ');
-    const secondHalf = words.slice(mid).join(' ');
-    const { data: candData } = await supabase
-      .rpc('search_passages', {
-        search_query: `"${firstHalf}" or "${secondHalf}"`,
-        book_scope: scope && scope.length > 0 ? scope : null,
-        lang: contentLang,
-      })
-      .select('id, content, sort_order, book_id, chapter_label, section_title, books(id, title, authors(name))');
-    const cands = ((candData as any[]) ?? []).filter(r => r.book_id != null && r.sort_order != null);
-    if (cands.length === 0) return [];
-
-    const bookIds = [...new Set(cands.map(r => r.book_id as string))];
-    const neededOrders = new Set<number>();
-    for (const r of cands) {
-      for (let d = -1; d <= 2; d++) neededOrders.add((r.sort_order as number) + d);
-    }
-
-    const { data: windowData } = await supabase
-      .from('passages')
-      .select('id, content, sort_order, book_id, chapter_label, section_title, books(id, title, authors(name))')
-      .in('book_id', bookIds)
-      .in('sort_order', [...neededOrders])
-      .limit(500);
-    const windowRows = (windowData as any[]) ?? [];
-
-    // A paragraph break almost always coincides with terminal punctuation, so
-    // "still waters. He restoreth" would never contain the literal phrase
-    // "still waters he restoreth". Compare with all punctuation collapsed to
-    // spaces — the same thing FTS5 tokenisation does for the strict match on
-    // mobile, where this cross-row case is already covered inside one chunk.
-    const flatten = (s: string) =>
-      foldPunctuation(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-    const foldedPhrase = flatten(phrase);
-    const out: SearchResult[] = [];
-    for (const bId of bookIds) {
-      const candOrders = cands.filter(r => r.book_id === bId).map(r => r.sort_order as number);
-      const rowsForBook = windowRows
-        .filter(r => r.book_id === bId)
-        .filter(r => candOrders.some(o => (r.sort_order as number) >= o - 1 && (r.sort_order as number) <= o + 2));
-      const stitched = stitchPhraseAcrossRows(
-        rowsForBook.map(r => ({ ...r, sort_order: r.sort_order as number, content: String(r.content ?? '') })),
-        foldedPhrase,
-        flatten,
-      );
-      out.push(...mapResults(stitched).map(h => ({ ...h, matchPhrase: phrase, proximity: true })));
-    }
-    return out;
   }
 
   async function runFuzzySearch(q: string, scope: string[] | null): Promise<SearchResult[]> {
