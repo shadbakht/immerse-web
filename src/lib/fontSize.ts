@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type FontSize = 'Small' | 'Medium' | 'Large' | 'XL';
+export type FontSize = 'Small' | 'Medium' | 'Large' | 'XL' | 'XXL' | 'XXXL';
 
 // Reading/quote body size (px) — the wide range. Drives --quote-font-size,
 // consumed by the reader body + every quote/snippet across screens.
@@ -15,6 +15,8 @@ export const FONT_SIZE_PX: Record<FontSize, number> = {
   Medium: 17,
   Large: 20,
   XL: 24,
+  XXL: 28,
+  XXXL: 32,
 };
 
 // Root html font-size (px). Tailwind's text-*/spacing utilities are rem-based,
@@ -26,6 +28,8 @@ export const ROOT_FONT_PX: Record<FontSize, number> = {
   Medium: 16,
   Large: 17.5,
   XL: 19,
+  XXL: 20.5,
+  XXXL: 22,
 };
 
 export const DEFAULT_FONT_SIZE: FontSize = 'Large';

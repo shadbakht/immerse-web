@@ -36,6 +36,8 @@ const FONT_OPTIONS: { key: FontSize; size: number }[] = [
   { key: 'Medium', size: 17 },
   { key: 'Large',  size: 20 },
   { key: 'XL',     size: 24 },
+  { key: 'XXL',    size: 28 },
+  { key: 'XXXL',   size: 32 },
 ];
 
 // "Shahrooz Shadbakht" → SS · "Shahrooz" → S · falls back to the username.
