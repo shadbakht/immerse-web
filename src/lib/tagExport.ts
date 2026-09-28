@@ -225,7 +225,7 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: 'Made with Immerse', size: 20, italics: true, color: DOC_FAINT })],
+        children: [new TextRun({ text: 'Made with Immerse Research', size: 20, italics: true, color: DOC_FAINT })],
       }),
     ],
   });
@@ -302,7 +302,7 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
   </style>
 </head>
 <body>${body}
-  <p class="footer">Made with Immerse</p>
+  <p class="footer">Made with Immerse Research</p>
 </body>
 </html>`;
 
@@ -400,7 +400,7 @@ export async function exportAsMarkdown(selectedTags: TagRow[], opts: ExportOptio
     }
   }
 
-  lines.push('', '---', '*Made with Immerse*');
+  lines.push('', '---', '*Made with Immerse Research*');
 
   const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
   triggerDownload(blob, `${exportBaseName(selectedTags)}.md`);

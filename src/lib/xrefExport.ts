@@ -97,7 +97,7 @@ export async function exportAsDocx(rows: XRefExportRow[]): Promise<void> {
   const footer = new Footer({
     children: [new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: 'Made with Immerse', size: 20, italics: true, color: DOC_FAINT })],
+      children: [new TextRun({ text: 'Made with Immerse Research', size: 20, italics: true, color: DOC_FAINT })],
     })],
   });
   const doc = new Document({ sections: [{ footers: { default: footer }, children }] });
@@ -153,7 +153,7 @@ export async function exportAsPdf(rows: XRefExportRow[]): Promise<void> {
 </head>
 <body>
   <p class="export-title">${escapeHtml(t('xrefs.title'))}</p>${body}
-  <p class="footer">Made with Immerse</p>
+  <p class="footer">Made with Immerse Research</p>
 </body>
 </html>`;
   const win = window.open('', '_blank');
@@ -198,6 +198,6 @@ export async function exportAsMarkdown(rows: XRefExportRow[]): Promise<void> {
       lines.push(`> *${citationInParens(row.b.citation)}*`);
     }
   }
-  lines.push('', '---', '*Made with Immerse*');
+  lines.push('', '---', '*Made with Immerse Research*');
   triggerDownload(new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' }), `${fileBase(t)}.md`);
 }
