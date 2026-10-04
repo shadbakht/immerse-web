@@ -495,7 +495,28 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         : importedSelected;
       const localResults = await searchLocalBooks(q, localBookIds, exactPhrase);
 
-      const keyword = [...localResults, ...remoteResults];
+      // A reader who types several words in order — usually remembering a line —
+      // means that line, quotes or not. The bag-of-words search above ranks by
+      // relevance and can bury the one paragraph that has them verbatim under
+      // paragraphs that merely mention each word (and, for a 3+ word query, under
+      // AI "Related" rows). So run the quoted-search path as well and put its hits
+      // first. Fewer than two words has no order to honour; operators and
+      // wildcards are the reader asking for something else.
+      const wordCount = q.split(/\s+/).filter(Boolean).length;
+      let literal: SearchResult[] = [];
+      if (!exactPhrase && wordCount >= 2 && wordCount <= 12 && !/[|&!()"*]|\b(AND|OR|NOT)\b/.test(q)) {
+        const [localLiteral, remoteLiteral] = await Promise.all([
+          searchLocalBooks(q, localBookIds, q),
+          onlyImportedSelected ? Promise.resolve([] as SearchResult[]) : runExactPhraseSearch(q, regularUUIDs).catch(() => [] as SearchResult[]),
+        ]);
+        literal = [...localLiteral, ...remoteLiteral];
+      }
+      const literalIds = new Set(literal.map(r => r.passageId));
+      // The ordinary row for a passage the literal list already leads with is dropped.
+      const withoutLiteral = <T extends { passageId: string }>(rows: T[]): T[] =>
+        literal.length ? rows.filter(r => !literalIds.has(r.passageId)) : rows;
+
+      const keyword = [...literal, ...withoutLiteral([...localResults, ...remoteResults])];
       if (isStale()) return;
       setSearchResults(keyword);
       setSearchLoading(false);
@@ -549,12 +570,16 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       if (isStale()) return;
 
       // Offline, rate limit, budget or an unparseable reply are silent — the
-      // keyword results are already on screen and still correct. Semantic rows
-      // can still arrive without a plan; then three or more words read as a
-      // question (its meaning matters), fewer as a lookup.
-      const plan = outcome.status === 'ok'
-        ? outcome.plan
-        : { isQuestion: q.split(/\s+/).length >= 3, phrases: [] as string[], terms: [] as string[] };
+      // keyword results are already on screen and still correct.
+      //
+      // Whether the query is a QUESTION is the reader's call, not Claude's and not
+      // a word count: only a "?" makes it one. Anything else is a lookup, so the
+      // literal matches for what was typed rank first and the AI "Related" rows
+      // only widen the net. (Claude's plan.isQuestion only shapes its guessed phrases.)
+      const plan = {
+        ...(outcome.status === 'ok' ? outcome.plan : { phrases: [] as string[], terms: [] as string[] }),
+        isQuestion: q.includes('?'),
+      };
 
       const perPhrase = await Promise.all(
         plan.phrases.map(phrase =>
@@ -611,7 +636,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         // See orderForDisplay: a lookup's literal matches must never be buried
         // under AI-"Related" results (no checkbox) just because several of
         // Claude's guessed phrases happened to agree with each other.
-        setSearchResults(orderForDisplay(fused, plan.isQuestion));
+        setSearchResults([...literal, ...withoutLiteral(orderForDisplay(fused, plan.isQuestion))]);
       }
       setAiLoading(false);
     } finally {
