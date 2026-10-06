@@ -708,7 +708,7 @@ export function flashPassageWhenReady(passageId: string) {
 /** How long a book must stay open before it counts as "recently viewed" — a
  *  brief open to check a reference should not evict something from the Home
  *  list. Mirrors the mobile reader's rule. */
-export const RECENTLY_VIEWED_MS = 20_000;
+export const RECENTLY_VIEWED_MS = 10_000;
 
 /** The reading_progress row for "opened this book": the passage the user is
  *  parked on (or the book's first passage) plus its progress fraction. Null for
@@ -946,7 +946,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
     container.addEventListener('scroll', scheduleProgressSave, { passive: true });
     // No initial save for a stationary reader — that is the recently-viewed
-    // recorder's job (20s), so a brief open never lands in the Home list. A
+    // recorder's job (10s), so a brief open never lands in the Home list. A
     // reader who actually scrolls writes their real position at the 3s debounce.
 
     return () => {
@@ -955,7 +955,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     };
   }, [passages, userId, saveProgress]);
 
-  // Record this book as "recently viewed" once it has been open for 20s — the
+  // Record this book as "recently viewed" once it has been open for 10s — the
   // web mirror of the mobile reader's rule. Ordering on Home is pure recency,
   // so an unwanted 0% entry is removed by hand (which deletes the cloud row).
   useEffect(() => {
@@ -977,7 +977,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     }, RECENTLY_VIEWED_MS);
     return () => clearTimeout(timer);
     // supabase (createBrowserClient) is a browser-singleton — omitted from deps
-    // like every other effect in this file, so the 20s timer isn't reset on
+    // like every other effect in this file, so the 10s timer isn't reset on
     // each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, target?.bookId, passages]);
@@ -1454,7 +1454,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         scrollRef.current?.scrollTo({ top: 0 });
       }
 
-      // The "recently viewed" reading_progress row is written by the 20s timer
+      // The "recently viewed" reading_progress row is written by the 10s timer
       // effect below, not here — a brief open to check a reference should not
       // land in the Home list. Scrolling writes the real position sooner, via
       // saveProgress(). (lastSavedPidRef is already set above when there is a
