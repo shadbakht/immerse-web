@@ -34,7 +34,12 @@ export async function proxy(request: NextRequest) {
   // '/.well-known' = apple-app-site-association (no file extension, so the
   // static-asset matcher below doesn't exempt it) + assetlinks.json — the OS
   // fetches these unauthenticated to verify universal / App Links for /c/*.
-  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/.well-known'];
+  // '/api/stripe/webhook' = Stripe's server-to-server POST. It has no session, so
+  // without this it is 307'd to /login and never reaches the handler (which
+  // verifies Stripe's signature itself) — the webhook could not have worked
+  // before. '/lifetime' is the unlisted one-time-purchase page; it shows its own
+  // "Sign in to continue" link for signed-out visitors.
+  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/.well-known', '/api/stripe/webhook', '/lifetime'];
   const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {
