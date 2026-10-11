@@ -4,8 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(request: Request) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  // `plan: 'lifetime'` is the one-time purchase, reached only from the unlisted
+  // /lifetime page. Anything else is the monthly subscription, as before.
+  const body = await request.json().catch(() => ({}));
+  const lifetime = body?.plan === 'lifetime';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -30,22 +34,25 @@ export async function POST() {
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerseresearch.app';
 
+  if (lifetime && !process.env.STRIPE_LIFETIME_PRICE_ID) {
+    console.error('[stripe/checkout] STRIPE_LIFETIME_PRICE_ID is not set');
+    return NextResponse.json({ error: 'lifetime_unavailable' }, { status: 500 });
+  }
+
   const session = await stripe.checkout.sessions.create({
     customer:            customerId,
-    mode:                'subscription',
+    mode:                lifetime ? 'payment' : 'subscription',
     payment_method_types: ['card'],
     line_items: [{
-      price:    process.env.STRIPE_PRICE_ID!,
+      price:    lifetime ? process.env.STRIPE_LIFETIME_PRICE_ID! : process.env.STRIPE_PRICE_ID!,
       quantity: 1,
     }],
     // Settings is a client-side tab inside AppShell — there is no /settings
     // route (AppShell reads ?tab=settings on mount). Plain /settings 404s.
     success_url: `${origin}/?tab=settings&upgraded=1`,
-    cancel_url:  `${origin}/?tab=settings`,
-    metadata: { supabase_user_id: user.id },
-    subscription_data: {
-      metadata: { supabase_user_id: user.id },
-    },
+    cancel_url:  lifetime ? `${origin}/lifetime` : `${origin}/?tab=settings`,
+    metadata: { supabase_user_id: user.id, ...(lifetime ? { plan: 'lifetime' } : {}) },
+    ...(lifetime ? {} : { subscription_data: { metadata: { supabase_user_id: user.id } } }),
   });
 
   return NextResponse.json({ url: session.url });
