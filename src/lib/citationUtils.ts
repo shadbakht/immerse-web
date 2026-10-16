@@ -207,6 +207,23 @@ export function buildCitation(
     return parts.filter(Boolean).join('، ');
   }
 
+  // ── Generic Arabic hadith/devotional book (ar) ─────────────────────────────
+  // Book title, chapter label, printed tradition number. Mirrors mobile's citation.ts.
+  if (fmt === 'hadith_ar') {
+    const parts = [book?.title, passage?.chapter_label,
+      passage?.paragraph_number ? `ح ${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
+  // ── Biḥār al-Anwār (ar) ──────────────────────────────────────────────────────
+  // Chunk label reads «ج N، باب K: …»; cite it as printed + tradition number.
+  // Mirrors mobile's citation.ts.
+  if (fmt === 'bihar_ar') {
+    const parts = ['بحار الأنوار', passage?.chapter_label,
+      passage?.paragraph_number ? `ح ${passage.paragraph_number}` : null];
+    return parts.filter(Boolean).join('، ');
+  }
+
   // ── Sahifa al-Sajjadiyya (ar) ────────────────────────────────────────────────
   // Item label only, no paragraph number — each chunk is one undivided
   // supplication. Mirrors mobile's citation.ts.
