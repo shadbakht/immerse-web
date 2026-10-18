@@ -82,6 +82,7 @@ export function applyReaderPrefs(
   s.setProperty('--reader-pad', `${p.padding}px`);
   s.setProperty('--reader-max-width', `${p.maxWidth}px`);
   s.setProperty('--reader-gutter', `${p.gutter}px`);
+  s.setProperty('--reader-icon-gutter', `${p.iconGutter}px`);
   s.setProperty('--reader-text-align', p.justify ? 'justify' : 'start');
   s.setProperty('--reader-indent', p.indent ? '1.4em' : '0');
   s.setProperty('--reader-para-gap', `${p.paragraphGap}em`);

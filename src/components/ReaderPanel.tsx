@@ -2597,7 +2597,9 @@ async function handleCopy() {
                   onClick={undefined}
                 >
                   {!isImported && (taggedPassageIds.has(passage.id) || notedPassageIds.has(passage.id) || xrefPassageIds.has(passage.id)) && (
-                    <div className="absolute -start-8 top-1 flex flex-col gap-1">
+                    // Pinned ICON_EDGE px from the page edge at every margin
+                    // setting, like mobile — see MARGINS in lib/readerTypography.
+                    <div className="absolute top-1 flex flex-col gap-1" style={{ insetInlineStart: 'calc(-1 * var(--reader-icon-gutter, 47px))' }}>
                       {taggedPassageIds.has(passage.id) && (
                         <button
                           onClick={e => { e.stopPropagation(); handleTagIconClick(passage.id); }}

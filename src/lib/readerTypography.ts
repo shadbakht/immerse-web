@@ -444,20 +444,31 @@ export const LINE_SPACING: Record<LineSpacing, number> = {
 // the column by ADDING padding rather than by lowering maxWidth alone.
 //
 // ⚠️ `pad` houses BOTH gutters — paragraph numbers overhang into the inline-end
-// side, annotation icons into the inline-start side. That is why `narrow` is 30
-// and not 20: an annotation icon is 25px wide, so anything tighter puts it on
-// top of the first word. The floors are built into the scale rather than
-// applied as a correction afterwards, so what the user picks is what they get.
+// side, annotation icons into the inline-start side — and both are PINNED a
+// fixed distance from the page edge (NUMBER_EDGE / ICON_EDGE), not a fixed
+// distance from the text. Changing the margin therefore moves only the text:
+// the numbers and icons stay put at the edge and the white space between them
+// and the text grows or shrinks. (Until 2026-10-18 the gutters were capped at
+// 34/32px from the text, so at "wide" the numbers rode inward with the text
+// and the steps were only 12–16px apart — the setting read as a nudge, not a
+// margin. Owner's report.) `narrow` is 36 because an annotation icon is 25px
+// wide: ICON_EDGE + 25 + a few px of air.
+// Mirrors the mobile repo's src/config/readerTypography.ts — change both.
 export const MARGINS: Record<Margins, { pad: number; maxWidth: number }> = {
-  narrow: { pad: 30, maxWidth: 780 },
-  normal: { pad: 42, maxWidth: 700 },
-  wide:   { pad: 58, maxWidth: 620 },
+  narrow: { pad: 36, maxWidth: 780 },
+  normal: { pad: 52, maxWidth: 700 },
+  wide:   { pad: 72, maxWidth: 620 },
 };
 
-/** Number gutter: leaves 6px of air, never wider than 34px. */
-export const gutterFor = (pad: number) => Math.min(pad - 6, 34);
-/** Annotation-icon gutter: the icon is 25px wide, so 4px of air. */
-export const iconGutterFor = (pad: number) => Math.min(pad - 4, 32);
+/** Paragraph numbers end this far from the page edge, at every margin. */
+export const NUMBER_EDGE = 8;
+/** Annotation icons start this far from the page edge, at every margin. */
+export const ICON_EDGE = 5;
+
+/** Number gutter: distance from the text edge to where the number ends. */
+export const gutterFor = (pad: number) => pad - NUMBER_EDGE;
+/** Annotation-icon gutter: distance from the text edge to the icon's outer edge. */
+export const iconGutterFor = (pad: number) => pad - ICON_EDGE;
 
 export const LETTER_SPACING_RANGE = { min: -0.02, max: 0.06, step: 0.01 };
 export const WORD_SPACING_RANGE   = { min: 0,     max: 0.30, step: 0.05 };
