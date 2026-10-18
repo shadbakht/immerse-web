@@ -25,7 +25,6 @@ import {
   type ReaderThemeKey, type Typeface,
 } from '@/lib/readerTypography';
 import { getStoredPrefs, saveReaderPrefs, stackFor } from '@/lib/readerPrefs';
-import { type ColorMode } from '@/lib/colorMode';
 import { type FontSize, FONT_SIZE_PX } from '@/lib/fontSize';
 
 const CARD =
@@ -49,14 +48,10 @@ interface Props {
   fontSize: FontSize;
   onFontChange: (s: FontSize) => void;
   fontOptions: { key: FontSize; size: number }[];
-  colorMode: ColorMode;
-  onColorModeChange: (m: ColorMode) => void;
-  appearanceKeys: Record<ColorMode, TranslationKey>;
 }
 
 export default function AppearanceSection({
   supabase, userId, fontSize, onFontChange, fontOptions,
-  colorMode, onColorModeChange, appearanceKeys,
 }: Props) {
   const { t } = useTranslation();
   const { contentLanguage } = useLanguage();
@@ -102,7 +97,7 @@ export default function AppearanceSection({
 
   return (
     <section className={CARD}>
-      <div className={CARD_HEAD}>{t('appearance.title')}</div>
+      <div className={CARD_HEAD}>{t('settings.readerAppearance')}</div>
 
       {/* ── Live specimen. Unlike mobile's, this one CAN use the real webfont:
              the same @font-face rules that serve the reader serve this page. */}
@@ -318,17 +313,6 @@ export default function AppearanceSection({
           </div>
         )}
       </div>
-
-      {/* ── App theme (chrome, not the page) ── */}
-      <Group label={t('appearance.appTheme')} hint={t('appearance.appThemeHint')}>
-        <Pills
-          options={(['light', 'dark', 'system'] as ColorMode[]).map(m => ({
-            key: m, label: t(appearanceKeys[m]),
-          }))}
-          value={colorMode}
-          onChange={m => onColorModeChange(m as ColorMode)}
-        />
-      </Group>
 
       <div className="px-5 pb-5">
         <button

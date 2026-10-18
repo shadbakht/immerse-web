@@ -19,9 +19,20 @@ const APP_LANGUAGES = [...UI_LANGUAGES].sort((a, b) => a.code.localeCompare(b.co
 // Single source of truth for the displayed version: package.json.
 const APP_VERSION = pkg.version;
 
-// Full feature walkthrough on YouTube (About → "Watch Full Feature Video").
+// Full feature walkthrough on YouTube (Help → "Watch How-To Video").
 // Same constant exists in the mobile repo: src/screens/SettingsScreen.js.
 const FEATURE_VIDEO_URL = 'https://youtu.be/6LfBemF6O30';
+
+// Same address as mobile's Settings → Help → Contact Support and /support.
+const SUPPORT_EMAIL = 'support@immerseresearch.app';
+
+const CARD =
+  'bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden';
+const CARD_HEAD =
+  'px-5 py-3 border-b border-gray-100 dark:border-[#2D4050] text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]';
+// A label/action row inside a card: whole row is the link or button.
+const ROW =
+  'px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-50 dark:border-[#2D4050]/60 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors';
 
 // Module-level so the light/dark/system buttons can name themselves without a
 // switch at the call site.
@@ -310,16 +321,54 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               )}
             </section>
 
-            {/* App language — the INTERFACE only, which is why the heading says
-                so. Which library you read is a separate control in the Library
-                header, as on mobile. Nothing library-related belongs here: web
-                streams every library from the server, so unlike mobile there is
-                no download to manage. */}
-            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.appLanguage')}</span>
+            {/* Reorganized 2026-10-18 to match mobile's Settings order, grouped
+                by what a setting affects: Reader Appearance (the page) → App
+                (every screen) → Help → About. Mobile also has Read Aloud Voice,
+                Library and Daily Readings sections; web has none of those
+                features, so it has no section for them. */}
+
+            {/* Reader Appearance — font size, typeface, line spacing, margins,
+                justification, paragraph style and page colour. Mirrors
+                mobile's Reader Appearance screen and shares its scales via
+                lib/readerTypography. The light/dark app theme moved out to the
+                App section below: it changes every screen, not the page. */}
+            <AppearanceSection
+              supabase={supabase}
+              userId={user?.id ?? null}
+              fontSize={fontSize}
+              onFontChange={handleFontChange}
+              fontOptions={FONT_OPTIONS}
+            />
+
+            {/* App — the light/dark theme and the INTERFACE language. Which
+                library you read is a separate control in the Library header, as
+                on mobile; web streams every library from the server, so unlike
+                mobile there is no download to manage here. */}
+            <section className={CARD}>
+              <div className={CARD_HEAD}>{t('settings.sectionApp')}</div>
+              <div className="px-5 py-4 border-b border-gray-50 dark:border-[#2D4050]/60">
+                <div className="text-sm text-gray-700 dark:text-[#D2DCE8] mb-1">{t('appearance.appTheme')}</div>
+                <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mb-3">{t('settings.appThemeHint')}</p>
+                <div role="radiogroup" className="flex gap-2">
+                  {(['light', 'dark', 'system'] as ColorMode[]).map(m => (
+                    <button
+                      key={m}
+                      role="radio"
+                      aria-checked={colorMode === m}
+                      onClick={() => handleColorModeChange(m)}
+                      className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                        colorMode === m
+                          ? 'border-[#1B6B7B] dark:border-[#2D9DB3] bg-[#1B6B7B]/8 dark:bg-[#2D9DB3]/8 text-[#1B6B7B] dark:text-[#2D9DB3]'
+                          : 'border-gray-200 dark:border-[#2D4050] text-gray-500 dark:text-[#8FA4B8] hover:border-gray-300 dark:hover:border-white/15'
+                      }`}
+                    >
+                      {t(APPEARANCE_KEYS[m])}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="px-5 py-4">
+                <div className="text-sm text-gray-700 dark:text-[#D2DCE8] mb-1">{t('settings.appLanguage')}</div>
                 <p className="text-xs text-gray-400 dark:text-[#5C7A8E] mb-3">
                   {t('settings.appLanguageHint')}
                 </p>
@@ -357,59 +406,44 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
               </div>
             </section>
 
-            {/* Appearance — font size, typeface, line spacing, margins,
-                justification, paragraph style, page colour and the light/dark
-                mode, all in one section. Mirrors mobile's Appearance screen and
-                shares its scales via lib/readerTypography. */}
-            <AppearanceSection
-              supabase={supabase}
-              userId={user?.id ?? null}
-              fontSize={fontSize}
-              onFontChange={handleFontChange}
-              fontOptions={FONT_OPTIONS}
-              colorMode={colorMode}
-              onColorModeChange={handleColorModeChange}
-              appearanceKeys={APPEARANCE_KEYS}
-            />
+            {/* Help */}
+            <section className={CARD}>
+              <div className={CARD_HEAD}>{t('settings.help')}</div>
+              <a
+                href={FEATURE_VIDEO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={ROW}
+              >
+                <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{t('settings.watchFeatureVideo')}</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">{t('settings.viewExternal')}</span>
+              </a>
+              <button onClick={() => setShowIntro(true)} className={`${ROW} w-full text-start`}>
+                <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{t('settings.replayOnboarding')}</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">{t('settings.view')}</span>
+              </button>
+              <a href={`mailto:${SUPPORT_EMAIL}`} className={`${ROW} border-b-0`}>
+                <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{t('settings.contactSupport')}</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">{SUPPORT_EMAIL}</span>
+              </a>
+            </section>
 
             {/* About */}
-            <section className="bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 dark:border-[#2D4050]">
-                <span className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E]">{t('settings.about')}</span>
-              </div>
+            <section className={CARD}>
+              <div className={CARD_HEAD}>{t('settings.about')}</div>
               <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.version')}</span>
+                <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{t('settings.version')}</span>
                 <span className="text-sm text-gray-500 dark:text-[#8FA4B8]">{APP_VERSION}</span>
               </div>
-              <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-[#2D4050]/60">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.privacyPolicy')}</span>
-                <a
-                  href={uiLanguage === 'en' ? '/privacy' : `/privacy?lang=${uiLanguage}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
-                >
-                  {t('settings.viewExternal')}
-                </a>
-              </div>
-              <button
-                onClick={() => setShowIntro(true)}
-                className="w-full px-5 py-4 flex items-center justify-between text-start border-b border-gray-50 dark:border-[#2D4050]/60 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+              <a
+                href={uiLanguage === 'en' ? '/privacy' : `/privacy?lang=${uiLanguage}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${ROW} border-b-0`}
               >
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.introTour')}</span>
-                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{t('settings.replayOnboarding')} →</span>
-              </button>
-              <div className="px-5 py-4 flex items-center justify-between">
-                <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('settings.fullFeatureVideo')}</span>
-                <a
-                  href={FEATURE_VIDEO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
-                >
-                  {t('settings.watchFeatureVideo')} →
-                </a>
-              </div>
+                <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{t('settings.legal')}</span>
+                <span className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3]">{t('settings.viewExternal')}</span>
+              </a>
             </section>
 
           </div>
