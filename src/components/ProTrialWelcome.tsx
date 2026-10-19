@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { isInTrial } from '@/lib/proStatus';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { webProPrice } from '@/lib/proPrice';
 
 // Per-user, per-browser "seen" flag. Purely informational card, so localStorage
 // (not a profiles column) is the right store — it may legitimately come back
@@ -18,7 +19,7 @@ const SEEN_PREFIX = 'immerse.proTrialWelcomeSeen.';
  * unset.
  */
 export default function ProTrialWelcome({ user }: { user: User | null }) {
-  const { t } = useTranslation();
+  const { t, uiLanguage } = useTranslation();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function ProTrialWelcome({ user }: { user: User | null }) {
           {t('proTrialIntro.body')}
         </p>
         <p className="text-sm font-semibold text-gray-900 dark:text-[#E2EAF2] mt-4">
-          {t('proTrialIntro.priceLine')}
+          {t('proTrialIntro.priceLine', { price: webProPrice(uiLanguage) })}
         </p>
         <ul className="mt-3 space-y-2">
           {features.map((line, i) => (

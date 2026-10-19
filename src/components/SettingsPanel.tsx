@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
-import { applyFontSize, type FontSize } from '@/lib/fontSize';
+import { applyFontSize, DEFAULT_FONT_SIZE, type FontSize } from '@/lib/fontSize';
+import { webProPrice } from '@/lib/proPrice';
 import { applyColorMode, getStoredColorMode, type ColorMode } from '@/lib/colorMode';
 import AppearanceSection from './AppearanceSection';
 import { UI_LANGUAGES, type TranslationKey } from '@immerse/i18n';
@@ -72,7 +73,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const { t } = useTranslation();
   const { uiLanguage, setUiLanguage } = useLanguage();
   const isGuest = !user;
-  const [fontSize, setFontSize] = useState<FontSize>('Large');
+  const [fontSize, setFontSize] = useState<FontSize>(DEFAULT_FONT_SIZE);
   const [colorMode, setColorMode] = useState<ColorMode>('light');
   const [isPro, setIsPro] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
@@ -110,7 +111,7 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       .single();
     if (data) {
       setAvatarUrl(data.avatar_url ?? null);
-      const loadedSize = (data.font_size as FontSize) ?? 'Large';
+      const loadedSize = (data.font_size as FontSize) ?? DEFAULT_FONT_SIZE;
       setFontSize(loadedSize);
       applyFontSize(loadedSize);
       const paidPro = data.is_pro ?? false;
@@ -309,13 +310,13 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                   sign in first — the pill above already covers that case). */}
               {!isGuest && !isPro && (
                 <div className="px-5 py-4">
-                  <p className="text-xs text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-3">{t('settings.upgradeBlurb')}</p>
+                  <p className="text-xs text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-3">{t('settings.upgradeBlurb', { price: webProPrice(uiLanguage) })}</p>
                   <button
                     onClick={handleUpgrade}
                     disabled={stripeLoading}
                     className="w-full text-sm font-bold tracking-wide bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-50"
                   >
-                    {stripeLoading ? t('common.loading') : t('settings.upgradeCta')}
+                    {stripeLoading ? t('common.loading') : t('settings.upgradeCta', { price: webProPrice(uiLanguage) })}
                   </button>
                 </div>
               )}

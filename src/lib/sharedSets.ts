@@ -12,6 +12,8 @@ import {
   type TagSubtreeRow,
 } from './communitySync';
 import { shareUrl } from './shareUrl';
+import { translate } from '@immerse/i18n';
+import { getStoredUiLanguage } from './language';
 
 export interface Tradition { id: string; name: string }
 export interface TraditionPair { pairKey: string; pairName: string }
@@ -100,7 +102,7 @@ export async function refreshSharedCompilation(tagId: string, userId: string): P
     if (!Array.isArray(ids) || !ids.includes(tagId)) continue;
     const live = ids.filter(id => liveIds.has(id));
     if (live.length === 0) continue;
-    const { payload, itemCount } = await buildForestSnapshot(live, userId, b.title ?? 'Shared compilations');
+    const { payload, itemCount } = await buildForestSnapshot(live, userId, b.title ?? translate(getStoredUiLanguage(), 'share.bundleTitle'));
     await supabase.from('shared_sets').update({
       payload, item_count: itemCount,
       ...(live.length !== ids.length ? { ref: { tag_ids: live } } : {}),
@@ -422,7 +424,7 @@ export async function createXrefShareLink(
 ): Promise<{ id: string; url: string }> {
   const supabase = createClient();
   const { data: row, error } = await supabase.from('shared_sets').insert({
-    owner_id: userId, kind: 'xrefs', title: title.trim() || 'Cross-References',
+    owner_id: userId, kind: 'xrefs', title: title.trim() || translate(getStoredUiLanguage(), 'xrefs.title'),
     ref: { xref_ids: xrefIds }, item_count: xrefIds.length,
   }).select('id').single();
   if (error) throw error;

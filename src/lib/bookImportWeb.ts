@@ -17,6 +17,8 @@ import JSZip from 'jszip';
 import { saveLocalBook, deleteLocalBook } from './importedBooksDb';
 import type { LocalBook } from './importedBooksDb';
 import { extractPdfText } from './pdfExtractWeb';
+import { translate } from '@immerse/i18n';
+import { getStoredUiLanguage } from './language';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -349,10 +351,13 @@ export async function importBook(file: File): Promise<ImportBookResult> {
       case 'rtf':  parsed = await parseRtf(file);  break;
       case 'pdf':  parsed = await parsePdf(file);  break;
       default:
-        return { success: false, error: `Unsupported format .${ext}. Use TXT, EPUB, DOCX, RTF, or PDF.` };
+        return {
+          success: false,
+          error: `${translate(getStoredUiLanguage(), 'import.unsupportedExt', { ext })} ${translate(getStoredUiLanguage(), 'import.webSupportedFormats')}`,
+        };
     }
   } catch (err: any) {
-    return { success: false, error: err.message ?? 'Could not parse the file.' };
+    return { success: false, error: err.message ?? translate(getStoredUiLanguage(), 'import.unreadable') };
   }
 
   const { paragraphs, chapterStarts } = flattenChapters(parsed.chapters);

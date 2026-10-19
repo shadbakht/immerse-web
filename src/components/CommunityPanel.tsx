@@ -15,6 +15,7 @@ import { createDiscoverBundleShare, revokeSharedSet } from '@/lib/sharedSets';
 import { shareUrl } from '@/lib/shareUrl';
 import { scriptScaleForText, treeDepthWeight } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { DiscoverIcon } from './Icons';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import {
   CompilationTree,
@@ -805,9 +806,11 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
 
       {/* Guest overlay */}
       {!user && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-8">
-          <div className="glass rounded-2xl p-8 max-w-sm w-full text-center">
-            <div className="text-4xl mb-4">✦</div>
+        // The card is a solid surface, not the 40% glass the panels use: the
+        // feed behind it is text, and translucent text over text was unreadable.
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-8">
+          <div className="bg-white dark:bg-[#1B2A38] border border-gray-100 dark:border-[#2D4050] shadow-2xl rounded-2xl p-8 max-w-sm w-full text-center">
+            <div className="flex justify-center mb-4"><DiscoverIcon size={40} /></div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">{t('discover.signInTitle')}</h2>
             <p className="text-sm text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-6">
               {t('discover.signInBody')}

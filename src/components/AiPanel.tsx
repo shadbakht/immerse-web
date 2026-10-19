@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import PanelSheet from './PanelSheet';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { webProPrice } from '@/lib/proPrice';
 import { logEvent } from '@/lib/analytics';
 
 interface AiResult {
@@ -25,7 +26,7 @@ interface AiPanelProps {
 
 export default function AiPanel({ visible, onClose, selectionText, bookTitle, authorName, bookLanguage, isBahai, isPro, userId }: AiPanelProps) {
   const supabase = createClient();
-  const { t } = useTranslation();
+  const { t, uiLanguage } = useTranslation();
   const [result, setResult] = useState<AiResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,10 +68,10 @@ export default function AiPanel({ visible, onClose, selectionText, bookTitle, au
           <div className="text-center py-4">
             <div className="text-4xl mb-4">✨</div>
             <p className="text-sm text-gray-600 dark:text-[#8FA4B8] leading-relaxed mb-5">
-              {t('ai.upgradeBlurb')}
+              {t('ai.upgradeBlurb', { price: webProPrice(uiLanguage) })}
             </p>
             <button className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors">
-              {t('ai.upgradeBtn')}
+              {t('ai.upgradeBtn', { price: webProPrice(uiLanguage) })}
             </button>
           </div>
         ) : loading ? (
