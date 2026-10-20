@@ -10,6 +10,8 @@ import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
 import { scriptScale } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import TeachingEmptyState from './TeachingEmptyState';
+import { NoteIcon } from './Icons';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 
 interface NoteRow {
@@ -32,6 +34,8 @@ interface NoteRow {
 interface NotesScreenProps {
   userId: string;
   onOpenBook: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
+  /** Switches to the Library tab — the empty state's way to go and make one. */
+  onOpenLibrary: () => void;
 }
 
 // Module-level, so the locale has to be handed in rather than hooked for.
@@ -140,7 +144,7 @@ function NoteItem({
   );
 }
 
-export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
+export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: NotesScreenProps) {
   const supabase = createClient();
   const { t, uiLanguage } = useTranslation();
   const [notes, setNotes]               = useState<NoteRow[]>([]);
@@ -421,9 +425,11 @@ export default function NotesScreen({ userId, onOpenBook }: NotesScreenProps) {
               <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">
-              {searchQuery ? t('notes.noMatch') : t('notes.empty')}
-            </p>
+            searchQuery ? (
+              <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">{t('notes.noMatch')}</p>
+            ) : (
+              <TeachingEmptyState Icon={NoteIcon} color="#D4BC6A" title={t('notes.emptyTitle')} body={t('notes.emptyBody')} onOpenLibrary={onOpenLibrary} />
+            )
           ) : body}
         </div>
       </div>

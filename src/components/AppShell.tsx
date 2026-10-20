@@ -233,11 +233,11 @@ export default function AppShell({ user, initialBookId, initialPassageId, initia
         <div className="flex-1 overflow-hidden">
           {activeTab === 'home'      && <HomePanel userId={userId} onOpenBook={openBookFromHome} onTabChange={tab => setActiveTab(tab as NavTab)} />}
           {activeTab === 'settings'  && <SettingsPanel user={user} />}
-          {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBookFromAnnotation} />}
+          {activeTab === 'tags'      && user  && <TagsScreen userId={userId} onOpenBook={openBookFromAnnotation} onOpenLibrary={() => handleTabChange('library')} />}
           {activeTab === 'tags'      && !user && <SignInPrompt message={t('tags.signInBody')} />}
-          {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBookFromAnnotation} />}
+          {activeTab === 'notes'     && user  && <NotesScreen userId={userId} onOpenBook={openBookFromAnnotation} onOpenLibrary={() => handleTabChange('library')} />}
           {activeTab === 'notes'     && !user && <SignInPrompt message={t('notes.signInBody')} />}
-          {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBookFromAnnotation} />}
+          {activeTab === 'xrefs'     && user  && <XRefsScreen userId={userId} onOpenBook={openBookFromAnnotation} onOpenLibrary={() => handleTabChange('library')} />}
           {activeTab === 'xrefs'     && !user && <SignInPrompt message={t('xrefs.signInBody')} />}
           {activeTab === 'community' && <CommunityPanel user={user} onOpenBook={openBookFromAnnotation} />}
         </div>

@@ -23,6 +23,8 @@ import { resolveTheme, scriptNeedsHeadingLetterSpacingDisabled, type ReaderPrefs
 import { resolveSelectionPassages } from '@/lib/selectionRange';
 import { fetchXrefSuggestions, type XrefSuggestion } from '@/lib/xrefSuggest';
 import { seedCollapsedToc, TOC_EXPAND_ROW_BUDGET } from '@/lib/tocCollapse';
+import { useFirstUseHint } from '@/lib/useFirstUseHint';
+import FirstUseHint from './FirstUseHint';
 
 interface Passage {
   id: string;
@@ -269,6 +271,9 @@ interface TocEntry {
   passageId: string;
   depth?: number;
 }
+
+// How long the one-time margin-marker tip stays before fading on its own.
+const MARGIN_HINT_MS = 8000;
 
 interface SelectionBar {
   x: number;
@@ -755,6 +760,21 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   const [footnoteMap, setFootnoteMap] = useState<Record<string, string>>({});
   const [activeFootnote, setActiveFootnote] = useState<{ num: string; text: string } | null>(null);
   const [selectionBar, setSelectionBar] = useState<SelectionBar | null>(null);
+
+  // One-time tip: the first annotation saved in this browser leaves a marker in
+  // the margin; say what it is. It fades on its own after a few seconds.
+  const { due: marginHintDue, spend: spendMarginHint } = useFirstUseHint('marginIcon');
+  const [marginHintShown, setMarginHintShown] = useState(false);
+  const noteAnnotationSaved = useCallback(() => {
+    if (!marginHintDue) return;
+    spendMarginHint();
+    setMarginHintShown(true);
+  }, [marginHintDue, spendMarginHint]);
+  useEffect(() => {
+    if (!marginHintShown) return;
+    const timer = setTimeout(() => setMarginHintShown(false), MARGIN_HINT_MS);
+    return () => clearTimeout(timer);
+  }, [marginHintShown]);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
   const [activePanel, setActivePanel] = useState<'tag' | 'note' | 'ai' | 'signin' | null>(null);
   const [pickSaving, setPickSaving] = useState(false);
@@ -1815,6 +1835,7 @@ async function handleCopy() {
       supabase.from('selection_tags').insert({ selection_id: selId, tag_id: tagId, created_at: now })
     ));
     if (bar) setTaggedPassageIds(prev => new Set(prev).add(bar.startPassageId));
+    if (tagIds.length > 0) noteAnnotationSaved();
   }
 
   async function handleNoteSave(content: string) {
@@ -1833,6 +1854,7 @@ async function handleCopy() {
         updated_at: now,
       }).catch(() => {});
     }
+    noteAnnotationSaved();
     if (bar) {
       setNotedPassageIds(prev => new Set(prev).add(bar.startPassageId));
       if (noteData) {
@@ -2024,6 +2046,7 @@ async function handleCopy() {
         updated_at:     now,
       }).select('id').single();
       if (xrefData) {
+        noteAnnotationSaved();
         await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selBId, updated_at: now }).catch(() => {});
         // Auto-generate label in background
         supabase.functions.invoke('generate-xref-label', {
@@ -2112,6 +2135,7 @@ async function handleCopy() {
         updated_at:     now,
       }).select('id').single();
       if (xrefData) {
+        noteAnnotationSaved();
         await pushXref({ id: xrefData.id, user_id: userId, selection_a_id: selIdA, selection_b_id: selBId, updated_at: now }).catch(() => {});
         supabase.functions.invoke('generate-xref-label', {
           body: { text_a: from.text, text_b: snapshotText },
@@ -2239,6 +2263,13 @@ async function handleCopy() {
 
   return (
     <div className="h-full flex flex-col relative" ref={readerRef}>
+      {marginHintShown && (
+        <FirstUseHint
+          text={t('hints.marginIcon')}
+          onClose={() => setMarginHintShown(false)}
+          className="absolute top-3 inset-x-4 z-40 max-w-xl mx-auto"
+        />
+      )}
       {/* Progressive-reveal banner: the book's start is already visible below,
        *  the rest is still streaming in behind it (see loadBook). Only ever
        *  shown for a book whose fetch spans more than one page — see the

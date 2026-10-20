@@ -14,6 +14,8 @@ import { Highlight } from './Highlight';
 import { AnnotationCard } from './AnnotationCard';
 import { scriptScale, scriptScaleForText, treeDepthWeight } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import TeachingEmptyState from './TeachingEmptyState';
+import { TagIcon } from './Icons';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -146,6 +148,8 @@ function SortableQuoteRow({ sel, depth }: { sel: SelRow; depth: number }) {
 interface TagsScreenProps {
   userId: string;
   onOpenBook: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
+  /** Switches to the Library tab — the empty state's way to go and make one. */
+  onOpenLibrary: () => void;
 }
 
 type CheckState = 'checked' | 'indeterminate' | 'unchecked';
@@ -337,7 +341,7 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
   );
 }
 
-export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
+export default function TagsScreen({ userId, onOpenBook, onOpenLibrary }: TagsScreenProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [tags, setTags] = useState<TagRow[]>([]);
@@ -996,7 +1000,11 @@ export default function TagsScreen({ userId, onOpenBook }: TagsScreenProps) {
             </DndContext>
           </div>
         ) : filtered.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">{searchQuery ? t('tags.noMatch') : t('tags.empty')}</p>
+          searchQuery ? (
+            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-4">{t('tags.noMatch')}</p>
+          ) : (
+            <TeachingEmptyState Icon={TagIcon} color="#5B8EC4" title={t('tags.emptyTitle')} body={t('tags.emptyBody')} onOpenLibrary={onOpenLibrary} />
+          )
         ) : (
           <div>
             {filtered.map((tag, i) => {

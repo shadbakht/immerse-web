@@ -9,6 +9,8 @@ import { loadCatalog, loadSlugMaps, type CatalogBook } from '@/lib/catalog';
 import { scriptScale } from '@/lib/readerTypography';
 import { makeTraditionResolver } from '@/lib/tradition';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import TeachingEmptyState from './TeachingEmptyState';
+import { XRefIcon } from './Icons';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import { groupXrefsByPair } from '@/lib/xrefGrouping';
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type XRefExportRow } from '@/lib/xrefExport';
@@ -39,6 +41,8 @@ interface XRefRow {
 interface XRefsScreenProps {
   userId: string;
   onOpenBook: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
+  /** Switches to the Library tab — the empty state's way to go and make one. */
+  onOpenLibrary: () => void;
 }
 
 function Highlight({ text, q }: { text: string; q: string }) {
@@ -172,7 +176,7 @@ function XRefCard({
   );
 }
 
-export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
+export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefsScreenProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [rows, setRows]               = useState<XRefRow[]>([]);
@@ -522,9 +526,11 @@ export default function XRefsScreen({ userId, onOpenBook }: XRefsScreenProps) {
             <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : hierarchy.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-6">
-            {searchQuery ? t('xrefs.noMatch') : t('xrefs.empty')}
-          </p>
+          searchQuery ? (
+            <p className="text-sm text-gray-400 dark:text-[#5C7A8E] text-center py-16 px-6">{t('xrefs.noMatch')}</p>
+          ) : (
+            <TeachingEmptyState Icon={XRefIcon} color="#5A9460" title={t('xrefs.emptyTitle')} body={t('xrefs.emptyBody')} onOpenLibrary={onOpenLibrary} />
+          )
         ) : (
           <div>
             {hierarchy.map((pair, pi) => {

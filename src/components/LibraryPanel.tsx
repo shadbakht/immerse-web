@@ -15,8 +15,11 @@ import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, tradi
 import { hasExactPhrase } from '@/lib/exactPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
-import { LANGUAGE_LABELS } from '@immerse/i18n';
+import { LANGUAGE_LABELS, translate } from '@immerse/i18n';
 import { scriptScale, treeDepthWeight } from '@/lib/readerTypography';
+import { fetchRecentlyAdded, pickRecentlyAdded, type RecentlyAddedData } from '@/lib/recentlyAdded';
+import { useFirstUseHint } from '@/lib/useFirstUseHint';
+import FirstUseHint from './FirstUseHint';
 
 // Categories whose books have no canonical order and should display
 // alphabetically (mirrors the mobile LibraryScreen normalised sort).
@@ -86,6 +89,9 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     setOpenNodes(new Set());   // collapse: the previous language's open nodes don't apply
   }, [setContentLanguage]);
 
+  // Which books count as new: the last answer from Supabase (see newSlugs)
+  const [recentData, setRecentData] = useState<RecentlyAddedData | null>(null);
+
   // My Books
   const [isPro, setIsPro]                 = useState(false);
   const [importedBooks, setImportedBooks] = useState<ImportedBook[]>([]);
@@ -96,6 +102,15 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
   // Search
   const [searchQuery,       setSearchQuery]       = useState('');
+  // One-time tip on the first focus of the search box: a "?" makes a search a
+  // question, answered by meaning.
+  const { due: questionHintDue, spend: spendQuestionHint } = useFirstUseHint('questionSearch');
+  const [questionHintShown, setQuestionHintShown] = useState(false);
+  function handleSearchFocus() {
+    if (!questionHintDue) return;
+    spendQuestionHint();
+    setQuestionHintShown(true);
+  }
   const [searchResults,     setSearchResults]     = useState<SearchResult[]>([]);
   const [searchLoading,     setSearchLoading]     = useState(false);
   const [aiLoading,         setAiLoading]         = useState(false);
@@ -254,6 +269,30 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     return books;
   }, [catalog, contentLang]);
 
+  // ── New books ────────────────────────────────────────────────────────────────
+  // Books added to this language's library in the last RECENT_DAYS, not
+  // counting the language's own launch week (lib/recentlyAdded, shared with
+  // mobile), wear a "New" pill in their row. Until a new language's answer arrives the old one
+  // stays, but none of its books are in this language, so it marks nothing.
+  useEffect(() => {
+    let alive = true;
+    // createClient() hands back the page's one shared browser client.
+    fetchRecentlyAdded(createClient(), contentLang)
+      .then(data => { if (alive) setRecentData(data); })
+      // A failed read just means no pills this time.
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [contentLang]);
+
+  const newSlugs = useMemo(() => {
+    if (!recentData || !catalog) return new Set<string>();
+    const present = new Set(catalog.books.filter(b => bookLang(b) === contentLang).map(b => b.id));
+    return new Set(pickRecentlyAdded(recentData.rows, recentData.firstAddedAt, new Date(), present).map(r => r.id));
+  }, [recentData, catalog, contentLang]);
+  // The pill speaks the library's language, like the titles it sits beside —
+  // not the interface's.
+  const newLabel = translate(contentLang, 'library.newBadge');
+
   // Recursively collect all book slugs under a category at any depth
   const allSlugsUnder = useCallback((catId: string): string[] => {
     const direct = booksInCategory(catId).map(b => b.id);
@@ -291,6 +330,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
   }
 
   // ── Recursive tree renderer ───────────────────────────────────────────────────
+  // Each shelf's number counts every book beneath it, at any depth. It used to
+  // count the shelf's direct children, so "Bahá'í 8" read as eight books.
   // level 0 = root traditions (rendered as top-level section rows)
   // level 1+ = sub-categories and books, indented by level
 
@@ -321,12 +362,20 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
               />
               <button
                 onClick={() => onOpenBook(uuid)}
-                className="flex-1 text-start pe-4 py-2.5 min-w-0"
+                className="flex-1 flex items-center gap-2 text-start pe-4 py-2.5 min-w-0"
               >
                 <div
-                  className="leading-5 text-gray-800 dark:text-[#D2DCE8] truncate"
+                  className="leading-5 text-gray-800 dark:text-[#D2DCE8] truncate min-w-0"
                   style={{ fontSize: `calc(0.875rem * ${treeScale})` }}
                 >{book.title}</div>
+                {newSlugs.has(book.id) && (
+                  <span
+                    className="shrink-0 rounded-full px-[7px] py-px font-semibold leading-4 bg-[#1B6B7B]/[0.14] text-[#1B6B7B] dark:bg-[#2D9DB3]/20 dark:text-[#2D9DB3]"
+                    style={{ fontSize: `calc(11px * ${treeScale})` }}
+                  >
+                    {newLabel}
+                  </span>
+                )}
               </button>
             </div>
             <Divider id={book.id} />
@@ -336,7 +385,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
 
         {children.map(child => {
           const childSlugs     = allSlugsUnder(child.id);
-          const childImmediate = childrenOf(child.id).length + booksInCategory(child.id).length;
           const isOpen         = openNodes.has(child.id);
           const state          = checkState(childSlugs);
 
@@ -369,7 +417,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                     <span
                       className="leading-4 text-gray-400 dark:text-[#5C7A8E]"
                       style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
-                    >{childImmediate}</span>
+                    >{childSlugs.length}</span>
                     <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
                   </div>
                 </button>
@@ -1067,6 +1115,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            onFocus={handleSearchFocus}
             placeholder={selectedSlugs.size > 0 ? t('library.searchSelected', { count: selectedSlugs.size }) : t('library.searchAll')}
             className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
@@ -1077,6 +1126,13 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             >{t('common.clear')}</button>
           )}
         </div>
+        {questionHintShown && (
+          <FirstUseHint
+            text={t('hints.questionSearch')}
+            onClose={() => setQuestionHintShown(false)}
+            className="mt-3"
+          />
+        )}
       </div>
 
       {/* Body */}
@@ -1153,7 +1209,6 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
         <div className="flex-1 overflow-y-auto">
           {roots.map(root => {
             const rootSlugs    = allSlugsUnder(root.id);
-            const immediateCount = childrenOf(root.id).length + booksInCategory(root.id).length;
             const isOpen    = openNodes.has(root.id);
             const state     = checkState(rootSlugs);
 
@@ -1173,7 +1228,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                       <span
                         className="leading-4 text-gray-400 dark:text-[#5C7A8E]"
                         style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
-                      >{immediateCount}</span>
+                      >{rootSlugs.length}</span>
                       <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${isOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
                     </div>
                   </button>

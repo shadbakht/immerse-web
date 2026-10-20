@@ -17,12 +17,12 @@ interface Step {
 
 // Ordered intro screenshots — desktop-web captures, in /public/onboarding.
 // Module level, so the copy is carried as keys and resolved at render.
+// Three screens, matching mobile: the Library, the one gesture everything else
+// starts from, and where the results collect.
 const STEPS: Step[] = [
-  { img: 'w1-home.png',            titleKey: 'onboarding.tour.home.label', captionKey: 'onboarding.tour.home.caption' },
   { img: 'w2-library-reader.png',  titleKey: 'onboarding.libraryTitle',    captionKey: 'onboarding.libraryCaption' },
   { img: 'w3-select-act.png',      titleKey: 'onboarding.selectActTitle',  captionKey: 'onboarding.selectActCaption' },
   { img: 'w4-compilations.png',    titleKey: 'onboarding.yourTagsTitle',   captionKey: 'onboarding.yourTagsCaption' },
-  { img: 'w5-xrefs.png',           titleKey: 'onboarding.xrefsTitle',      captionKey: 'onboarding.xrefsCaption' },
 ];
 
 export default function Onboarding({ visible, onClose }: OnboardingProps) {

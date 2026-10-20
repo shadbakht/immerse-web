@@ -300,15 +300,18 @@ function ProfileView({
   onOpenBook,
   selection,
   onToggleSelect,
+  onRequireSignIn,
 }: {
   profile:       ProfileUser;
-  currentUserId: string;
+  /** Null for a guest, who can read a profile but not follow it. */
+  currentUserId: string | null;
   subscribedIds: Set<string>;
   onImport:      (ct: CommunityTagRow) => void;
   onBack:        () => void;
   onOpenBook?:   OpenBookFn;
   selection:      Map<string, Set<string>>;
   onToggleSelect: (ct: CommunityTag, exportId: string) => void;
+  onRequireSignIn: () => void;
 }) {
   const supabase      = createClient();
   const [tags, setTags]               = useState<CommunityTag[]>([]);
@@ -328,7 +331,7 @@ function ProfileView({
         setLoading(false);
       });
 
-    if (profile.userId === currentUserId) {
+    if (!currentUserId || profile.userId === currentUserId) {
       setFollowLoading(false);
       return;
     }
@@ -345,6 +348,7 @@ function ProfileView({
   }, [profile.userId, currentUserId]);
 
   async function handleFollowToggle() {
+    if (!currentUserId) { onRequireSignIn(); return; }
     if (followLoading) return;
     setFollowLoading(true);
     try {
@@ -450,6 +454,49 @@ function ProfileView({
   );
 }
 
+// ── Guest sign-in card ────────────────────────────────────────────────────────
+
+/**
+ * Guests can browse and read Discover; this opens when one taps something that
+ * needs an account (Import, Follow, Export). The card is a solid surface, not
+ * the 40% glass the panels use: the feed behind it is text, and translucent
+ * text over text was unreadable.
+ */
+function GuestSignInCard({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="absolute inset-0 z-30 bg-black/50 backdrop-blur-sm flex items-center justify-center px-8"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="bg-white dark:bg-[#1B2A38] border border-gray-100 dark:border-[#2D4050] shadow-2xl rounded-2xl p-8 max-w-sm w-full text-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-center mb-4"><DiscoverIcon size={40} /></div>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">{t('discover.signInTitle')}</h2>
+        <p className="text-sm text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-6">
+          {t('discover.signInBody')}
+        </p>
+        <a
+          href="/login"
+          className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
+        >
+          {t('common.signInCreate')}
+        </a>
+        <button
+          onClick={onClose}
+          className="mt-2 w-full py-2.5 text-sm font-medium text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] transition-colors"
+        >
+          {t('common.cancel')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps) {
@@ -462,6 +509,8 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   const [searchQuery, setSearchQuery]     = useState('');
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [profileView, setProfileView]     = useState<ProfileUser | null>(null);
+  // A guest tapped Import, Follow or Export: show the sign-in card.
+  const [askSignIn, setAskSignIn]         = useState(false);
 
   // Export selection: ctId → set of selected exportIds (tag nodes within that card).
   const [selection, setSelection] = useState<Map<string, { ct: CommunityTag; ids: Set<string> }>>(new Map());
@@ -632,7 +681,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, []);
 
   const handleImport = useCallback(async (ct: CommunityTagRow) => {
-    if (!user?.id) return;
+    if (!user?.id) { setAskSignIn(true); return; }
     try {
       await importCommunityTag(ct, user.id);
       setSubscribedIds(prev => new Set(prev).add(ct.id));
@@ -647,18 +696,22 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, [t]);
 
   // ── Profile view ────────────────────────────────────────────────────────────
-  if (profileView && user?.id) {
+  if (profileView) {
     return (
-      <ProfileView
-        profile={profileView}
-        currentUserId={user.id}
-        subscribedIds={subscribedIds}
-        onImport={handleImport}
-        onBack={() => setProfileView(null)}
-        onOpenBook={onOpenBook}
-        selection={selectionIds}
-        onToggleSelect={toggleSelect}
-      />
+      <div className="h-full relative">
+        <ProfileView
+          profile={profileView}
+          currentUserId={user?.id ?? null}
+          subscribedIds={subscribedIds}
+          onImport={handleImport}
+          onBack={() => setProfileView(null)}
+          onOpenBook={onOpenBook}
+          selection={selectionIds}
+          onToggleSelect={toggleSelect}
+          onRequireSignIn={() => setAskSignIn(true)}
+        />
+        {askSignIn && <GuestSignInCard onClose={() => setAskSignIn(false)} />}
+      </div>
     );
   }
 
@@ -673,7 +726,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
             <div className="flex items-center gap-2">
               <div className="relative" ref={exportMenuRef}>
                 <button
-                  onClick={() => setShowExportMenu(v => !v)}
+                  onClick={() => (user?.id ? setShowExportMenu(v => !v) : setAskSignIn(true))}
                   disabled={exporting}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
                   title={t('tags.exportSelected')}
@@ -804,26 +857,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         />
       </div>
 
-      {/* Guest overlay */}
-      {!user && (
-        // The card is a solid surface, not the 40% glass the panels use: the
-        // feed behind it is text, and translucent text over text was unreadable.
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-8">
-          <div className="bg-white dark:bg-[#1B2A38] border border-gray-100 dark:border-[#2D4050] shadow-2xl rounded-2xl p-8 max-w-sm w-full text-center">
-            <div className="flex justify-center mb-4"><DiscoverIcon size={40} /></div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-[#E2EAF2] mb-2">{t('discover.signInTitle')}</h2>
-            <p className="text-sm text-gray-500 dark:text-[#8FA4B8] leading-relaxed mb-6">
-              {t('discover.signInBody')}
-            </p>
-            <a
-              href="/login"
-              className="block w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors text-sm"
-            >
-              {t('common.signInCreate')}
-            </a>
-          </div>
-        </div>
-      )}
+      {askSignIn && <GuestSignInCard onClose={() => setAskSignIn(false)} />}
     </div>
   );
 }
