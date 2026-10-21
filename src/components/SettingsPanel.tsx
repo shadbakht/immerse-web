@@ -27,6 +27,13 @@ const FEATURE_VIDEO_URL = 'https://youtu.be/6LfBemF6O30';
 // Same address as mobile's Settings → Help → Contact Support and /support.
 const SUPPORT_EMAIL = 'support@immerseresearch.app';
 
+// Sign-in provider brand names, never translated.
+const PROVIDERS = [
+  { id: 'google', label: 'Google' },
+  { id: 'apple', label: 'Apple' },
+  { id: 'discord', label: 'Discord' },
+] as const;
+
 const CARD =
   'bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden';
 const CARD_HEAD =
@@ -88,6 +95,10 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [loading, setLoading] = useState(!isGuest);
   const [justUpgraded, setJustUpgraded] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  // Result of a Settings → Sign-in Methods round trip, read back from the URL
+  // the provider redirected to (?linked=google or ?link_error=…).
+  const [linkNotice, setLinkNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     setColorMode(getStoredColorMode());
@@ -98,7 +109,20 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       if (saved) { setFontSize(saved); applyFontSize(saved); }
     }
     if (typeof window !== 'undefined') {
-      setJustUpgraded(new URLSearchParams(window.location.search).get('upgraded') === '1');
+      const qs = new URLSearchParams(window.location.search);
+      setJustUpgraded(qs.get('upgraded') === '1');
+      const linked = PROVIDERS.find(p => p.id === qs.get('linked'));
+      const linkError = qs.get('link_error');
+      if (linkError && linked) {
+        setLinkNotice({
+          ok: false,
+          text: linkError === 'identity_already_exists'
+            ? t('settings.identityInUseBody', { provider: linked.label })
+            : `${t('common.somethingWrong')} (${linkError})`,
+        });
+      } else if (linked) {
+        setLinkNotice({ ok: true, text: t('settings.connectSuccess', { provider: linked.label }) });
+      }
     }
   }, [user?.id]);
 
@@ -133,6 +157,21 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
       setUsername(user.user_metadata?.username || '');
     }
     setLoading(false);
+  }
+
+  async function handleConnect(provider: (typeof PROVIDERS)[number]['id']) {
+    setConnecting(provider);
+    setLinkNotice(null);
+    const next = `/?tab=settings&linked=${provider}`;
+    const { error } = await supabase.auth.linkIdentity({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+    });
+    // On success the browser has navigated to the provider.
+    if (error) {
+      setLinkNotice({ ok: false, text: error.message });
+      setConnecting(null);
+    }
   }
 
   async function handleFontChange(size: FontSize) {
@@ -321,6 +360,46 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 </div>
               )}
             </section>
+
+            {/* Sign-in Methods (2026-10-21) — connect another provider to the
+                account you're in, so a different provider email can't open a
+                second, empty account. Mirrors mobile's section. */}
+            {!isGuest && user && (() => {
+              const linked = new Set((user.identities ?? []).map(i => i.provider));
+              return (
+                <section className={CARD}>
+                  <div className={CARD_HEAD}>{t('settings.signInMethods')}</div>
+                  <p className="px-5 pt-4 text-xs text-gray-500 dark:text-[#8FA4B8]">{t('settings.signInMethodsHint')}</p>
+                  {linkNotice && (
+                    <p className={`px-5 pt-3 text-sm ${linkNotice.ok ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                      {linkNotice.text}
+                    </p>
+                  )}
+                  {linked.has('email') && (
+                    <div className="px-5 py-4 flex items-center justify-between gap-3 border-b border-gray-50 dark:border-[#2D4050]/60">
+                      <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{t('settings.providerEmail')}</span>
+                      <span className="text-sm text-gray-500 dark:text-[#8FA4B8] truncate">{user.email}</span>
+                    </div>
+                  )}
+                  {PROVIDERS.map(p => (
+                    <div key={p.id} className="px-5 py-4 flex items-center justify-between gap-3 border-b last:border-b-0 border-gray-50 dark:border-[#2D4050]/60">
+                      <span className="text-sm text-gray-700 dark:text-[#D2DCE8]">{p.label}</span>
+                      {linked.has(p.id) ? (
+                        <span className="text-sm text-gray-500 dark:text-[#8FA4B8]">{t('settings.connected')}</span>
+                      ) : (
+                        <button
+                          onClick={() => handleConnect(p.id)}
+                          disabled={!!connecting}
+                          className="text-sm font-semibold text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline disabled:opacity-50"
+                        >
+                          {connecting === p.id ? t('common.pleaseWait') : t('settings.connect')}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </section>
+              );
+            })()}
 
             {/* Reorganized 2026-10-18 to match mobile's Settings order, grouped
                 by what a setting affects: Reader Appearance (the page) → App

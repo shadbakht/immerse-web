@@ -7,6 +7,16 @@ export async function GET(request: Request) {
   const type = searchParams.get('type'); // 'signup' for email confirmation
   const next = searchParams.get('next') ?? '/';
 
+  // A refused linkIdentity (Settings → Sign-in Methods, or the "already have
+  // an account" flow) comes back with no code, only error_code — most often
+  // identity_already_exists. Hand it to the page that asked instead of
+  // dropping it silently.
+  const linkError = searchParams.get('error_code');
+  if (!code && linkError) {
+    const sep = next.includes('?') ? '&' : '?';
+    return NextResponse.redirect(`${origin}${next}${sep}link_error=${encodeURIComponent(linkError)}`);
+  }
+
   if (code) {
     const supabase = await createClient();
     const { data } = await supabase.auth.exchangeCodeForSession(code);

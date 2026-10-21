@@ -11,12 +11,23 @@ import { useTranslation } from '@/contexts/LanguageProvider';
 // username was auto-derived, never chosen. No skip: this page doesn't
 // redirect on its own until one of the two paths below actually succeeds.
 //
-// The second path, "Already have an Immerse account?", is deliberately NOT a
+// Opens on "Have you signed in to Immerse before?" with two equal choices
+// (2026-10-21): a Pro user signed in with a Google address different from his
+// email account, picked a username, and landed in an empty account believing
+// his Compilations were gone — the old small link under the username field
+// was too easy to miss. Same as mobile's ChooseUsernameScreen.
+//
+// The "Yes, I have an account" path is deliberately NOT a
 // data merge (reassigning tags/notes/etc. between two already-populated
 // accounts is a much bigger, riskier operation) — it only works because the
 // fresh account reaching this page is still empty. It switches the session to
-// the existing account (proven via a mailed code) and attaches this OAuth
-// identity to THAT account instead; the fresh one is simply abandoned.
+// the existing account (proven via a mailed code), deletes the fresh one via
+// the release_unconfirmed_signup RPC (it owns the OAuth identity, so linking
+// is refused until it's gone; the RPC refuses anything with saved data), and
+// attaches this OAuth identity to the existing account.
+// Brand names, never translated.
+const PROVIDER_LABELS: Record<string, string> = { google: 'Google', apple: 'Apple', discord: 'Discord' };
+
 function ChooseUsernameInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,7 +35,12 @@ function ChooseUsernameInner() {
   const supabase = createClient();
   const { t } = useTranslation();
 
-  const [mode, setMode] = useState<'username' | 'linkEmail' | 'linkCode'>('username');
+  const [mode, setMode] = useState<'ask' | 'username' | 'linkEmail' | 'linkCode'>('ask');
+  const [email, setEmail] = useState('');
+  // True once the code has switched the session to the existing account but
+  // attaching the provider failed — they're in their real account, so offer a
+  // way into the app instead of leaving them on this page.
+  const [switched, setSwitched] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const [username, setUsername] = useState('');
@@ -42,6 +58,7 @@ function ChooseUsernameInner() {
       if (!data.user) { router.push('/login'); return; }
       setUserId(data.user.id);
       setProvider((data.user.app_metadata?.provider as string) ?? null);
+      setEmail(data.user.email ?? '');
       supabase.from('profiles').select('username').eq('id', data.user.id).maybeSingle().then(({ data: p }) => {
         if (p?.username) setUsername(p.username);
       });
@@ -119,10 +136,37 @@ function ChooseUsernameInner() {
     // Captured before verifyOtp's session switch, which would otherwise
     // silently change what app_metadata.provider resolves to.
     const targetProvider = provider ?? 'google';
+    // Same for the fresh account's token, needed after the switch to release it.
+    const { data: fresh } = await supabase.auth.getSession();
+    const freshToken = fresh.session?.access_token;
     setLoading(true);
     try {
       const { error: verifyError } = await supabase.auth.verifyOtp({ email: linkEmail.trim(), token: clean, type: 'email' });
       if (verifyError) throw verifyError;
+    } catch (err: any) {
+      setError(classifyCodeError(err));
+      setLoading(false);
+      return;
+    }
+    try {
+      // The fresh account owns the OAuth identity, so linkIdentity would be
+      // refused (identity_already_exists). Release it, authenticated as the
+      // FRESH account — its JWT stays valid after the session switch.
+      if (freshToken) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/release_unconfirmed_signup`, {
+          method: 'POST',
+          headers: {
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            Authorization: `Bearer ${freshToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: '{}',
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.message === 'account_not_empty' ? t('auth.linkAccountNotEmpty') : (body?.message ?? t('common.somethingWrong')));
+        }
+      }
       // linkIdentity's own authorize call already carries the now-current
       // session's JWT, so the server knows which account to attach the
       // identity to before the browser even navigates away — the redirect
@@ -134,7 +178,10 @@ function ChooseUsernameInner() {
       });
       if (linkError) throw linkError;
     } catch (err: any) {
-      setError(classifyCodeError(err));
+      // The code was right and the session is already the existing account;
+      // only the provider attach failed. Say what happened, then let them in.
+      setError(err?.message ?? t('common.somethingWrong'));
+      setSwitched(true);
       setLoading(false);
     }
     // On success the browser navigates away — no further state update needed.
@@ -159,6 +206,14 @@ function ChooseUsernameInner() {
           <div className="flex justify-center mb-4">
             <Image src="/immerse-icon.png" alt="Immerse" width={72} height={72} className="rounded-2xl" />
           </div>
+          {mode === 'ask' && (
+            <>
+              <h1 className="text-2xl font-bold text-white tracking-tight">{t('auth.firstTimeTitle')}</h1>
+              <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mt-2">
+                {t('auth.firstTimeBlurb', { provider: PROVIDER_LABELS[provider ?? ''] ?? 'Google', email })}
+              </p>
+            </>
+          )}
           {mode === 'username' && (
             <>
               <h1 className="text-2xl font-bold text-white tracking-tight">{t('auth.chooseUsernameTitle')}</h1>
@@ -178,6 +233,23 @@ function ChooseUsernameInner() {
             </>
           )}
         </div>
+
+        {mode === 'ask' && (
+          <div className="space-y-3">
+            <button
+              onClick={() => { setMode('username'); setError(''); }}
+              className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition"
+            >
+              {t('auth.firstTimeNew')}
+            </button>
+            <button
+              onClick={() => { setMode('linkEmail'); setError(''); }}
+              className="w-full border border-[#1B6B7B] dark:border-[#2D9DB3] text-[#5FB3C4] font-semibold py-3.5 rounded-xl hover:bg-white/5 transition"
+            >
+              {t('auth.firstTimeExisting')}
+            </button>
+          </div>
+        )}
 
         {mode === 'username' && (
           <div className="space-y-3">
@@ -220,10 +292,10 @@ function ChooseUsernameInner() {
             </button>
 
             <button
-              onClick={() => { setMode('linkEmail'); setError(''); }}
-              className="w-full text-center text-[#1B6B7B] dark:text-[#2D9DB3] text-sm py-1 hover:underline"
+              onClick={() => { setMode('ask'); setError(''); }}
+              className="w-full text-center text-gray-400 dark:text-[#5C7A8E] text-sm py-2 hover:text-white transition"
             >
-              {t('auth.alreadyHaveAccount')}
+              {t('common.back')}
             </button>
           </div>
         )}
@@ -248,7 +320,7 @@ function ChooseUsernameInner() {
               {loading ? t('common.pleaseWait') : t('common.continue')}
             </button>
             <button
-              onClick={() => { setMode('username'); setError(''); }}
+              onClick={() => { setMode('ask'); setError(''); }}
               className="w-full text-center text-gray-400 dark:text-[#5C7A8E] text-sm py-2 hover:text-white transition"
             >
               {t('common.back')}
@@ -269,6 +341,14 @@ function ChooseUsernameInner() {
               className="w-full bg-white/10 text-white text-center text-2xl tracking-[0.5em] placeholder-gray-500 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#1B6B7B] dark:focus:ring-[#2D9DB3]"
             />
             {error && <p className="text-red-400 text-sm">{error}</p>}
+            {switched ? (
+              <button
+                onClick={() => { router.push(next); router.refresh(); }}
+                className="w-full bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white font-semibold py-3.5 rounded-xl hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition"
+              >
+                {t('common.continue')}
+              </button>
+            ) : (
             <button
               onClick={handleVerifyLinkCode}
               disabled={loading}
@@ -276,6 +356,7 @@ function ChooseUsernameInner() {
             >
               {loading ? t('auth.verifying') : t('auth.verify')}
             </button>
+            )}
             <button
               onClick={handleResendLinkCode}
               disabled={linkCooldown > 0}

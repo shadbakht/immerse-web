@@ -56,7 +56,10 @@
       "Scheherazade New",
       "LXGW WenKai",
       "Noto Serif SC",
-      "IranNastaliq"
+      "IranNastaliq",
+      "Google",
+      "Apple",
+      "Discord"
     ],
     "ignorePaths": [
       "legalContent.ts",
