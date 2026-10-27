@@ -330,7 +330,6 @@ export default function AppearanceSection({
       <div className="px-5 pt-1 pb-4 border-t border-gray-100 dark:border-[#2D4050]">
         <Toggle
           label={t('appearance.whalie')}
-          hint={t('appearance.whalieHint')}
           value={whalie.enabled}
           onChange={whalie.setEnabled}
         />
