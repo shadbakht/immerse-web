@@ -178,7 +178,8 @@ var whalieEngine = (function () {
     for (var q = 0; q < CODES.length; q++) {
       var hex = p[CODES.charAt(q)];
       var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
-      out.push(LITTLE ? ((255 << 24) | (b << 16) | (g << 8) | r) : ((r << 24) | (g << 16) | (b << 8) | 255));
+      // >>> 0: unsigned, as a Uint32Array reads it back, so seal() can compare.
+      out.push((LITTLE ? ((255 << 24) | (b << 16) | (g << 8) | r) : ((r << 24) | (g << 16) | (b << 8) | 255)) >>> 0);
     }
     return (PAL32[name] = out);
   }
@@ -394,15 +395,6 @@ var whalieEngine = (function () {
   var lastStyle = null;
   function fill(ctx, style) { if (style !== lastStyle) { ctx.fillStyle = style; lastStyle = style; } }
 
-  /** An axis-aligned block centred on (X, Y) CSS px, snapped to device pixels. */
-  function block(ctx, X, Y, half, dpr) {
-    var x0 = Math.round((X - half) * dpr), x1 = Math.round((X + half) * dpr);
-    var y0 = Math.round((Y - half) * dpr), y1 = Math.round((Y + half) * dpr);
-    if (x1 <= x0) x1 = x0 + 1;
-    if (y1 <= y0) y1 = y0 + 1;
-    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-  }
-
   // Spray dots at the top of the spout (prototype, verbatim): [side, height].
   var SPRAY = [[-4, 2], [4, 2], [-6, -2], [6, -2]];
 
@@ -463,8 +455,8 @@ var whalieEngine = (function () {
   /**
    * Write one pass of blocks, in sample order, into `px` (row stride `stride`,
    * origin at device px (bx0, by0)), clipped to [bx0, bx1) × [by0, by1). Each
-   * block is snapped exactly as block() snaps it, and a later block overwrites
-   * an earlier one exactly as an opaque fillRect does.
+   * block is centred on its sample and snapped to device pixels, and a later
+   * block overwrites an earlier one exactly as an opaque fillRect does.
    */
   function paintPass(px, stride, bx0, by0, bx1, by1, dpr, half, codes, pal) {
     for (var n = 0; n < NS; n++) {
@@ -489,15 +481,57 @@ var whalieEngine = (function () {
   }
 
   /**
+   * Close the outline wherever bending split it. On the outer curve of a bend
+   * the one-pixel outline spreads apart and the next segment's body colour can
+   * reach the bare page (the "crack on his back" mid-breach). Every body pixel
+   * that touches a bare pixel becomes outline, `rounds` pixels deep, so the
+   * outline stays closed. At rest no body pixel touches the page, so nothing
+   * changes there. `hit` is a reused scratch list.
+   */
+  function seal(px, stride, w, h, oc, rounds, hit) {
+    hit.length = 0;
+    var x, y, i, v, k, start = 0;
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) {
+        i = y * stride + x; v = px[i];
+        if (v === 0 || v === oc) continue;
+        if ((x > 0 && px[i - 1] === 0) || (x < w - 1 && px[i + 1] === 0) ||
+            (y > 0 && px[i - stride] === 0) || (y < h - 1 && px[i + stride] === 0)) hit.push(i);
+      }
+    }
+    for (var round = 0; round < rounds; round++) {
+      var end = hit.length;
+      for (k = start; k < end; k++) px[hit[k]] = oc;
+      if (round == rounds - 1) break;
+      for (k = start; k < end; k++) {
+        i = hit[k]; x = i % stride; y = (i - x) / stride;
+        if (x > 0 && px[i - 1] !== 0 && px[i - 1] !== oc) hit.push(i - 1);
+        if (x < w - 1 && px[i + 1] !== 0 && px[i + 1] !== oc) hit.push(i + 1);
+        if (y > 0 && px[i - stride] !== 0 && px[i - stride] !== oc) hit.push(i - stride);
+        if (y < h - 1 && px[i + stride] !== 0 && px[i + stride] !== oc) hit.push(i + stride);
+      }
+      start = end;
+    }
+  }
+
+  // Palette "codes" for the fallback buffer: code n is CODES.charAt(n - 1),
+  // so 0 stays transparent and 1 is the outline.
+  var CODE1 = [];
+  for (i = 0; i < CODES.length; i++) CODE1.push(i + 1);
+
+  /**
    * The underlay (every non-outline pixel larger, in its own colour, so no
    * hairline gaps open on the back when the body bends), then the main pass,
-   * as one putImageData over a box holding every block, clipped to the canvas
-   * as fillRect clips. Rounding is monotonic, so no block can start left of
-   * round((minX - hu) * dpr) or end right of round((maxX + hu) * dpr) + 1 (the
-   * +1 covers block()'s one-pixel minimum); likewise vertically. Box pixels no
-   * block covers stay transparent — what the canvas held there before.
+   * then seal(), into one buffer over a box holding every block, clipped to
+   * the canvas as fillRect clips. Rounding is monotonic, so no block can start
+   * left of round((minX - hu) * dpr) or end right of round((maxX + hu) * dpr)
+   * + 1 (the +1 covers the one-pixel minimum block); likewise vertically. Box
+   * pixels no block covers stay transparent — what the canvas held there
+   * before. With ImageData the buffer holds RGBA and goes out as one
+   * putImageData; without it (never in a real WebView or browser) it holds
+   * palette codes and goes out as one fillRect per run of a colour.
    */
-  function raster(ctx, cache, dpr, cw, chh, pal, blink) {
+  function raster(ctx, cache, dpr, cw, chh, p, palName, blink, fast) {
     var hu = 3.2 / SUB / 2, hm = 2.3 / SUB / 2;
     var bx0 = Math.round((EXT[0] - hu) * dpr), by0 = Math.round((EXT[1] - hu) * dpr);
     var bx1 = Math.round((EXT[2] + hu) * dpr) + 1, by1 = Math.round((EXT[3] + hu) * dpr) + 1;
@@ -506,17 +540,36 @@ var whalieEngine = (function () {
     if (bx1 > cw) bx1 = cw;
     if (by1 > chh) by1 = chh;
     if (bx1 <= bx0 || by1 <= by0) return; // wholly off the canvas (mid-turn)
-    var bbw = bx1 - bx0, bbh = by1 - by0, img = cache.img;
-    if (!img || img.width < bbw || img.height < bbh) {
-      img = cache.img = ctx.createImageData(Math.max(bbw, img ? img.width : 0), Math.max(bbh, img ? img.height : 0));
-      cache.px = new Uint32Array(img.data.buffer, img.data.byteOffset, img.width * img.height);
+    var bbw = bx1 - bx0, bbh = by1 - by0, px, stride, pal, img, n;
+    if (fast) {
+      img = cache.img;
+      if (!img || img.width < bbw || img.height < bbh) {
+        img = cache.img = ctx.createImageData(Math.max(bbw, img ? img.width : 0), Math.max(bbh, img ? img.height : 0));
+        cache.px = new Uint32Array(img.data.buffer, img.data.byteOffset, img.width * img.height);
+      }
+      px = cache.px; stride = img.width; pal = pal32(palName, p);
+    } else {
+      if (!cache.codes || cache.codes.length < bbw * bbh) cache.codes = new Array(bbw * bbh);
+      px = cache.codes; stride = bbw; pal = CODE1;
     }
-    var px = cache.px, stride = img.width, end = bbh * stride;
+    var end = bbh * stride;
     if (px.fill) px.fill(0, 0, end);
-    else for (var n = 0; n < end; n++) px[n] = 0;
+    else for (n = 0; n < end; n++) px[n] = 0;
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hu, UCH, pal);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hm, blink ? BCH : MCH, pal);
-    ctx.putImageData(img, bx0, by0, 0, 0, bbw, bbh);
+    seal(px, stride, bbw, bbh, pal[0], Math.max(1, Math.round(dpr / 2)), cache.hit || (cache.hit = []));
+    if (fast) {
+      ctx.putImageData(img, bx0, by0, 0, 0, bbw, bbh);
+    } else {
+      for (var yy = 0; yy < bbh; yy++) {
+        for (var xx = 0; xx < bbw;) {
+          var v = px[yy * stride + xx], run = 1;
+          while (xx + run < bbw && px[yy * stride + xx + run] === v) run++;
+          if (v) { fill(ctx, p[CODES.charAt(v - 1)]); ctx.fillRect(bx0 + xx, by0 + yy, run, 1); }
+          xx += run;
+        }
+      }
+    }
     mark(cache, bx0, by0, bx1, by1);
   }
 
@@ -555,22 +608,7 @@ var whalieEngine = (function () {
 
     bend(s, ps);
 
-    if (fast) {
-      raster(ctx, cache, dpr, cw, chh, pal32(T[s.palette] ? s.palette : 'paper', p), blink);
-    } else {
-      // No ImageData (never in a real WebView or browser): the original blocks.
-      var big = 3.2 / SUB, sz = 2.3 / SUB;
-      for (n = 0; n < NS; n++) {
-        var ch = subs[n].ch;
-        if (ch == 'o') continue;
-        fill(ctx, p[(ch == 'e' || ch == 'x') ? 'd' : ch]);
-        block(ctx, SX[n], SY[n], big / 2, dpr);
-      }
-      for (n = 0; n < NS; n++) {
-        fill(ctx, p[blink ? subs[n].blinkCh : subs[n].ch]);
-        block(ctx, SX[n], SY[n], sz / 2, dpr);
-      }
-    }
+    raster(ctx, cache, dpr, cw, chh, p, T[s.palette] ? s.palette : 'paper', blink, fast);
 
     // Spout, perpendicular to the body.
     if (s.spout > 0) {
