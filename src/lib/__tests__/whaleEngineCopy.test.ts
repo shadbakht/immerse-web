@@ -7,7 +7,7 @@ import { join } from 'path';
 // changes it, re-copy that file verbatim and update this hash — never edit
 // the web copy by hand.
 const MOBILE_WHALE_ENGINE_SHA256 =
-  '0d8e401ab005a27627a0cc9868bfe720b17f22c7e7c36a1d230e946a393411a9';
+  'aa9a252870f6598165ee8d8b8fc2608c0c9c1e43d918856a31b6ac06d81dfab4';
 
 describe('whaleEngine.js copy', () => {
   it('is byte-identical to mobile src/reader/whaleEngine.js', () => {

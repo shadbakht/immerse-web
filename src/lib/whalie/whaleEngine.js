@@ -157,6 +157,24 @@ var whalieEngine = (function () {
   }
   var ANG = [], PIV = [], JS = [], JC = [];
 
+  // Outline "bridges": every pair of outline samples that sit side by side
+  // (across or down) in the sprite. On the outer curve of a strong bend (the
+  // top of a breach) the two spread apart until the page shows between them —
+  // the notch in his back. raster() paints a block at each pair's midpoint
+  // BEFORE everything else, so a bridge shows only where nothing else drew:
+  // in such a gap. Unbent, the two blocks overlap and the bridge stays hidden.
+  var BRA = [], BRB = [];
+  (function () {
+    var at = {};
+    for (var n = 0; n < NS; n++) if (subs[n].ch == 'o') at[subs[n].x * 2 + ',' + subs[n].y * 2] = n;
+    for (n = 0; n < NS; n++) {
+      if (subs[n].ch != 'o') continue;
+      var kx = subs[n].x * 2, ky = subs[n].y * 2, m;
+      m = at[(kx + 1) + ',' + ky]; if (m != null) { BRA.push(n); BRB.push(m); }
+      m = at[kx + ',' + (ky + 1)]; if (m != null) { BRA.push(n); BRB.push(m); }
+    }
+  })();
+
   // Blocks are opaque, integer-aligned rectangles, so instead of thousands of
   // fillRect calls they are written, in the same order, into one reused RGBA
   // buffer over the whale's bounding box and put with one putImageData: later
@@ -480,6 +498,33 @@ var whalieEngine = (function () {
     }
   }
 
+  // A bridge is drawn only once its pair has spread past 1.6× the samples'
+  // resting spacing (1 / SUB): the swim stroke never gets there, so his look
+  // while swimming is untouched — a bridge there would only round a stray
+  // pixel onto the jagged edge.
+  var BRIDGE_MIN2 = (1.6 / SUB) * (1.6 / SUB);
+
+  /** The outline bridges (see BRA/BRB), in the outline colour `col`. */
+  function paintBridges(px, stride, bx0, by0, bx1, by1, dpr, half, col) {
+    for (var q = 0; q < BRA.length; q++) {
+      var a = BRA[q], b = BRB[q], gx = SX[b] - SX[a], gy = SY[b] - SY[a];
+      if (gx * gx + gy * gy <= BRIDGE_MIN2) continue;   // not spread apart: no gap to bridge
+      var X = (SX[a] + SX[b]) / 2, Y = (SY[a] + SY[b]) / 2;
+      var x0 = Math.round((X - half) * dpr), x1 = Math.round((X + half) * dpr);
+      var y0 = Math.round((Y - half) * dpr), y1 = Math.round((Y + half) * dpr);
+      if (x1 <= x0) x1 = x0 + 1;
+      if (y1 <= y0) y1 = y0 + 1;
+      if (x0 < bx0) x0 = bx0;
+      if (x1 > bx1) x1 = bx1;
+      if (y0 < by0) y0 = by0;
+      if (y1 > by1) y1 = by1;
+      for (var yy = y0; yy < y1; yy++) {
+        var o = (yy - by0) * stride - bx0;
+        for (var xx = x0; xx < x1; xx++) px[o + xx] = col;
+      }
+    }
+  }
+
   /**
    * Close the outline wherever bending split it. On the outer curve of a bend
    * the one-pixel outline spreads apart and the next segment's body colour can
@@ -520,10 +565,10 @@ var whalieEngine = (function () {
   for (i = 0; i < CODES.length; i++) CODE1.push(i + 1);
 
   /**
-   * The underlay (every non-outline pixel larger, in its own colour, so no
-   * hairline gaps open on the back when the body bends), then the main pass,
-   * then seal(), into one buffer over a box holding every block, clipped to
-   * the canvas as fillRect clips. Rounding is monotonic, so no block can start
+   * The outline bridges, then the underlay (every non-outline pixel larger,
+   * in its own colour, so no hairline gaps open on the back when the body
+   * bends), then the main pass, then seal(), into one buffer over a box
+   * holding every block, clipped to the canvas as fillRect clips. Rounding is monotonic, so no block can start
    * left of round((minX - hu) * dpr) or end right of round((maxX + hu) * dpr)
    * + 1 (the +1 covers the one-pixel minimum block); likewise vertically. Box
    * pixels no block covers stay transparent — what the canvas held there
@@ -555,6 +600,7 @@ var whalieEngine = (function () {
     var end = bbh * stride;
     if (px.fill) px.fill(0, 0, end);
     else for (n = 0; n < end; n++) px[n] = 0;
+    paintBridges(px, stride, bx0, by0, bx1, by1, dpr, hm, pal[0]);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hu, UCH, pal);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hm, blink ? BCH : MCH, pal);
     seal(px, stride, bbw, bbh, pal[0], Math.max(1, Math.round(dpr / 2)), cache.hit || (cache.hit = []));
@@ -809,6 +855,14 @@ var whalieEngine = (function () {
       },
       _state: function () {
         return { x: state.x, facing: state.facing, mode: state.mode, lineVisible: state.lineVisible, spout: state.spout };
+      },
+      // Tests: the midpoint (CSS px, canvas space) between every pair of
+      // neighbouring outline samples, as last drawn — where the outline must
+      // be unbroken.
+      _outlineMidpoints: function () {
+        var out = [];
+        for (var q = 0; q < BRA.length; q++) out.push([(SX[BRA[q]] + SX[BRB[q]]) / 2, (SY[BRA[q]] + SY[BRB[q]]) / 2]);
+        return out;
       }
     };
   }
