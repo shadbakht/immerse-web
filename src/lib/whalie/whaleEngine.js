@@ -250,13 +250,13 @@ var whalieEngine = (function () {
 
   // Splash: when his nose re-enters the water on the dive, a burst of
   // droplets in the water colour arcs up, centred under his body, and falls
-  // back to the line. Owner-tuned with sliders: 13 drops, 23 pt high, 0.6 s
+  // back to the line. Owner-tuned with sliders: 13 drops, 23 pt high, 1 s
   // in the air, 31 pt wide, 3 pt dots. Each drop's [sideways, upward] launch
   // speed (pt/s) comes from a fixed pattern — spread across the width, tallest
   // in the middle — under gravity SPLASH_G; a drop is gone once it is back at
   // the line.
   var NOSE = [0.5, 13];   // the tip of his nose, in sprite coordinates
-  var SPLASH_N = 13, SPLASH_H = 23, SPLASH_T = 0.6, SPLASH_W = 31, SPLASH_DOT = 3;
+  var SPLASH_N = 13, SPLASH_H = 23, SPLASH_T = 1, SPLASH_W = 31, SPLASH_DOT = 3;
   var SPLASH_G = 8 * SPLASH_H / (SPLASH_T * SPLASH_T), SPLASH_DUR = SPLASH_T * 1.1;
   var SPLASH = [];
   (function () {
