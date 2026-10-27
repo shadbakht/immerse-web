@@ -498,11 +498,12 @@ var whalieEngine = (function () {
     }
   }
 
-  // A bridge is drawn only once its pair has spread past 1.6× the samples'
-  // resting spacing (1 / SUB): the swim stroke never gets there, so his look
-  // while swimming is untouched — a bridge there would only round a stray
-  // pixel onto the jagged edge.
-  var BRIDGE_MIN2 = (1.6 / SUB) * (1.6 / SUB);
+  // A bridge is drawn only once its pair has spread past 2.2× the samples'
+  // resting spacing (1 / SUB) — just short of where a gap can open (2.3×,
+  // the main block's width). The swim stroke never gets there, so his look
+  // while swimming is pixel-for-pixel what it was; at 1.6× it did, and a
+  // bridge flickered a stray pixel onto his edge every few frames.
+  var BRIDGE_MIN2 = (2.2 / SUB) * (2.2 / SUB);
 
   /** The outline bridges (see BRA/BRB), in the outline colour `col`. */
   function paintBridges(px, stride, bx0, by0, bx1, by1, dpr, half, col) {
@@ -531,7 +532,8 @@ var whalieEngine = (function () {
    * reach the bare page (the "crack on his back" mid-breach). Every body pixel
    * that touches a bare pixel becomes outline, `rounds` pixels deep, so the
    * outline stays closed. At rest no body pixel touches the page, so nothing
-   * changes there. `hit` is a reused scratch list.
+   * changes there. Run only mid-breach (see draw()). `hit` is a reused
+   * scratch list.
    */
   function seal(px, stride, w, h, oc, rounds, hit) {
     hit.length = 0;
@@ -576,7 +578,7 @@ var whalieEngine = (function () {
    * putImageData; without it (never in a real WebView or browser) it holds
    * palette codes and goes out as one fillRect per run of a colour.
    */
-  function raster(ctx, cache, dpr, cw, chh, p, palName, blink, fast) {
+  function raster(ctx, cache, dpr, cw, chh, p, palName, blink, fast, sealIt) {
     var hu = 3.2 / SUB / 2, hm = 2.3 / SUB / 2;
     var bx0 = Math.round((EXT[0] - hu) * dpr), by0 = Math.round((EXT[1] - hu) * dpr);
     var bx1 = Math.round((EXT[2] + hu) * dpr) + 1, by1 = Math.round((EXT[3] + hu) * dpr) + 1;
@@ -603,7 +605,7 @@ var whalieEngine = (function () {
     paintBridges(px, stride, bx0, by0, bx1, by1, dpr, hm, pal[0]);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hu, UCH, pal);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hm, blink ? BCH : MCH, pal);
-    seal(px, stride, bbw, bbh, pal[0], Math.max(1, Math.round(dpr / 2)), cache.hit || (cache.hit = []));
+    if (sealIt) seal(px, stride, bbw, bbh, pal[0], Math.max(1, Math.round(dpr / 2)), cache.hit || (cache.hit = []));
     if (fast) {
       ctx.putImageData(img, bx0, by0, 0, 0, bbw, bbh);
     } else {
@@ -654,7 +656,10 @@ var whalieEngine = (function () {
 
     bend(s, ps);
 
-    raster(ctx, cache, dpr, cw, chh, p, T[s.palette] ? s.palette : 'paper', blink, fast);
+    // seal() only mid-breach: that is the only bend strong enough to need it,
+    // and swimming it re-coloured a different stray edge pixel or two every
+    // frame — a visible shimmer along his head (TestFlight 1.7.9 build 146).
+    raster(ctx, cache, dpr, cw, chh, p, T[s.palette] ? s.palette : 'paper', blink, fast, s.mode == 'breach');
 
     // Spout, perpendicular to the body.
     if (s.spout > 0) {
