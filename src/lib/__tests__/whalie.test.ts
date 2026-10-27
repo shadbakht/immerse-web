@@ -151,6 +151,63 @@ describe('useWhalie', () => {
     expect(result.current.enabled).toBe(true);
   });
 
+  // A client whose SELECTs and UPDATEs each wait until the test settles them.
+  function deferredSupabase() {
+    const selects: Array<(v: unknown) => void> = [];
+    const updates: Array<{ patch: unknown; done: (v: unknown) => void }> = [];
+    const client = {
+      from: () => ({
+        select: () => ({ eq: () => ({ single: () => new Promise(r => { selects.push(r); }) }) }),
+        update: (patch: unknown) => ({
+          eq: () => new Promise(r => { updates.push({ patch, done: r }); }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+    return { client, selects, updates };
+  }
+
+  it('a reconcile landing after a toggle in another instance does not flip it back', async () => {
+    localStorage.setItem(WHALIE_STORAGE_KEY, 'false');
+    const sb = deferredSupabase();
+    // Settings is open and has reconciled (account: off).
+    const settings = renderHook(() => useWhalie(sb.client, 'u1'));
+    await act(async () => { sb.selects[0]({ data: { whalie_enabled: false }, error: null }); });
+    // The user turns him on; the account write is still in flight…
+    act(() => settings.result.current.setEnabled(true));
+    // …when the reader opens and its fetch reads the account's stale "off".
+    const reader = renderHook(() => useWhalie(sb.client, 'u1'));
+    await act(async () => { sb.selects[1]({ data: { whalie_enabled: false }, error: null }); });
+    expect(localStorage.getItem(WHALIE_STORAGE_KEY)).toBe('true');
+    expect(reader.result.current.enabled).toBe(true);
+    expect(settings.result.current.enabled).toBe(true);
+    await act(async () => { sb.updates.forEach(u => u.done({ error: null })); });
+    expect(sb.updates.map(u => u.patch)).toEqual([{ whalie_enabled: true }]);
+  });
+
+  it('a choice stored by another tab during the fetch is not overwritten by the fetched value', async () => {
+    localStorage.setItem(WHALIE_STORAGE_KEY, 'false');
+    const sb = deferredSupabase();
+    const pending = initWhalie(sb.client, 'u1');
+    localStorage.setItem(WHALIE_STORAGE_KEY, 'true'); // another tab chose "on"
+    sb.selects[0]({ data: { whalie_enabled: false }, error: null });
+    await expect(pending).resolves.toBe(true);
+    expect(localStorage.getItem(WHALIE_STORAGE_KEY)).toBe('true');
+  });
+
+  it('still adopts the account value when no save overlapped the fetch', async () => {
+    localStorage.setItem(WHALIE_STORAGE_KEY, 'false');
+    const sb = deferredSupabase();
+    const settings = renderHook(() => useWhalie(sb.client, 'u1'));
+    act(() => settings.result.current.setEnabled(true));
+    await act(async () => { sb.updates[0].done({ error: null }); });
+    // A later reconcile, started after that save settled, follows the account
+    // (e.g. changed on another device).
+    const pending = initWhalie(sb.client, 'u1');
+    sb.selects[sb.selects.length - 1]({ data: { whalie_enabled: false }, error: null });
+    await expect(pending).resolves.toBe(false);
+    expect(localStorage.getItem(WHALIE_STORAGE_KEY)).toBe('false');
+  });
+
   it('a second instance (settings vs reader) follows a change made in the first', async () => {
     const sb = fakeSupabase({ remote: null });
     const a = renderHook(() => useWhalie(sb.client, null));

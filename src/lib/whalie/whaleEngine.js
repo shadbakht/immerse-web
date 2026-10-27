@@ -89,7 +89,7 @@ var whalieEngine = (function () {
   function hyp(x, y) { return Math.sqrt(x * x + y * y); }
 
   var SP = [[0, 13], [8, 13], [16, 14], [24, 15], [32, 14], [38, 13], [42, 11], [44, 8], [45, 5], [45.5, 2]];
-  var seg = [], tot = 0, i, j;
+  var seg = [], tot = 0, i;
   for (i = 0; i < SP.length - 1; i++) {
     var len = hyp(SP[i + 1][0] - SP[i][0], SP[i + 1][1] - SP[i][1]);
     seg.push({ a: SP[i], b: SP[i + 1], s0: tot, l: len });
@@ -130,6 +130,11 @@ var whalieEngine = (function () {
     });
   });
   subs.sort(function (p, q) { return p.t - q.t; });
+
+  // Per-sample screen positions, allocated once and reused every frame.
+  // Float64Array keeps full double precision, so the output is unchanged.
+  function buffer(len) { return typeof Float64Array != 'undefined' ? new Float64Array(len) : new Array(len); }
+  var SX = buffer(subs.length), SY = buffer(subs.length);
 
   // ─── Constants (prototype defaults, verbatim) ───────────────────────────────
 
@@ -368,13 +373,20 @@ var whalieEngine = (function () {
     });
 
     // Sprite → screen: translate(cx,cy) · scale(dir,1) · rotate(A) · translate(-CX,-CY).
+    // Hot path (~3.3k samples × 3 joints a frame): rot() is inlined here with
+    // the same arithmetic, in the same order, so no array is allocated per call.
     var sA = Math.sin(ps.A), cA = Math.cos(ps.A);
-    var X = new Array(subs.length), Y = new Array(subs.length);
+    var X = SX, Y = SY, nJ = JOINTS.length;
     for (n = 0; n < subs.length; n++) {
       var sp = subs[n], qx = sp.x, qy = sp.y;
-      for (k = 0; k < JOINTS.length; k++) {
+      for (k = 0; k < nJ; k++) {
         var wgt = sst((sp.t - JOINTS[k].t) / W + 0.5);
-        if (wgt > 0) { var rq = rot([qx, qy], piv[k], ang[k] * wgt); qx = rq[0]; qy = rq[1]; }
+        if (wgt > 0) {
+          var ra = ang[k] * wgt, rs = Math.sin(ra), rc = Math.cos(ra), pv = piv[k];
+          var rx = qx - pv[0], ry = qy - pv[1];
+          qx = pv[0] + rx * rc - ry * rs;
+          qy = pv[1] + rx * rs + ry * rc;
+        }
       }
       var dx = qx - CX, dy = qy - CY;
       X[n] = ps.cx + ps.dir * (dx * cA - dy * sA);
@@ -461,6 +473,15 @@ var whalieEngine = (function () {
     var state = newState(cssWidth(), { palette: opts.palette, floor: opts.floor, reduceMotion: opts.reduceMotion });
     var ctx = null, raf = 0, last = null, paused = false, dead = false;
 
+    // Last value written to each per-frame style property; a property is only
+    // written when its value changes (style writes can invalidate layout).
+    var written = {};
+    function setStyle(st, key, prop, val) {
+      if (written[key] === val) return;
+      written[key] = val;
+      st[prop] = val;
+    }
+
     // Touch handling (reader ruling, Task 3). touchstart is NEVER cancelled, so a
     // scroll that begins on him still scrolls. Only a still, short touch is a tap:
     // its touchend and the click that follows are cancelled and stopped, so no
@@ -535,19 +556,21 @@ var whalieEngine = (function () {
         var ps = ctx ? draw(ctx, state, dpr, cssW) : pose(state);
         // The floor moves the whole canvas, never the drawing inside it: a breach
         // never clips, and a turn dips out of sight at the top of whatever bar shows.
-        cs.bottom = state.floor + 'px';
+        setStyle(cs, 'cb', 'bottom', state.floor + 'px');
         if (state.mode == 'swim') {
           var b = bounds(state, ps);
-          hs.display = 'block';
-          hs.left = b.left + 'px';
-          hs.bottom = (state.floor + LH - (b.top + b.height)) + 'px';
-          hs.width = b.width + 'px';
-          hs.height = b.height + 'px';
+          setStyle(hs, 'hd', 'display', 'block');
+          setStyle(hs, 'hl', 'left', b.left + 'px');
+          setStyle(hs, 'hb', 'bottom', (state.floor + LH - (b.top + b.height)) + 'px');
+          setStyle(hs, 'hw', 'width', b.width + 'px');
+          setStyle(hs, 'hh', 'height', b.height + 'px');
         } else {
-          hs.display = 'none';
+          setStyle(hs, 'hd', 'display', 'none');
         }
       } catch (err) {
         if (onLog) onLog('whalie frame error: ' + (err && err.message ? err.message : String(err)));
+        // A stopped whale must not leave a live tap target behind.
+        try { setStyle(hs, 'hd', 'display', 'none'); } catch (e2) { /* nothing more to do */ }
         return; // stop animating rather than throw every frame
       }
       schedule();

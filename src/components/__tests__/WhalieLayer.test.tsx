@@ -108,6 +108,48 @@ describe('WhalieLayer', () => {
     expect(onPassageClick).toHaveBeenCalledTimes(1);
   });
 
+  it('a mouse drag released over Whalie reaches the passage (selection bar), not his hit box', () => {
+    const onMouseUp = jest.fn();
+    const { container } = render(
+      <div>
+        <div data-testid="passage" onMouseUp={onMouseUp}>Some text</div>
+        <WhalieLayer enabled palette="paper" floor={0} paused={false} />
+      </div>,
+    );
+    const hit = hitDiv(container);
+    const passage = container.querySelector('[data-testid="passage"]') as HTMLElement;
+    expect(hit.style.pointerEvents).toBe('auto');
+    // The drag starts on the text: while the button is held he lets the mouse
+    // through, so the browser hit-tests the release onto the text under him.
+    fireEvent.mouseDown(passage);
+    expect(hit.style.pointerEvents).toBe('none');
+    // (jsdom does not hit-test; a release over him with pointer-events:none
+    // lands on the text, which this dispatch stands in for.)
+    fireEvent.mouseUp(passage);
+    expect(onMouseUp).toHaveBeenCalledTimes(1);
+    expect(hit.style.pointerEvents).toBe('auto'); // clickable again afterwards
+  });
+
+  it('a press that starts on Whalie keeps his hit box live, so clicking him still works', () => {
+    const { container } = render(<WhalieLayer enabled palette="paper" floor={0} paused={false} />);
+    const hit = hitDiv(container);
+    fireEvent.mouseDown(hit);
+    expect(hit.style.pointerEvents).toBe('auto');
+    fireEvent.mouseUp(hit);
+    expect(hit.style.pointerEvents).toBe('auto');
+  });
+
+  it('a drag released outside the window ends on the next button-less mouse move', () => {
+    const { container } = render(<WhalieLayer enabled palette="paper" floor={0} paused={false} />);
+    const hit = hitDiv(container);
+    fireEvent.mouseDown(document.body);
+    expect(hit.style.pointerEvents).toBe('none');
+    fireEvent.mouseMove(document.body, { buttons: 1 });
+    expect(hit.style.pointerEvents).toBe('none');
+    fireEvent.mouseMove(document.body, { buttons: 0 });
+    expect(hit.style.pointerEvents).toBe('auto');
+  });
+
   it('destroys the engine on unmount', () => {
     const { unmount } = render(<WhalieLayer enabled palette="paper" floor={0} paused={false} />);
     const handle = createSpy.mock.results[0].value;

@@ -13,6 +13,13 @@
 // Clicks: the canvas is pointer-events:none; only the engine's hit box (sized
 // to him, while swimming) takes pointer events, and it stops propagation of its
 // own click. Every other click lands on the passage exactly as before.
+//
+// Mouse drag-selection: while a button that went down somewhere else is held,
+// his hit box is made pointer-events:none, so a drag that is released over him
+// delivers its mouseup to the text underneath — and so to the reader's
+// onMouseUp, which raises the selection bar — instead of to his hit box (a
+// sibling of the passage, outside its event path). A press that starts ON him
+// is left alone, so clicking him still breaches.
 
 import { useEffect, useRef } from 'react';
 import { createWhalie, type WhalePalette, type WhalieHandle } from '@/lib/whalie/whaleEngine';
@@ -60,7 +67,38 @@ export default function WhalieLayer({ enabled, palette, floor, paused, className
     };
     document.addEventListener('visibilitychange', onVisibility);
 
+    const host = hostRef.current;
+    let dragging = false;
+    const setHitPointer = (value: string) => {
+      // The engine's children are its canvas (always pointer-events:none) and
+      // its hit box; only the hit box takes pointer events.
+      Array.prototype.forEach.call(host.children, (el: HTMLElement) => {
+        if (el.tagName === 'DIV') el.style.pointerEvents = value;
+      });
+    };
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      setHitPointer('auto');
+    };
+    // Capture phase, so nothing in the page can stop these first. The mouseup's
+    // target was already hit-tested with pointer-events:none, so restoring here
+    // does not pull that mouseup back onto him.
+    const onMouseDown = (e: MouseEvent) => {
+      if (host.contains(e.target as Node)) return;
+      dragging = true;
+      setHitPointer('none');
+    };
+    // Released outside the window: the next move with no button held ends it.
+    const onMouseMove = (e: MouseEvent) => { if (dragging && e.buttons === 0) endDrag(); };
+    document.addEventListener('mousedown', onMouseDown, true);
+    document.addEventListener('mouseup', endDrag, true);
+    document.addEventListener('mousemove', onMouseMove, true);
+
     return () => {
+      document.removeEventListener('mousedown', onMouseDown, true);
+      document.removeEventListener('mouseup', endDrag, true);
+      document.removeEventListener('mousemove', onMouseMove, true);
       mq?.removeEventListener?.('change', onMotion);
       document.removeEventListener('visibilitychange', onVisibility);
       handle.destroy();

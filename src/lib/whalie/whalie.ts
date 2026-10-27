@@ -37,6 +37,12 @@ export function getStoredWhalie(): boolean | null {
   }
 }
 
+// Every instance on the page shares these. A save that had not settled when a
+// reconcile began (or that started during it) may not have reached the server
+// before that reconcile's SELECT ran, so the remote value it read can be stale.
+let savesStarted = 0;
+let savesSettled = 0;
+
 function storeLocal(enabled: boolean) {
   try {
     localStorage.setItem(WHALIE_STORAGE_KEY, String(enabled));
@@ -56,6 +62,10 @@ export async function initWhalie(
 ): Promise<boolean> {
   const local = getStoredWhalie();
   if (!userId) return local ?? false;
+  const settledAtStart = savesSettled;
+  // Another instance (Settings ↔ reader, or another tab) chose while this
+  // reconcile was running: its value is newer than whatever the fetch read.
+  const choseElsewhere = () => savesStarted > settledAtStart || getStoredWhalie() !== local;
   try {
     const { data, error } = await supabase
       .from('profiles').select('whalie_enabled').eq('id', userId).single();
@@ -70,7 +80,7 @@ export async function initWhalie(
       }
       return seed ?? false;
     }
-    if (isTouched()) return getStoredWhalie() ?? false;
+    if (isTouched() || choseElsewhere()) return getStoredWhalie() ?? false;
     const value = !!remote;
     if (value !== local) storeLocal(value);
     return value;
@@ -83,9 +93,12 @@ export async function initWhalie(
 export async function saveWhalie(supabase: SupabaseClient, userId: string | null, enabled: boolean) {
   storeLocal(enabled);
   if (!userId) return;
+  savesStarted++;
   try {
     await supabase.from('profiles').update({ whalie_enabled: enabled }).eq('id', userId);
-  } catch { /* local value stands */ }
+  } catch { /* local value stands */ } finally {
+    savesSettled++;
+  }
 }
 
 export function useWhalie(supabase: SupabaseClient, userId: string | null) {
