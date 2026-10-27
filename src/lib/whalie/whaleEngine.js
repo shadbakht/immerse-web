@@ -248,13 +248,25 @@ var whalieEngine = (function () {
   var BREACH_LEAD = 0.35, BREACH_DUR = BT[BT.length - 1];
   var SPOUT_DUR = 1.4;
 
-  // Splash: when his nose re-enters the water on the dive, a small burst of
-  // droplets (the spout's dots and colour) arcs up from where it went in and
-  // falls back to the line. [sideways, upward] launch speeds in pt/s, under
-  // SPLASH_G pt/s²; each drop is gone once it is back at the line.
+  // Splash: when his nose re-enters the water on the dive, a burst of
+  // droplets in the water colour arcs up, centred under his body, and falls
+  // back to the line. Owner-tuned with sliders: 13 drops, 23 pt high, 0.6 s
+  // in the air, 31 pt wide, 3 pt dots. Each drop's [sideways, upward] launch
+  // speed (pt/s) comes from a fixed pattern — spread across the width, tallest
+  // in the middle — under gravity SPLASH_G; a drop is gone once it is back at
+  // the line.
   var NOSE = [0.5, 13];   // the tip of his nose, in sprite coordinates
-  var SPLASH = [[-16, 44], [-8, 56], [-2, 38], [5, 60], [12, 50], [22, 34], [-24, 30]];
-  var SPLASH_G = 170, SPLASH_DUR = 0.75;
+  var SPLASH_N = 13, SPLASH_H = 23, SPLASH_T = 0.6, SPLASH_W = 31, SPLASH_DOT = 3;
+  var SPLASH_G = 8 * SPLASH_H / (SPLASH_T * SPLASH_T), SPLASH_DUR = SPLASH_T * 1.1;
+  var SPLASH = [];
+  (function () {
+    var vy = 4 * SPLASH_H / SPLASH_T;
+    for (var q = 0; q < SPLASH_N; q++) {
+      var f = -1 + 2 * q / (SPLASH_N - 1), jit = ((q * 7) % 5) / 5 - 0.4;
+      var ff = Math.max(-1, Math.min(1, f + jit * 0.25));
+      SPLASH.push([ff * SPLASH_W / (SPLASH_T * 0.5), vy * (1 - 0.45 * Math.abs(ff)) * (0.85 + 0.15 * ((q * 3) % 4) / 3)]);
+    }
+  })();
 
   // ─── State machine ──────────────────────────────────────────────────────────
   // facing 'left' is the sprite's drawn direction (prototype facing = 1).
@@ -346,7 +358,7 @@ var whalieEngine = (function () {
     var nose = rot(NOSE, [CX, CY], ps.A);
     s.noseY = ps.cy + (nose[1] - CY);
     if (!s.splashed && t > 2.4 && wasY < LINE && s.noseY >= LINE) {
-      s.splashed = true; s.splashT = 0; s.splashX = ps.cx + (nose[0] - CX) * ps.dir;
+      s.splashed = true; s.splashT = 0; s.splashX = ps.cx;   // under his body, not his nose tip
     }
     if (t > 3.4) s.lineVisible = false;
     if (t >= BREACH_DUR) {
@@ -705,7 +717,7 @@ var whalieEngine = (function () {
     // Splash where his nose went back in (see SPLASH).
     if (s.splashT >= 0) {
       fill(ctx, p.wave);
-      var sdot = Math.max(1, Math.round(2 * dpr)), st = s.splashT;
+      var sdot = Math.max(1, Math.round(SPLASH_DOT * dpr)), st = s.splashT;
       for (k = 0; k < SPLASH.length; k++) {
         var drop = SPLASH[k];
         var lift = drop[1] * st - 0.5 * SPLASH_G * st * st;
