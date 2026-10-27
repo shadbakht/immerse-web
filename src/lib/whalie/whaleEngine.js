@@ -136,6 +136,53 @@ var whalieEngine = (function () {
   function buffer(len) { return typeof Float64Array != 'undefined' ? new Float64Array(len) : new Array(len); }
   var SX = buffer(subs.length), SY = buffer(subs.length);
 
+  // ─── Per-frame cost (pixel output unchanged — pinned by the pixel golden) ───
+  // Each sample's joint weights never change, so they are computed once here
+  // with the very expression draw() used to evaluate every frame. A weight of
+  // exactly 1 rotates by the joint's full angle, whose sin/cos draw() takes
+  // once per frame; only samples inside a blend band need their own trig.
+  var NJ = JOINTS.length, BEND_W = 0.14, NS = subs.length;
+  var WGT = buffer(NS * NJ), PX = buffer(NS), PY = buffer(NS);
+  for (i = 0; i < NS; i++) {
+    PX[i] = subs[i].x; PY[i] = subs[i].y;
+    for (var jk = 0; jk < NJ; jk++) WGT[i * NJ + jk] = sst((subs[i].t - JOINTS[jk].t) / BEND_W + 0.5);
+  }
+  // Joints k in [KLO[i], KHI[i]) are the only ones that move sample i
+  // (weight > 0); a rotation by weight 0 is skipped today anyway.
+  var KLO = [], KHI = [];
+  for (i = 0; i < NS; i++) {
+    var lo = NJ, hi = 0;
+    for (jk = 0; jk < NJ; jk++) if (WGT[i * NJ + jk] > 0) { if (jk < lo) lo = jk; hi = jk + 1; }
+    KLO.push(lo < hi ? lo : 0); KHI.push(lo < hi ? hi : 0);
+  }
+  var ANG = [], PIV = [], JS = [], JC = [];
+
+  // Blocks are opaque, integer-aligned rectangles, so instead of thousands of
+  // fillRect calls they are written, in the same order, into one reused RGBA
+  // buffer over the whale's bounding box and put with one putImageData: later
+  // writes overwrite earlier ones exactly as opaque fillRect does.
+  var CODES = 'odfbglex';
+  var UCH = [], MCH = [], BCH = [];
+  for (i = 0; i < NS; i++) {
+    var sc = subs[i].ch;
+    UCH.push(sc == 'o' ? -1 : CODES.indexOf((sc == 'e' || sc == 'x') ? 'd' : sc));
+    MCH.push(CODES.indexOf(sc));
+    BCH.push(CODES.indexOf(subs[i].blinkCh));
+  }
+  var HAS_U32 = typeof Uint32Array != 'undefined' && typeof Int32Array != 'undefined';
+  var LITTLE = HAS_U32 && new Uint8Array(new Uint32Array([1]).buffer)[0] == 1;
+  var PAL32 = {};
+  function pal32(name, p) {
+    if (PAL32[name]) return PAL32[name];
+    var out = [];
+    for (var q = 0; q < CODES.length; q++) {
+      var hex = p[CODES.charAt(q)];
+      var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+      out.push(LITTLE ? ((255 << 24) | (b << 16) | (g << 8) | r) : ((r << 24) | (g << 16) | (b << 8) | 255));
+    }
+    return (PAL32[name] = out);
+  }
+
   // ─── Constants (prototype defaults, verbatim) ───────────────────────────────
 
   var AMP = 0.15, PERIOD = 4, TILT = -0.2, FROWN = 1.6, SPEED = 2;
@@ -356,72 +403,186 @@ var whalieEngine = (function () {
     ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
   }
 
-  function draw(ctx, s, dpr, cssW) {
-    var p = T[s.palette] || T.paper, W = 0.14, n, k;
-    var ps = pose(s), bw = s.bw;
-    lastStyle = null;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, Math.round(cssW * dpr), Math.round(LH * dpr));
+  // Spray dots at the top of the spout (prototype, verbatim): [side, height].
+  var SPRAY = [[-4, 2], [4, 2], [-6, -2], [6, -2]];
 
-    // Spine bend.
-    var ang = JOINTS.map(function (jt) { return jt.k * (AMP * Math.sin(s.phase - jt.lag) * (1 - bw) + s.bKey * bw); });
-    var piv = [];
-    JOINTS.forEach(function (jt, q) {
+  /** Grow the per-canvas dirty rectangle (device px) by one drawn rectangle. */
+  function mark(cache, x0, y0, x1, y1) {
+    if (x0 < cache.dx0) cache.dx0 = x0;
+    if (y0 < cache.dy0) cache.dy0 = y0;
+    if (x1 > cache.dx1) cache.dx1 = x1;
+    if (y1 > cache.dy1) cache.dy1 = y1;
+  }
+
+  /** Spine bend + sprite → screen for every sample, into SX/SY (CSS px). */
+  function bend(s, ps) {
+    var bw = s.bw, k, n;
+    for (k = 0; k < NJ; k++) {
+      var jt = JOINTS[k];
+      ANG[k] = jt.k * (AMP * Math.sin(s.phase - jt.lag) * (1 - bw) + s.bKey * bw);
+      JS[k] = Math.sin(ANG[k]); JC[k] = Math.cos(ANG[k]);
       var pp = jt.p;
-      for (var z = 0; z < q; z++) pp = rot(pp, piv[z], ang[z]);
-      piv.push(pp);
-    });
-
+      for (var z = 0; z < k; z++) pp = rot(pp, PIV[z], ANG[z]);
+      PIV[k] = pp;
+    }
     // Sprite → screen: translate(cx,cy) · scale(dir,1) · rotate(A) · translate(-CX,-CY).
     // Hot path (~3.3k samples × 3 joints a frame): rot() is inlined here with
     // the same arithmetic, in the same order, so no array is allocated per call.
-    var sA = Math.sin(ps.A), cA = Math.cos(ps.A);
-    var X = SX, Y = SY, nJ = JOINTS.length;
-    for (n = 0; n < subs.length; n++) {
-      var sp = subs[n], qx = sp.x, qy = sp.y;
-      for (k = 0; k < nJ; k++) {
-        var wgt = sst((sp.t - JOINTS[k].t) / W + 0.5);
+    // A weight of exactly 1 rotates by ANG[k] * 1 === ANG[k], whose sin/cos are
+    // JS[k]/JC[k] — the same doubles Math.sin/cos would return here.
+    var sA = Math.sin(ps.A), cA = Math.cos(ps.A), pcx = ps.cx, pcy = ps.cy, pdir = ps.dir;
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (n = 0; n < NS; n++) {
+      var qx = PX[n], qy = PY[n], base = n * NJ, kEnd = KHI[n];
+      for (k = KLO[n]; k < kEnd; k++) {
+        var wgt = WGT[base + k];
         if (wgt > 0) {
-          var ra = ang[k] * wgt, rs = Math.sin(ra), rc = Math.cos(ra), pv = piv[k];
+          var rs, rc;
+          if (wgt === 1) { rs = JS[k]; rc = JC[k]; }
+          else { var ra = ANG[k] * wgt; rs = Math.sin(ra); rc = Math.cos(ra); }
+          var pv = PIV[k];
           var rx = qx - pv[0], ry = qy - pv[1];
           qx = pv[0] + rx * rc - ry * rs;
           qy = pv[1] + rx * rs + ry * rc;
         }
       }
       var dx = qx - CX, dy = qy - CY;
-      X[n] = ps.cx + ps.dir * (dx * cA - dy * sA);
-      Y[n] = ps.cy + (dx * sA + dy * cA);
+      var X = pcx + pdir * (dx * cA - dy * sA), Y = pcy + (dx * sA + dy * cA);
+      SX[n] = X; SY[n] = Y;
+      if (X < minX) minX = X;
+      if (X > maxX) maxX = X;
+      if (Y < minY) minY = Y;
+      if (Y > maxY) maxY = Y;
     }
+    EXT[0] = minX; EXT[1] = minY; EXT[2] = maxX; EXT[3] = maxY;
+  }
 
-    var big = 3.2 / SUB, sz = 2.3 / SUB;
-    // Underlay: every non-outline pixel painted larger in its own colour first,
-    // so no hairline gaps open on the back when the body bends.
-    for (n = 0; n < subs.length; n++) {
-      var ch = subs[n].ch;
-      if (ch == 'o') continue;
-      fill(ctx, p[(ch == 'e' || ch == 'x') ? 'd' : ch]);
-      block(ctx, X[n], Y[n], big / 2, dpr);
+  // Extent of the last bend(), in CSS px: [minX, minY, maxX, maxY].
+  var EXT = [0, 0, 0, 0];
+
+  /**
+   * Write one pass of blocks, in sample order, into `px` (row stride `stride`,
+   * origin at device px (bx0, by0)), clipped to [bx0, bx1) × [by0, by1). Each
+   * block is snapped exactly as block() snaps it, and a later block overwrites
+   * an earlier one exactly as an opaque fillRect does.
+   */
+  function paintPass(px, stride, bx0, by0, bx1, by1, dpr, half, codes, pal) {
+    for (var n = 0; n < NS; n++) {
+      var code = codes[n];
+      if (code < 0) continue;
+      var X = SX[n], Y = SY[n];
+      var x0 = Math.round((X - half) * dpr), x1 = Math.round((X + half) * dpr);
+      var y0 = Math.round((Y - half) * dpr), y1 = Math.round((Y + half) * dpr);
+      if (x1 <= x0) x1 = x0 + 1;
+      if (y1 <= y0) y1 = y0 + 1;
+      if (x0 < bx0) x0 = bx0;
+      if (x1 > bx1) x1 = bx1;
+      if (y0 < by0) y0 = by0;
+      if (y1 > by1) y1 = by1;
+      if (x1 <= x0) continue;
+      var col = pal[code];
+      for (var yy = y0; yy < y1; yy++) {
+        var o = (yy - by0) * stride - bx0;
+        for (var xx = x0; xx < x1; xx++) px[o + xx] = col;
+      }
     }
-    var blink = s.blinkLeft > 0;
-    for (n = 0; n < subs.length; n++) {
-      fill(ctx, p[blink ? subs[n].blinkCh : subs[n].ch]);
-      block(ctx, X[n], Y[n], sz / 2, dpr);
+  }
+
+  /**
+   * The underlay (every non-outline pixel larger, in its own colour, so no
+   * hairline gaps open on the back when the body bends), then the main pass,
+   * as one putImageData over a box holding every block, clipped to the canvas
+   * as fillRect clips. Rounding is monotonic, so no block can start left of
+   * round((minX - hu) * dpr) or end right of round((maxX + hu) * dpr) + 1 (the
+   * +1 covers block()'s one-pixel minimum); likewise vertically. Box pixels no
+   * block covers stay transparent — what the canvas held there before.
+   */
+  function raster(ctx, cache, dpr, cw, chh, pal, blink) {
+    var hu = 3.2 / SUB / 2, hm = 2.3 / SUB / 2;
+    var bx0 = Math.round((EXT[0] - hu) * dpr), by0 = Math.round((EXT[1] - hu) * dpr);
+    var bx1 = Math.round((EXT[2] + hu) * dpr) + 1, by1 = Math.round((EXT[3] + hu) * dpr) + 1;
+    if (bx0 < 0) bx0 = 0;
+    if (by0 < 0) by0 = 0;
+    if (bx1 > cw) bx1 = cw;
+    if (by1 > chh) by1 = chh;
+    if (bx1 <= bx0 || by1 <= by0) return; // wholly off the canvas (mid-turn)
+    var bbw = bx1 - bx0, bbh = by1 - by0, img = cache.img;
+    if (!img || img.width < bbw || img.height < bbh) {
+      img = cache.img = ctx.createImageData(Math.max(bbw, img ? img.width : 0), Math.max(bbh, img ? img.height : 0));
+      cache.px = new Uint32Array(img.data.buffer, img.data.byteOffset, img.width * img.height);
+    }
+    var px = cache.px, stride = img.width, end = bbh * stride;
+    if (px.fill) px.fill(0, 0, end);
+    else for (var n = 0; n < end; n++) px[n] = 0;
+    paintPass(px, stride, bx0, by0, bx1, by1, dpr, hu, UCH, pal);
+    paintPass(px, stride, bx0, by0, bx1, by1, dpr, hm, blink ? BCH : MCH, pal);
+    ctx.putImageData(img, bx0, by0, 0, 0, bbw, bbh);
+    mark(cache, bx0, by0, bx1, by1);
+  }
+
+  /** One spout dot, `d` along the body's up axis and `sd` along its side. */
+  function spoutDot(ctx, cache, ps, dpr, dot, d, sd) {
+    var ax = Math.round((ps.bx + ps.up[0] * d + ps.side[0] * sd - 1) * dpr);
+    var ay = Math.round((ps.by + ps.up[1] * d + ps.side[1] * sd - 1) * dpr);
+    ctx.fillRect(ax, ay, dot, dot);
+    mark(cache, ax, ay, ax + dot, ay + dot);
+  }
+
+  /**
+   * Draw one frame. `cache` is per canvas (see create()): it remembers what the
+   * last frame drew, so only that is cleared, and holds the reused pixel buffer.
+   */
+  function draw(ctx, s, dpr, cssW, cache) {
+    var p = T[s.palette] || T.paper, n, k;
+    var ps = pose(s), blink = s.blinkLeft > 0;
+    var cw = Math.round(cssW * dpr), chh = Math.round(LH * dpr);
+    cache = cache || {};
+    var fast = HAS_U32 && typeof ctx.putImageData == 'function' && typeof ctx.createImageData == 'function';
+    lastStyle = null;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Everything is redrawn every frame, so clearing what the last frame drew
+    // leaves the same canvas as clearing all of it. A new context or a resized
+    // canvas (which the browser has cleared) starts with a full clear.
+    if (!fast || cache.ctx !== ctx || cache.cw !== cw || cache.ch !== chh) {
+      ctx.clearRect(0, 0, cw, chh);
+    } else if (cache.dx1 > cache.dx0 && cache.dy1 > cache.dy0) {
+      var c0 = Math.max(0, cache.dx0), r0 = Math.max(0, cache.dy0);
+      var c1 = Math.min(cw, cache.dx1), r1 = Math.min(chh, cache.dy1);
+      if (c1 > c0 && r1 > r0) ctx.clearRect(c0, r0, c1 - c0, r1 - r0);
+    }
+    cache.ctx = ctx; cache.cw = cw; cache.ch = chh;
+    cache.dx0 = 1e9; cache.dy0 = 1e9; cache.dx1 = -1e9; cache.dy1 = -1e9;
+
+    bend(s, ps);
+
+    if (fast) {
+      raster(ctx, cache, dpr, cw, chh, pal32(T[s.palette] ? s.palette : 'paper', p), blink);
+    } else {
+      // No ImageData (never in a real WebView or browser): the original blocks.
+      var big = 3.2 / SUB, sz = 2.3 / SUB;
+      for (n = 0; n < NS; n++) {
+        var ch = subs[n].ch;
+        if (ch == 'o') continue;
+        fill(ctx, p[(ch == 'e' || ch == 'x') ? 'd' : ch]);
+        block(ctx, SX[n], SY[n], big / 2, dpr);
+      }
+      for (n = 0; n < NS; n++) {
+        fill(ctx, p[blink ? subs[n].blinkCh : subs[n].ch]);
+        block(ctx, SX[n], SY[n], sz / 2, dpr);
+      }
     }
 
     // Spout, perpendicular to the body.
     if (s.spout > 0) {
       fill(ctx, p.wave);
       var dot = Math.max(1, Math.round(2 * dpr)), hh = s.spout;
-      var at = function (d, sd) {
-        return [Math.round((ps.bx + ps.up[0] * d + ps.side[0] * sd - 1) * dpr), Math.round((ps.by + ps.up[1] * d + ps.side[1] * sd - 1) * dpr)];
-      };
-      for (k = 1; k <= Math.floor(hh); k++) { var a1 = at(k * 3, 0); ctx.fillRect(a1[0], a1[1], dot, dot); }
+      for (k = 1; k <= Math.floor(hh); k++) spoutDot(ctx, cache, ps, dpr, dot, k * 3, 0);
       if (hh >= 2.5) {
         var spread = (hh - 2.5) / 2.5 * 2, top = hh * 3;
-        [[-4, 2], [4, 2], [-6, -2], [6, -2]].forEach(function (pr) {
-          var a2 = at(top + pr[1], pr[0] + (pr[0] < 0 ? -1 : 1) * spread);
-          ctx.fillRect(a2[0], a2[1], dot, dot);
-        });
+        for (k = 0; k < SPRAY.length; k++) {
+          var pr = SPRAY[k];
+          spoutDot(ctx, cache, ps, dpr, dot, top + pr[1], pr[0] + (pr[0] < 0 ? -1 : 1) * spread);
+        }
       }
     }
 
@@ -431,7 +592,9 @@ var whalieEngine = (function () {
       var ph = Math.floor(s.time * 1000 / 220) % 4, d2 = Math.max(1, Math.round(2 * dpr));
       for (var lx = Math.round(s.lineCx - 33); lx < s.lineCx + 33; lx += 2) {
         var ly = ((((lx / 2) + ph) % 4 < 2) ? LINE : LINE - 2);
-        ctx.fillRect(Math.round(lx * dpr), Math.round(ly * dpr), d2, d2);
+        var wx = Math.round(lx * dpr), wy = Math.round(ly * dpr);
+        ctx.fillRect(wx, wy, d2, d2);
+        mark(cache, wx, wy, wx + d2, wy + d2);
       }
     }
     return ps;
@@ -472,6 +635,7 @@ var whalieEngine = (function () {
 
     var state = newState(cssWidth(), { palette: opts.palette, floor: opts.floor, reduceMotion: opts.reduceMotion });
     var ctx = null, raf = 0, last = null, paused = false, dead = false;
+    var drawCache = {}; // this canvas's dirty rectangle + reused pixel buffer (see draw())
 
     // Last value written to each per-frame style property; a property is only
     // written when its value changes (style writes can invalidate layout).
@@ -553,7 +717,7 @@ var whalieEngine = (function () {
           ctx = canvas.getContext ? canvas.getContext('2d') : null;
           if (ctx) ctx.imageSmoothingEnabled = false;
         }
-        var ps = ctx ? draw(ctx, state, dpr, cssW) : pose(state);
+        var ps = ctx ? draw(ctx, state, dpr, cssW, drawCache) : pose(state);
         // The floor moves the whole canvas, never the drawing inside it: a breach
         // never clips, and a turn dips out of sight at the top of whatever bar shows.
         setStyle(cs, 'cb', 'bottom', state.floor + 'px');
