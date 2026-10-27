@@ -532,8 +532,11 @@ var whalieEngine = (function () {
    * reach the bare page (the "crack on his back" mid-breach). Every body pixel
    * that touches a bare pixel becomes outline, `rounds` pixels deep, so the
    * outline stays closed. At rest no body pixel touches the page, so nothing
-   * changes there. Run only mid-breach (see draw()). `hit` is a reused
-   * scratch list.
+   * changes there. Swimming, it also keeps his front edge steady: the white
+   * throat pixels that would poke through the outline and flicker against the
+   * page as he moves are drawn as outline instead (build 145, approved on an
+   * iPad; turning it off for swimming in 147 brought the flicker back). `hit`
+   * is a reused scratch list.
    */
   function seal(px, stride, w, h, oc, rounds, hit) {
     hit.length = 0;
@@ -578,7 +581,7 @@ var whalieEngine = (function () {
    * putImageData; without it (never in a real WebView or browser) it holds
    * palette codes and goes out as one fillRect per run of a colour.
    */
-  function raster(ctx, cache, dpr, cw, chh, p, palName, blink, fast, sealIt) {
+  function raster(ctx, cache, dpr, cw, chh, p, palName, blink, fast) {
     var hu = 3.2 / SUB / 2, hm = 2.3 / SUB / 2;
     var bx0 = Math.round((EXT[0] - hu) * dpr), by0 = Math.round((EXT[1] - hu) * dpr);
     var bx1 = Math.round((EXT[2] + hu) * dpr) + 1, by1 = Math.round((EXT[3] + hu) * dpr) + 1;
@@ -605,7 +608,7 @@ var whalieEngine = (function () {
     paintBridges(px, stride, bx0, by0, bx1, by1, dpr, hm, pal[0]);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hu, UCH, pal);
     paintPass(px, stride, bx0, by0, bx1, by1, dpr, hm, blink ? BCH : MCH, pal);
-    if (sealIt) seal(px, stride, bbw, bbh, pal[0], Math.max(1, Math.round(dpr / 2)), cache.hit || (cache.hit = []));
+    seal(px, stride, bbw, bbh, pal[0], Math.max(1, Math.round(dpr / 2)), cache.hit || (cache.hit = []));
     if (fast) {
       ctx.putImageData(img, bx0, by0, 0, 0, bbw, bbh);
     } else {
@@ -656,10 +659,7 @@ var whalieEngine = (function () {
 
     bend(s, ps);
 
-    // seal() only mid-breach: that is the only bend strong enough to need it,
-    // and swimming it re-coloured a different stray edge pixel or two every
-    // frame — a visible shimmer along his head (TestFlight 1.7.9 build 146).
-    raster(ctx, cache, dpr, cw, chh, p, T[s.palette] ? s.palette : 'paper', blink, fast, s.mode == 'breach');
+    raster(ctx, cache, dpr, cw, chh, p, T[s.palette] ? s.palette : 'paper', blink, fast);
 
     // Spout, perpendicular to the body.
     if (s.spout > 0) {
