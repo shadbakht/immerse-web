@@ -26,6 +26,8 @@ import {
 } from '@/lib/readerTypography';
 import { getStoredPrefs, saveReaderPrefs, stackFor } from '@/lib/readerPrefs';
 import { type FontSize, FONT_SIZE_PX } from '@/lib/fontSize';
+import { useDocumentDark, useWhalie, whaliePaletteFor } from '@/lib/whalie/whalie';
+import WhalieLayer from './WhalieLayer';
 
 const CARD =
   'bg-white dark:bg-[#1B2A38] rounded-2xl border border-gray-100 dark:border-[#2D4050] shadow-sm overflow-hidden';
@@ -57,6 +59,10 @@ export default function AppearanceSection({
   const { contentLanguage } = useLanguage();
   const [prefs, setPrefsState] = useState<ReaderPrefs>(DEFAULT_READER_PREFS);
   const [fineOpen, setFineOpen] = useState(true);
+  // Whalie is NOT a reader pref: his own column (profiles.whalie_enabled), so
+  // the reset button below leaves him alone, as on mobile.
+  const whalie = useWhalie(supabase, userId);
+  const appDark = useDocumentDark();
 
   useEffect(() => { setPrefsState(getStoredPrefs()); }, []);
 
@@ -103,7 +109,7 @@ export default function AppearanceSection({
              the same @font-face rules that serve the reader serve this page. */}
       <div className="px-5 pt-4">
         <div
-          className="appearance-specimen rounded-xl border px-6 py-5"
+          className="appearance-specimen relative overflow-hidden rounded-xl border px-6 py-5"
           lang={contentLanguage}
           dir={directionOf(contentLanguage)}
           style={{
@@ -157,6 +163,12 @@ export default function AppearanceSection({
           }}>
             {translate(contentLanguage, 'appearance.previewText')}
           </p>
+          <WhalieLayer
+            enabled={whalie.enabled}
+            palette={whaliePaletteFor(prefs.theme, appDark)}
+            floor={0}
+            paused={false}
+          />
         </div>
       </div>
 
@@ -312,6 +324,16 @@ export default function AppearanceSection({
             />
           </div>
         )}
+      </div>
+
+      {/* ── Whalie. Outside the Fine tuning collapse, like mobile's card. ── */}
+      <div className="px-5 pt-1 pb-4 border-t border-gray-100 dark:border-[#2D4050]">
+        <Toggle
+          label={t('appearance.whalie')}
+          hint={t('appearance.whalieHint')}
+          value={whalie.enabled}
+          onChange={whalie.setEnabled}
+        />
       </div>
 
       <div className="px-5 pb-5">

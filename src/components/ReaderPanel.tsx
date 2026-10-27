@@ -25,6 +25,8 @@ import { fetchXrefSuggestions, type XrefSuggestion } from '@/lib/xrefSuggest';
 import { seedCollapsedToc, TOC_EXPAND_ROW_BUDGET } from '@/lib/tocCollapse';
 import { useFirstUseHint } from '@/lib/useFirstUseHint';
 import FirstUseHint from './FirstUseHint';
+import WhalieLayer from './WhalieLayer';
+import { useDocumentDark, useWhalie, whaliePaletteFor } from '@/lib/whalie/whalie';
 
 interface Passage {
   id: string;
@@ -743,6 +745,13 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // that is the difference between instant and visibly janky. Only the two
   // things React actually needs to branch on are held in state.
   const [readerSmoothing, setReaderSmoothing] = useState(false);
+  // Whalie (opt-in). The theme is held so his palette follows it live; the
+  // floor lifts him above whatever bottom strip is showing (0 when none).
+  const [readerTheme, setReaderTheme] = useState<ReaderPrefs['theme']>('light');
+  const whalie = useWhalie(supabase, userId ?? null);
+  const appDark = useDocumentDark();
+  const streamBannerRef = useRef<HTMLDivElement>(null);
+  const [whalieFloor, setWhalieFloor] = useState(0);
   const [loading, setLoading] = useState(false);
   // Live count of passages fetched so far during a cold (uncached) book load —
   // null when not mid-load. Drives the "Loading… (N so far)" text so a big
@@ -889,6 +898,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         bookLanguage: book?.language,
       });
       setReaderSmoothing(resolveTheme(prefs.theme, isDark()).isDarkChrome);
+      setReaderTheme(prefs.theme);
     };
 
     apply(getStoredPrefs());
@@ -905,6 +915,25 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       document.documentElement.style.setProperty('--reader-font-scale', '1');
     };
   }, [userId, book?.language]);
+
+  // Whalie's floor: the reader's only bottom strip is the "loading more" banner
+  // (absolute, bottom-4). While it shows he swims above its top edge; the
+  // engine eases the change. Bottom sheets (footnote z-40, PanelSheet z-50)
+  // simply draw over him instead.
+  useEffect(() => {
+    const banner = streamBannerRef.current;
+    const reader = readerRef.current;
+    if (!isStreamingMore || !banner || !reader) { setWhalieFloor(0); return; }
+    const measure = () => setWhalieFloor(Math.max(0, Math.round(
+      reader.getBoundingClientRect().bottom - banner.getBoundingClientRect().top,
+    )));
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(banner);
+    ro.observe(reader);
+    return () => ro.disconnect();
+  }, [isStreamingMore]);
 
   // Pre-compute max sort_order once passages load (for fraction calculation)
   const maxSortOrder = useMemo(
@@ -2276,7 +2305,7 @@ async function handleCopy() {
        *  streaming-eligibility check in loadBook (no saved position to jump
        *  to, so there's nothing for this to visually interrupt). */}
       {isStreamingMore && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 bg-white/95 dark:bg-[#1B2A38]/95 border border-gray-200 dark:border-[#2D4050] rounded-full shadow-sm text-xs text-gray-500 dark:text-[#8FA4B8]">
+        <div ref={streamBannerRef} className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 bg-white/95 dark:bg-[#1B2A38]/95 border border-gray-200 dark:border-[#2D4050] rounded-full shadow-sm text-xs text-gray-500 dark:text-[#8FA4B8]">
           <div className="w-3 h-3 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           {t('reader.loadingMoreBanner')}
         </div>
@@ -2705,6 +2734,19 @@ async function handleCopy() {
           })}
         </div>
       </div>}
+
+      {/* Whalie — over the text (z-25: above the passage and the loading
+          banner, below the selection bar z-30 and every sheet z-40/50). Only a
+          click on him is his; the rest of the page behaves as before. */}
+      {!pdfUrl && book && (
+        <WhalieLayer
+          enabled={whalie.enabled}
+          palette={whaliePaletteFor(readerTheme, appDark)}
+          floor={whalieFloor}
+          paused={false}
+          className="z-[25]"
+        />
+      )}
 
       {/* Footnote panel */}
       {activeFootnote && (
