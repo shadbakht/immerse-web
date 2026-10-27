@@ -425,7 +425,7 @@ var whalieEngine = (function () {
   }
 
   /** Spine bend + sprite → screen for every sample, into SX/SY (CSS px). */
-  function bend(s, ps) {
+  function bend(s, ps, dpr) {
     var bw = s.bw, k, n;
     for (k = 0; k < NJ; k++) {
       var jt = JOINTS[k];
@@ -440,7 +440,14 @@ var whalieEngine = (function () {
     // the same arithmetic, in the same order, so no array is allocated per call.
     // A weight of exactly 1 rotates by ANG[k] * 1 === ANG[k], whose sin/cos are
     // JS[k]/JC[k] — the same doubles Math.sin/cos would return here.
-    var sA = Math.sin(ps.A), cA = Math.cos(ps.A), pcx = ps.cx, pcy = ps.cy, pdir = ps.dir;
+    // The rigid part of his motion (the glide and the bob) is snapped to whole
+    // device pixels, so every block moves by the same whole number of pixels
+    // and his head shifts as one piece. Unsnapped, each block rounded on its
+    // own and his throat stripes changed thickness frame to frame — a shimmer
+    // on the front underbelly (owner, on the web and iPad, 1.7.9). The screen
+    // cannot show a finer position anyway.
+    var sA = Math.sin(ps.A), cA = Math.cos(ps.A), pdir = ps.dir;
+    var pcx = Math.round(ps.cx * dpr) / dpr, pcy = Math.round(ps.cy * dpr) / dpr;
     var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
     for (n = 0; n < NS; n++) {
       var qx = PX[n], qy = PY[n], base = n * NJ, kEnd = KHI[n];
@@ -657,7 +664,7 @@ var whalieEngine = (function () {
     cache.ctx = ctx; cache.cw = cw; cache.ch = chh;
     cache.dx0 = 1e9; cache.dy0 = 1e9; cache.dx1 = -1e9; cache.dy1 = -1e9;
 
-    bend(s, ps);
+    bend(s, ps, dpr);
 
     raster(ctx, cache, dpr, cw, chh, p, T[s.palette] ? s.palette : 'paper', blink, fast);
 
