@@ -248,6 +248,14 @@ var whalieEngine = (function () {
   var BREACH_LEAD = 0.35, BREACH_DUR = BT[BT.length - 1];
   var SPOUT_DUR = 1.4;
 
+  // Splash: when his nose re-enters the water on the dive, a small burst of
+  // droplets (the spout's dots and colour) arcs up from where it went in and
+  // falls back to the line. [sideways, upward] launch speeds in pt/s, under
+  // SPLASH_G pt/s²; each drop is gone once it is back at the line.
+  var NOSE = [0.5, 13];   // the tip of his nose, in sprite coordinates
+  var SPLASH = [[-16, 44], [-8, 56], [-2, 38], [5, 60], [12, 50], [22, 34], [-24, 30]];
+  var SPLASH_G = 170, SPLASH_DUR = 0.75;
+
   // ─── State machine ──────────────────────────────────────────────────────────
   // facing 'left' is the sprite's drawn direction (prototype facing = 1).
 
@@ -265,6 +273,7 @@ var whalieEngine = (function () {
       offX: 0, offY: 0, offA: 0, bw: 0, bKey: 0,
       phase: 0, time: 0, blinkClock: 0, blinkLeft: 0, breachClock: 0,
       lineVisible: false, lineCx: 0, rising: false, spoutFired: false, spoutT: -1, spout: 0,
+      noseY: 0, splashed: false, splashT: -1, splashX: 0,
       reduceMotion: !!opts.reduceMotion, palette: opts.palette || 'paper',
       floor: floor, floorFrom: floor, floorTo: floor, floorT: FLOOR_EASE
     };
@@ -280,7 +289,7 @@ var whalieEngine = (function () {
     if (s.mode == 'turn') { s.pending = true; return; }
     if (s.mode != 'swim') return;
     var w = Math.max(width, 2 * MARGIN);
-    s.mode = 'breach'; s.t = 0; s.spoutFired = false; s.rising = false;
+    s.mode = 'breach'; s.t = 0; s.spoutFired = false; s.rising = false; s.splashed = false;
     var fwd = fwdOf(s);
     var room = fwd < 0 ? s.x - MARGIN : w - MARGIN - s.x;
     var back = room < 16 ? 16 - room : 0;
@@ -332,6 +341,13 @@ var whalieEngine = (function () {
     s.offA = hermite(BREACH.A, t) - TILT * (1 - s.bw);
     s.bKey = hermite(BREACH.B, t);
     s.bw = sst(t / 0.5) * (1 - sst((t - (BREACH_DUR - 0.7)) / 0.7));
+    // The nose is ahead of every joint, so it moves with the body's pose only.
+    var ps = pose(s), wasY = s.noseY;
+    var nose = rot(NOSE, [CX, CY], ps.A);
+    s.noseY = ps.cy + (nose[1] - CY);
+    if (!s.splashed && t > 2.4 && wasY < LINE && s.noseY >= LINE) {
+      s.splashed = true; s.splashT = 0; s.splashX = ps.cx + (nose[0] - CX) * ps.dir;
+    }
     if (t > 3.4) s.lineVisible = false;
     if (t >= BREACH_DUR) {
       finishMove(s);
@@ -396,6 +412,10 @@ var whalieEngine = (function () {
       s.t += dt; stepBreach(s);
     }
 
+    if (s.splashT >= 0) {
+      s.splashT += dt;
+      if (s.splashT >= SPLASH_DUR) s.splashT = -1;
+    }
     // Spout: fires once, the instant the blowhole clears the water line.
     if (s.spoutT >= 0) {
       s.spoutT += dt;
@@ -682,6 +702,20 @@ var whalieEngine = (function () {
       }
     }
 
+    // Splash where his nose went back in (see SPLASH).
+    if (s.splashT >= 0) {
+      fill(ctx, p.wave);
+      var sdot = Math.max(1, Math.round(2 * dpr)), st = s.splashT;
+      for (k = 0; k < SPLASH.length; k++) {
+        var drop = SPLASH[k];
+        var lift = drop[1] * st - 0.5 * SPLASH_G * st * st;
+        if (lift < 0) continue;   // back in the water
+        var dx0 = Math.round((s.splashX + dirOf(s) * drop[0] * st - 1) * dpr), dy0 = Math.round((LINE - lift - 1) * dpr);
+        ctx.fillRect(dx0, dy0, sdot, sdot);
+        mark(cache, dx0, dy0, dx0 + sdot, dy0 + sdot);
+      }
+    }
+
     // Stepped water line (one row, whale-wide, appears instantly).
     if (s.lineVisible) {
       fill(ctx, p.wave);
@@ -866,7 +900,7 @@ var whalieEngine = (function () {
         if (hit.parentNode) hit.parentNode.removeChild(hit);
       },
       _state: function () {
-        return { x: state.x, facing: state.facing, mode: state.mode, lineVisible: state.lineVisible, spout: state.spout };
+        return { x: state.x, facing: state.facing, mode: state.mode, lineVisible: state.lineVisible, spout: state.spout, splash: state.splashT, noseY: state.noseY };
       },
       // Tests: the midpoint (CSS px, canvas space) between every pair of
       // neighbouring outline samples, as last drawn — where the outline must
