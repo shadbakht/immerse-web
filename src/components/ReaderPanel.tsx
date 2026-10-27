@@ -2735,16 +2735,19 @@ async function handleCopy() {
         </div>
       </div>}
 
-      {/* Whalie — over the text (z-25: above the passage and the loading
-          banner, below the selection bar z-30 and every sheet z-40/50). Only a
-          click on him is his; the rest of the page behaves as before. */}
+      {/* Whalie — over the text but BELOW every overlay: z-5 sits above the
+          passage (which has no positioned stacking of its own) and under the
+          TOC backdrop z-10 / panel z-20, the loading banner z-20, the
+          selection bar z-30 and every sheet z-30/40/50. Only a click on him is
+          his; the rest of the page behaves as before. Pinned by
+          __tests__/ReaderPanel.whalieZ.test.ts. */}
       {!pdfUrl && book && (
         <WhalieLayer
           enabled={whalie.enabled}
           palette={whaliePaletteFor(readerTheme, appDark)}
           floor={whalieFloor}
           paused={false}
-          className="z-[25]"
+          className="z-[5]"
         />
       )}
 

@@ -29,8 +29,9 @@ beforeEach(() => {
   })) as never;
 });
 
+// The engine appends exactly two children to the host: its canvas and its hit box.
 const hitDiv = (root: HTMLElement) =>
-  Array.from(root.querySelectorAll('div')).find(d => d.style.zIndex === '6') as HTMLDivElement;
+  root.querySelector('[data-whalie-host] > div') as HTMLDivElement;
 
 describe('WhalieLayer', () => {
   it('mounts a canvas when enabled and removes it when disabled', () => {
