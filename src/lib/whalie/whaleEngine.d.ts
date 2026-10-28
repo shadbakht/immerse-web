@@ -8,6 +8,8 @@ export type WhalePalette = 'paper' | 'sepia' | 'night';
 export interface WhalieHandle {
   setPalette(palette: WhalePalette): void;
   setFloor(px: number): void;
+  /** Buttons floating above the floor that he climbs over (CSS px; top measured up from the stage bottom). */
+  setBumps(bumps: { left: number; right: number; top: number }[]): void;
   setReduceMotion(reduce: boolean): void;
   setPaused(paused: boolean): void;
   breach(): void;
@@ -18,6 +20,8 @@ export interface WhalieHandle {
 export interface CreateWhalieOptions {
   palette?: WhalePalette;
   floor?: number;
+  x?: number;
+  facing?: 'left' | 'right';
   reduceMotion?: boolean;
   onLog?: (message: string) => void;
 }

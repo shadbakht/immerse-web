@@ -38,6 +38,9 @@
  *   - the background is left transparent — he swims over the text;
  *   - `floor` (height of the bottom chrome, eased over 0.4 s) moves the canvas
  *     itself (CSS bottom); inside it he is drawn as if the floor were 0.
+ *   - `bumps` (buttons floating above that chrome) raise the floor locally: as
+ *     he swims toward one he rises over it on a BUMP_RAMP-wide slope and comes
+ *     back down past it, so he goes over a button rather than behind it.
  *
  * Public API
  *   WHALE_SPRITE        string[29] of 60 chars, final grid incl. eye overlay
@@ -49,7 +52,10 @@
  *                              palette, floor }; x/facing random when omitted
  *   stepWhalie(state, dtSeconds, width) → state   (dt clamped to 0.05 s)
  *   createWhalie(host, { palette, floor, reduceMotion, onLog })
- *     → { setPalette, setFloor, setReduceMotion, setPaused, breach, destroy, _state }
+ *     → { setPalette, setFloor, setBumps, setReduceMotion, setPaused, breach, destroy, _state }
+ *   setBumps([{ left, right, top }])  CSS px; left/right across the canvas,
+ *                              top measured up from the stage bottom (the same
+ *                              frame as floor). [] clears them.
  */
 
 /* eslint-disable no-var -- `var` is deliberate: this file is spliced RAW into a
@@ -209,6 +215,11 @@ var whalieEngine = (function () {
   var STRAIGHT = 0.65, SMILE = -0.5, UP = 1.25, DOWN = -1.3;
   var MAX_DT = 0.05, BLINK_EVERY = 5, BLINK_FOR = 0.16, BREACH_EVERY = 120;
   var FLOOR_EASE = 0.4, HIT_MIN = 44;
+  // Bumps: he starts rising BUMP_RAMP px before his body would reach a bump
+  // (BUMP_PAD clear of it) and is fully over it by then; the lift itself
+  // follows its target with a BUMP_EASE time constant, so a bump appearing or
+  // vanishing with the chrome glides like the floor does.
+  var BUMP_RAMP = 36, BUMP_PAD = 6, BUMP_EASE = 0.2;
   // A touch on him counts as a tap only if it moved less than TAP_SLOP px and
   // lasted less than TAP_MS. Anything else (a scroll, a long-press) is the page's.
   var TAP_SLOP = 10, TAP_MS = 350;
@@ -287,7 +298,8 @@ var whalieEngine = (function () {
       lineVisible: false, lineCx: 0, rising: false, spoutFired: false, spoutT: -1, spout: 0,
       noseY: 0, splashed: false, splashT: -1, splashX: 0,
       reduceMotion: !!opts.reduceMotion, palette: opts.palette || 'paper',
-      floor: floor, floorFrom: floor, floorTo: floor, floorT: FLOOR_EASE
+      floor: floor, floorFrom: floor, floorTo: floor, floorT: FLOOR_EASE,
+      bumps: [], lift: 0
     };
   }
 
@@ -401,6 +413,17 @@ var whalieEngine = (function () {
       s.floorT = Math.min(FLOOR_EASE, s.floorT + dt);
       s.floor = s.floorFrom + (s.floorTo - s.floorFrom) * sst(s.floorT / FLOOR_EASE);
     }
+    // Bumps lift him over a button in his path, measured from his resting x
+    // (not a turn's or breach's offset), above the floor he is heading for.
+    var want = 0;
+    for (var bi = 0; bi < s.bumps.length; bi++) {
+      var bp = s.bumps[bi];
+      var gap = Math.max(bp.left - (s.x + CX + BUMP_PAD), (s.x - CX - BUMP_PAD) - bp.right, 0);
+      var up = (bp.top - s.floorTo) * sst(1 - gap / BUMP_RAMP);
+      if (up > want) want = up;
+    }
+    s.lift += (want - s.lift) * (1 - Math.exp(-dt / BUMP_EASE));
+    if (Math.abs(want - s.lift) < 0.01) s.lift = want;
 
     // Blink every 5 s for 160 ms.
     s.blinkLeft = Math.max(0, s.blinkLeft - dt);
@@ -775,7 +798,7 @@ var whalieEngine = (function () {
 
     function cssWidth() { return canvas.clientWidth || host.clientWidth || window.innerWidth || 0; }
 
-    var state = newState(cssWidth(), { palette: opts.palette, floor: opts.floor, reduceMotion: opts.reduceMotion });
+    var state = newState(cssWidth(), { x: opts.x, facing: opts.facing, palette: opts.palette, floor: opts.floor, reduceMotion: opts.reduceMotion });
     var ctx = null, raf = 0, last = null, paused = false, dead = false;
     var drawCache = {}; // this canvas's dirty rectangle + reused pixel buffer (see draw())
 
@@ -862,12 +885,13 @@ var whalieEngine = (function () {
         var ps = ctx ? draw(ctx, state, dpr, cssW, drawCache) : pose(state);
         // The floor moves the whole canvas, never the drawing inside it: a breach
         // never clips, and a turn dips out of sight at the top of whatever bar shows.
-        setStyle(cs, 'cb', 'bottom', state.floor + 'px');
+        var fl = state.floor + state.lift;
+        setStyle(cs, 'cb', 'bottom', fl + 'px');
         if (state.mode == 'swim') {
           var b = bounds(state, ps);
           setStyle(hs, 'hd', 'display', 'block');
           setStyle(hs, 'hl', 'left', b.left + 'px');
-          setStyle(hs, 'hb', 'bottom', (state.floor + LH - (b.top + b.height)) + 'px');
+          setStyle(hs, 'hb', 'bottom', (fl + LH - (b.top + b.height)) + 'px');
           setStyle(hs, 'hw', 'width', b.width + 'px');
           setStyle(hs, 'hh', 'height', b.height + 'px');
         } else {
@@ -891,6 +915,13 @@ var whalieEngine = (function () {
         if (px == state.floorTo) return;
         state.floorFrom = state.floor; state.floorTo = px; state.floorT = 0;
       },
+      setBumps: function (list) {
+        var out = [];
+        (list || []).forEach(function (b) {
+          if (b && b.right > b.left && b.top > 0) out.push({ left: +b.left, right: +b.right, top: +b.top });
+        });
+        state.bumps = out;
+      },
       setReduceMotion: function (b) { state.reduceMotion = !!b; },
       setPaused: function (b) {
         b = !!b;
@@ -912,7 +943,7 @@ var whalieEngine = (function () {
         if (hit.parentNode) hit.parentNode.removeChild(hit);
       },
       _state: function () {
-        return { x: state.x, facing: state.facing, mode: state.mode, lineVisible: state.lineVisible, spout: state.spout, splash: state.splashT, noseY: state.noseY };
+        return { x: state.x, facing: state.facing, mode: state.mode, lineVisible: state.lineVisible, spout: state.spout, splash: state.splashT, noseY: state.noseY, floor: state.floor, lift: state.lift };
       },
       // Tests: the midpoint (CSS px, canvas space) between every pair of
       // neighbouring outline samples, as last drawn — where the outline must
