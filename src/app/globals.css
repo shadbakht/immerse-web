@@ -312,6 +312,11 @@ body {
 /* A drop-capped paragraph must not also first-line-indent. */
 .reader-page p.dropcap-open { text-indent: 0; }
 
+/* A stanza (Buddhist verse: \n-separated lines in one passage) never takes the
+   first-line indent — only its first line would step in. Mirrors mobile's
+   p:has(> br) rule. */
+.reader-page p.verse { text-indent: 0; }
+
 /* Translator's credit ("translated from the Pali by / … / © 1999") — a small
    muted colophon under the sutta title, unnumbered. Mirrors mobile p.credit. */
 .reader-page p.credit {

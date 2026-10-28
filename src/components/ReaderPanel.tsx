@@ -2728,7 +2728,7 @@ async function handleCopy() {
                       they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isCredit ? ' credit' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isCredit ? ' credit' : ''}${!isCredit && book?.isBuddhist && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}
