@@ -95,20 +95,33 @@ interface BookMeta {
   // gates the AI Summary disclaimer. Undefined/false for imported books,
   // which have no catalog entry.
   isBahai?: boolean;
+  // Whether it is on the English Buddhist shelf, whose suttas carry verse as
+  // \n-separated lines inside one passage (one stanza per passage, as the
+  // mobile reader shows them with <br>) — those lines must not collapse.
+  isBuddhist?: boolean;
 }
 
 /** catalog.json's categoryId for a book, by its Supabase uuid — resolved via the
  * uuid→slug map, then a catalog lookup by slug. Both are module-cached after
  * their first load, so repeat calls (one per book open) are effectively free. */
-async function resolveIsBahai(uuid: string, supabase: ReturnType<typeof createClient>): Promise<boolean> {
+async function resolveCategoryId(uuid: string, supabase: ReturnType<typeof createClient>): Promise<string | undefined> {
   try {
     const [{ uuidToSlug }, catalog] = await Promise.all([loadSlugMaps(supabase), loadCatalog()]);
     const slug = uuidToSlug.get(uuid);
-    const categoryId = slug ? catalog.books.find(b => b.id === slug)?.categoryId : undefined;
-    return !!categoryId?.includes('bahai');
+    return slug ? catalog.books.find(b => b.id === slug)?.categoryId : undefined;
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+function shelfFlags(categoryId: string | undefined): Pick<BookMeta, 'isBahai' | 'isBuddhist'> {
+  return { isBahai: !!categoryId?.includes('bahai'), isBuddhist: !!categoryId?.startsWith('cat-buddhist') };
+}
+
+/** A translator's colophon ("translated from the Pali by / Thanissaro Bhikkhu /
+ * © 1999") — unnumbered, set small and muted, and never given the drop cap. */
+export function isCreditPassage(p: { content: string; paragraph_number: number | null }): boolean {
+  return !p.paragraph_number && /^translated (from|into)\b/i.test(p.content);
 }
 
 /**
@@ -154,12 +167,14 @@ export function dropCapEligible(p: {
   isHeadingEcho: boolean;
   pendingAfterHeading: boolean;
   isLetterDate: boolean;
+  isCredit?: boolean;
 }): boolean {
   // A letter-date line ("26 February 1932") often sits between the eyebrow and
   // the first real paragraph (This Decisive Hour). It must not take the cap, and
   // it must not consume the pending-after-heading flag — the next real paragraph
   // gets the cap instead (the caller only clears the flag when applyDropCap).
-  if (p.isPrayerStyle || p.isHeadingEcho || p.isLetterDate) return false;
+  // A translator's credit line sits in the same spot and is skipped the same way.
+  if (p.isPrayerStyle || p.isHeadingEcho || p.isLetterDate || p.isCredit) return false;
   return p.showChapter || p.pendingAfterHeading;
 }
 
@@ -1267,7 +1282,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         return;
       }
     }
-    const isBahaiPromise = resolveIsBahai(bookId, supabase);
+    const categoryPromise = resolveCategoryId(bookId, supabase);
     try {
       // A tab that sat backgrounded for a while can wake up with an access token
       // that expired while its refresh timer was throttled — the very next query
@@ -1367,7 +1382,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
         // everything settles.
         bookDataPromise.then(async bd => {
           if (bd) {
-            setBook({ title: bd.title, authorName: (bd.authors as any)?.name ?? '', citationFormat: (bd as any).citation_format ?? 'author_book_paragraph', language: bcp47((bd as any).language), isBahai: await isBahaiPromise });
+            setBook({ title: bd.title, authorName: (bd.authors as any)?.name ?? '', citationFormat: (bd as any).citation_format ?? 'author_book_paragraph', language: bcp47((bd as any).language), ...shelfFlags(await categoryPromise) });
             setFootnoteMap((bd as any).footnotes ?? {});
           }
         }).catch(() => {});
@@ -1379,7 +1394,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       setIsStreamingMore(false);
 
       if (bookData) {
-        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language), isBahai: await isBahaiPromise });
+        setBook({ title: bookData.title, authorName: (bookData.authors as any)?.name ?? '', citationFormat: (bookData as any).citation_format ?? 'author_book_paragraph', language: bcp47((bookData as any).language), ...shelfFlags(await categoryPromise) });
         setFootnoteMap((bookData as any).footnotes ?? {});
       }
 
@@ -2504,13 +2519,14 @@ async function handleCopy() {
             // "circa" forms This Decisive Hour uses (mirrors the corpus
             // p.letter-date class set by fix4cSectionEyebrows.mjs).
             const isLetterDate = /^\[?\s*(?:circa\s+)?(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\[?\d{4}\]?/.test(passage.content);
+            const isCredit = isCreditPassage(passage);
 
             // A heading-echo row draws the eyebrow but renders no <p>, so the
             // drop cap belongs on the next real body paragraph.
             if (showChapter && isHeadingEcho) pendingDropCapAfterHeading = true;
             const applyDropCap = dropCapEligible({
               showChapter: !!showChapter, isPrayerStyle, isHeadingEcho,
-              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate,
+              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate, isCredit,
             });
             if (applyDropCap) pendingDropCapAfterHeading = false;
 
@@ -2712,7 +2728,7 @@ async function handleCopy() {
                       they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isPrayerStyle ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isCredit ? ' credit' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}

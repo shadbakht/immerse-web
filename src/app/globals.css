@@ -312,6 +312,16 @@ body {
 /* A drop-capped paragraph must not also first-line-indent. */
 .reader-page p.dropcap-open { text-indent: 0; }
 
+/* Translator's credit ("translated from the Pali by / … / © 1999") — a small
+   muted colophon under the sutta title, unnumbered. Mirrors mobile p.credit. */
+.reader-page p.credit {
+  text-indent: 0;
+  font-size: 0.82em;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--reader-muted);
+}
+
 /* Appearance-settings type specimen drop cap — MIRRORS the .reader-page rule
    above. The specimen is not a .reader-page (that pulls ~15 CSS vars it never
    sets), so this is a scoped parallel copy carrying the same RTL/CJK guard off
