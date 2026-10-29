@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { pushNote, pushXref, deleteRemote } from '@/lib/annotationSync';
 import { buildCitation } from '@/lib/citationUtils';
+import { classifyTabletLine } from '@/lib/tabletFrame';
 import type { ReaderTarget, XRefPickFrom } from './AppShell';
 import PanelSheet from './PanelSheet';
 import TagPanel from './TagPanel';
@@ -120,6 +121,12 @@ function shelfFlags(categoryId: string | undefined): Pick<BookMeta, 'isBahai' | 
 
 /** A translator's colophon ("translated from the Pali by / Thanissaro Bhikkhu /
  * © 1999") — unnumbered, set small and muted, and never given the drop cap. */
+/** Books whose tablets carry the Persian/Arabic frame lines (see src/lib/tabletFrame.ts). */
+function isTabletScript(language: string | null | undefined): boolean {
+  const base = (language ?? '').toLowerCase().split('-')[0];
+  return base === 'fa' || base === 'ar';
+}
+
 export function isCreditPassage(p: { content: string; paragraph_number: number | null }): boolean {
   return !p.paragraph_number && /^translated (from|into)\b/i.test(p.content);
 }
@@ -2520,13 +2527,21 @@ async function handleCopy() {
             // p.letter-date class set by fix4cSectionEyebrows.mjs).
             const isLetterDate = /^\[?\s*(?:circa\s+)?(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\[?\d{4}\]?/.test(passage.content);
             const isCredit = isCreditPassage(passage);
+            // A Persian/Arabic tablet's frame — «هواللّه», a closing «حیفا» /
+            // date, a compilation's «(… شمارۀ ۶۸) [۱]» source line. The packs
+            // ship these unnumbered (paragraph_number 0), so only those rows are
+            // checked. Mirrors mobile's p.l / p.attribution (src/lib/tabletFrame.ts).
+            const tabletFrame = !passage.paragraph_number && isTabletScript(book?.language)
+              ? classifyTabletLine(passage.content) : null;
+            const isInvocation = tabletFrame === 'invocation';
+            const isFrameEnd = tabletFrame === 'closing' || tabletFrame === 'citation';
 
             // A heading-echo row draws the eyebrow but renders no <p>, so the
             // drop cap belongs on the next real body paragraph.
             if (showChapter && isHeadingEcho) pendingDropCapAfterHeading = true;
             const applyDropCap = dropCapEligible({
               showChapter: !!showChapter, isPrayerStyle, isHeadingEcho,
-              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate, isCredit,
+              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate, isCredit: isCredit || isInvocation,
             });
             if (applyDropCap) pendingDropCapAfterHeading = false;
 
@@ -2728,7 +2743,7 @@ async function handleCopy() {
                       they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isCredit ? ' credit' : ''}${!isCredit && book?.isBuddhist && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isCredit ? ' credit' : ''}${!isCredit && book?.isBuddhist && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}
