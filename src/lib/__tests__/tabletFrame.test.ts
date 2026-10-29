@@ -15,6 +15,12 @@ const CASES: Array<[string, ReturnType<typeof classifyTabletLine>]> = [
   ['(آرشیو مرکز جهانی) [۱۲]', 'citation'],
   ['(در هر ٢۴ ساعت يک بار ادا شود)', null],
   ['۳۹', 'number'],
+  ['(D’une lettre datée du 26 novembre 1923 à une assemblée spirituelle nationale, cf. Administration bahá’íe : Messages sélectionnés 1922-1932, p. 53) [3]', 'citation'],
+  ['(Los Angeles, California)', null],
+  ['‘Abdu’l-Bahá', 'attribution'],
+  ['Bahá’u’lláh', 'attribution'],
+  ['Er ist Gott!', 'invocation'],
+  ['Er ist Gott, und Seine Herrlichkeit erfüllt die Welten, die Er geschaffen hat und die Er erhält, allezeit.', null],
   ['از صعود ولد جلیل محزون مباشید زیرا این جهان تنگ است کیهان جنگ است', null],
 ];
 

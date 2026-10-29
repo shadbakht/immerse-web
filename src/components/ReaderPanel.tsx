@@ -2531,10 +2531,12 @@ async function handleCopy() {
             // date, a compilation's «(… شمارۀ ۶۸) [۱]» source line. The packs
             // ship these unnumbered (paragraph_number 0), so only those rows are
             // checked. Mirrors mobile's p.l / p.attribution (src/lib/tabletFrame.ts).
-            const tabletFrame = !passage.paragraph_number && isTabletScript(book?.language)
-              ? classifyTabletLine(passage.content) : null;
-            const isInvocation = tabletFrame === 'invocation';
-            const isFrameEnd = tabletFrame === 'closing' || tabletFrame === 'citation';
+            // A compilation's source line is checked in every language (French
+            // «(… p. 53) [3]»); the tablet invocation/closing rules are Persian/Arabic.
+            const tabletFrame = !passage.paragraph_number ? classifyTabletLine(passage.content) : null;
+            const isInvocation = tabletFrame === 'invocation' && !(book?.language ?? 'en').startsWith('en');
+            const isFrameEnd = tabletFrame === 'citation' || tabletFrame === 'attribution' ||
+              (tabletFrame === 'closing' && isTabletScript(book?.language));
 
             // A heading-echo row draws the eyebrow but renders no <p>, so the
             // drop cap belongs on the next real body paragraph.
