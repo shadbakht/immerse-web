@@ -603,7 +603,8 @@ function XrefEntryBlock({ entry, onOpenBook, onDelete }: {
 
 // Phase 6: one AI-suggested cross-reference candidate. Collapsed shows citation
 // + a 2-line quote + reason / annotation badge; tapping expands the full quote
-// and reveals "Use this passage". Loose matches render dimmed. Kept in this
+// and reveals "Use this passage". Loose matches carry a "loose match" line —
+// not dimmed, which read as disabled. Kept in this
 // file like mobile keeps it in XRefPanel.tsx.
 function SuggestionCard({ suggestion, onAccept }: {
   suggestion: XrefSuggestion;
@@ -619,7 +620,7 @@ function SuggestionCard({ suggestion, onAccept }: {
         ? t('xref.inCompilation', { name: suggestion.annotated.label })
         : t('xref.youNotedThis');
   return (
-    <div className={suggestion.loose ? 'opacity-60' : undefined}>
+    <div>
       <div
         className="px-4 py-3 bg-gray-50 dark:bg-[#243040] rounded-xl border border-gray-100 dark:border-[#2D4050] cursor-pointer select-none"
         onClick={() => setExpanded(v => !v)}
@@ -841,6 +842,9 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // (fired much later, possibly after a re-render) still needs it to rebuild
   // the pick-from endpoint.
   const suggestSrcRef = useRef<XRefPickFrom | null>(null);
+  // "Use this passage": the candidate's paragraph arrives pre-selected (still
+  // adjustable) under a Cancel / Save bar, like mobile's suggested pick.
+  const [suggestedPickPid, setSuggestedPickPid] = useState<string | null>(null);
   // Reading progress tracking
   const progressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedPidRef   = useRef<string | null>(null);
@@ -1998,8 +2002,49 @@ async function handleCopy() {
   function acceptSuggestion(s: XrefSuggestion) {
     const from = suggestSrcRef.current;
     if (!from) return;
+    setSuggestedPickPid(s.pid);
     onStartXrefPick?.(from);
-    onOpenBook?.(s.bookId, s.pid, s.text);
+    // No snapshot: its exact-text flash re-renders the paragraph, which would
+    // drop the pre-selection made below.
+    onOpenBook?.(s.bookId, s.pid);
+  }
+
+  // Pre-select the accepted candidate's whole paragraph once it is in the DOM,
+  // then raise the selection data the Save button uses (the same bar a manual
+  // selection builds, so an adjusted selection simply replaces it).
+  useEffect(() => {
+    if (!suggestedPickPid || !xrefPickFrom || loading) return;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = () => {
+      const p = scrollRef.current?.querySelector(`p[data-pid="${suggestedPickPid}"]`);
+      if (!p) { if (++tries < 40) timer = setTimeout(tick, 75); return; }
+      const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+      let first: Text | null = null, last: Text | null = null, n: Node | null;
+      while ((n = walker.nextNode())) { if (!first) first = n as Text; last = n as Text; }
+      if (!first || !last) return;
+      const range = document.createRange();
+      range.setStart(first, 0);
+      range.setEnd(last, last.length);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      buildSelectionBar();
+    };
+    tick();
+    return () => { if (timer) clearTimeout(timer); };
+  }, [suggestedPickPid, xrefPickFrom, loading, passages, buildSelectionBar]);
+
+  // The pick ended (saved, cancelled, or the banner's Cancel) — leave the mode.
+  useEffect(() => {
+    if (!xrefPickFrom) setSuggestedPickPid(null);
+  }, [xrefPickFrom]);
+
+  function cancelSuggestedPick() {
+    setSuggestedPickPid(null);
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+    onXrefPickDone?.();
   }
 
   // Creates selection A (the "from") using stored pick-from data
@@ -2385,8 +2430,8 @@ async function handleCopy() {
         </>
       )}
 
-      {/* Selection action bar */}
-      {selectionBar && (
+      {/* Selection action bar — the suggested-pick bar below replaces it */}
+      {selectionBar && !suggestedPickPid && (
         <div
           ref={selectionBarRef}
           className="absolute z-30 flex items-center bg-gray-900 rounded-2xl px-1.5 py-1.5 shadow-xl"
@@ -3001,6 +3046,26 @@ async function handleCopy() {
           </PanelSheet>
         );
       })()}
+
+      {/* Suggested xref target: pre-selected paragraph, adjustable, saved from here */}
+      {suggestedPickPid && xrefPickFrom && (
+        <div className="absolute bottom-0 inset-x-0 z-30 flex gap-3 px-5 py-4 bg-white/95 dark:bg-[#1A2633]/95 backdrop-blur border-t border-gray-200 dark:border-[#2D4050]">
+          <button
+            onClick={cancelSuggestedPick}
+            disabled={pickSaving}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-[#2D4050] text-sm font-medium text-gray-600 dark:text-[#8FA4B8] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors disabled:opacity-50"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            onClick={handlePickFromSelection}
+            disabled={!selectionBar || pickSaving}
+            className="flex-1 py-2.5 rounded-xl bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-semibold hover:bg-[#155a68] dark:hover:bg-[#2589A0] transition-colors disabled:opacity-50"
+          >
+            {pickSaving ? t('common.saving') : t('common.save')}
+          </button>
+        </div>
+      )}
 
       {/* Phase 6: AI cross-reference suggestions sheet. Shown while the request
           is in flight / errored, or once results are back AND the source
