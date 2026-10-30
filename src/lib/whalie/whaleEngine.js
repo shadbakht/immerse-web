@@ -219,7 +219,7 @@ var whalieEngine = (function () {
   // (BUMP_PAD clear of it) and is fully over it by then; the lift itself
   // follows its target with a BUMP_EASE time constant, so a bump appearing or
   // vanishing with the chrome glides like the floor does.
-  var BUMP_RAMP = 36, BUMP_PAD = 6, BUMP_EASE = 0.2;
+  var BUMP_RAMP = 16, BUMP_PAD = 2, BUMP_EASE = 0.2;
   // A touch on him counts as a tap only if it moved less than TAP_SLOP px and
   // lasted less than TAP_MS. Anything else (a scroll, a long-press) is the page's.
   var TAP_SLOP = 10, TAP_MS = 350;
