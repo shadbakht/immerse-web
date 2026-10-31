@@ -27,7 +27,7 @@ jest.mock('../supabase/client', () => ({
 }));
 
 import JSZip from 'jszip';
-import { exportAsDocx, exportAsMarkdown, type TagRow } from '../tagExport';
+import { exportAsDocx, exportAsMarkdown, hasSubTags, type TagRow } from '../tagExport';
 
 let capturedBlob: Blob | null = null;
 
@@ -116,5 +116,37 @@ describe('exportAsDocx — Word heading outline levels', () => {
   it('does not put a heading style on quote / citation paragraphs', async () => {
     const xml = await docXmlOf([tagAtDepth(0, 0)]);
     expect([...xml.matchAll(/<w:pStyle w:val="Heading\d"\/>/g)]).toHaveLength(1);
+  });
+});
+
+describe('hasSubTags', () => {
+  const row = (id: string, parent_id: string | null) =>
+    ({ id, name: id, parent_id, depth: parent_id ? 1 : 0, sort_order: 0, created_at: '', visibility: 'private', selections: [] });
+  it('is true only for a tag something in the export nests under', () => {
+    const tags = [row('root', null), row('child', 'root')];
+    expect(hasSubTags(tags, tags[0])).toBe(true);
+    expect(hasSubTags(tags, tags[1])).toBe(false);
+  });
+});
+
+describe('empty parent headings', () => {
+  // Root with no quotes of its own → one sub-tag with a quote, one truly empty.
+  const parentOnly: TagRow[] = [
+    { ...tagAtDepth(0, 0), name: 'Feasts', selections: [] },
+    { ...tagAtDepth(1, 1), name: 'Light', parent_id: 't0' },
+    { ...tagAtDepth(2, 1), name: 'Mercy', parent_id: 't0', selections: [] },
+  ];
+  const EMPTY = '(no passages in this compilation)';
+  const count = (s: string) => s.split(EMPTY).length - 1;
+
+  it('marks only the empty leaf in Markdown, not the parent', async () => {
+    await exportAsMarkdown(parentOnly, { includeNotes: false, includeXrefs: false });
+    const md = await capturedBlob!.text();
+    expect(count(md)).toBe(1);
+    expect(md.indexOf(EMPTY)).toBeGreaterThan(md.indexOf('Mercy'));
+  });
+
+  it('marks only the empty leaf in DOCX', async () => {
+    expect(count(await docXmlOf(parentOnly))).toBe(1);
   });
 });

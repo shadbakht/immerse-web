@@ -57,6 +57,12 @@ function exportBaseName(selectedTags: TagRow[]): string {
   return safeFilename(root?.name ?? 'tags');
 }
 
+/** True when another exported tag nests under `tag`. Such a parent prints as a
+ *  heading only — never with "No passages tagged" under it. */
+export function hasSubTags(tags: TagRow[], tag: TagRow): boolean {
+  return tags.some(o => o.parent_id === tag.id);
+}
+
 // ─── Enrich with notes + full selection offsets from Supabase ─────────────────
 
 interface EnrichedData {
@@ -156,6 +162,8 @@ export async function exportAsDocx(selectedTags: TagRow[], opts: ExportOptions =
     );
 
     if (tag.selections.length === 0) {
+      // Its quotes all sit in its sub-compilations: a heading, not an empty tag.
+      if (hasSubTags(selectedTags, tag)) continue;
       children.push(
         new Paragraph({
           children: [new TextRun({ text: t('export.noPassagesTagged'), italics: true, size: 20, color: DOC_FAINT })],
@@ -251,6 +259,8 @@ export async function exportAsPdf(selectedTags: TagRow[], opts: ExportOptions = 
     body += `\n  <h2 class="tag-heading">${escapeHtml(tag.name)}</h2>`;
 
     if (tag.selections.length === 0) {
+      // Its quotes all sit in its sub-compilations: a heading, not an empty tag.
+      if (hasSubTags(selectedTags, tag)) continue;
       body += `\n  <p class="empty">${escapeHtml(t('export.noPassagesTagged'))}</p>`;
       continue;
     }
@@ -372,6 +382,8 @@ export async function exportAsMarkdown(selectedTags: TagRow[], opts: ExportOptio
     lines.push(`${prefix} ${tag.name}`);
 
     if (tag.selections.length === 0) {
+      // Its quotes all sit in its sub-compilations: a heading, not an empty tag.
+      if (hasSubTags(selectedTags, tag)) continue;
       lines.push('', `*${t('export.noPassagesTagged')}*`);
       continue;
     }
