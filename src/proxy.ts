@@ -31,15 +31,17 @@ export async function proxy(request: NextRequest) {
   // '/c' = public shared-compilation pages (Phase 5 share links). A signed-out
   // visitor with a link must see the page, not a login bounce — the page's own
   // Save button handles the sign-in redirect when they choose to save.
+  // '/d/' = the same page for shares made from Discover (a universal / App Link
+  // path, so signed-out browsers without the app land here too).
   // '/.well-known' = apple-app-site-association (no file extension, so the
   // static-asset matcher below doesn't exempt it) + assetlinks.json — the OS
-  // fetches these unauthenticated to verify universal / App Links for /c/*.
+  // fetches these unauthenticated to verify universal / App Links for /d/*.
   // '/api/stripe/webhook' = Stripe's server-to-server POST. It has no session, so
   // without this it is 307'd to /login and never reaches the handler (which
   // verifies Stripe's signature itself) — the webhook could not have worked
   // before. '/lifetime' is the unlisted one-time-purchase page; it shows its own
   // "Sign in to continue" link for signed-out visitors.
-  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/.well-known', '/api/stripe/webhook', '/lifetime'];
+  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/d/', '/.well-known', '/api/stripe/webhook', '/lifetime'];
   const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {

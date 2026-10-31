@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 
-// No app claims immerseresearch.app paths any more — /c/ share links are
-// browser-only by design (the app hands off via the immerse:// scheme from the
-// in-page buttons instead). Kept as a live route so nothing 404s and so
-// re-adding a claim later is a one-line change.
+// Only /d/* (shares made from Discover) opens the app directly — it lands on
+// the shared card in the Discover tab. /c/* (shares of the owner's own
+// Compilations / X-refs) stays browser-only by design: its in-page "Save to my
+// …" button hands off via the immerse:// scheme instead.
 const AASA = {
   applinks: {
     apps: [],
-    details: [],
+    details: [
+      { appID: 'A7C4DXVVCJ.com.shadbakht.immerse', paths: ['/d/*'] },
+    ],
   },
 };
 

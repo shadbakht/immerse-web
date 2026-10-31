@@ -4,7 +4,8 @@
  * Sets `location.href` to `appUrl` (an `immerse://…` URL). If the app is
  * installed the OS foregrounds it and this page goes hidden. If it is NOT
  * installed nothing visible happens — so after a short delay, if this page is
- * still visible, navigate to `webFallbackUrl` instead.
+ * still visible, navigate to `webFallbackUrl` instead (or stay put when it is
+ * omitted — the current page already is the web version).
  *
  * Used by the share page's "Import Compilation" / "Open in Reader" buttons —
  * the only actions that are meant to leave the browser.
@@ -22,7 +23,7 @@ export const _nav = {
   },
 };
 
-export function openInApp(appUrl: string, webFallbackUrl: string): void {
+export function openInApp(appUrl: string, webFallbackUrl?: string): void {
   if (typeof window === 'undefined') return;
 
   let done = false;
@@ -43,7 +44,7 @@ export function openInApp(appUrl: string, webFallbackUrl: string): void {
 
   window.setTimeout(() => {
     teardown();
-    if (done) return;
+    if (done || !webFallbackUrl) return;
     _nav.go(webFallbackUrl);
   }, FALLBACK_MS);
 }

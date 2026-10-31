@@ -1,4 +1,4 @@
-import { buildShareMetaDescription, buildXrefShareMetaDescription } from '../shareMeta';
+import { buildShareMetaDescription, buildXrefShareMetaDescription, shareHeading } from '../shareMeta';
 
 const payload = (firstQuote: string) => ([
   { exportId: 't0', parentExportId: null, name: 'Root', depth: 0, sortOrder: 0,
@@ -47,5 +47,24 @@ describe('buildXrefShareMetaDescription', () => {
   it('singular fallback', () => {
     expect(buildXrefShareMetaDescription([], 1))
       .toBe('1 cross-reference across the world’s scriptures.');
+  });
+});
+
+describe('shareHeading', () => {
+  const node = (exportId: string, name: string, parentExportId: string | null) =>
+    ({ exportId, name, parentExportId, depth: 0, sortOrder: 0, selections: [] }) as any;
+
+  it('uses the single root name over a stale parent-card title', () => {
+    expect(shareHeading([node('c:t5', 'Light (Núr)', null)], 'Feast devotions')).toBe('Light (Núr)');
+  });
+  it('keeps the wrapper name for a multi-root bundle', () => {
+    expect(shareHeading(
+      [node('__wrap__', 'Bundle', null), node('a', 'A', '__wrap__'), node('b', 'B', '__wrap__')],
+      'Bundle',
+    )).toBe('Bundle');
+  });
+  it('falls back to the title when there is no single root', () => {
+    expect(shareHeading([node('a', 'A', null), node('b', 'B', null)], 'Title')).toBe('Title');
+    expect(shareHeading([], 'Title')).toBe('Title');
   });
 });

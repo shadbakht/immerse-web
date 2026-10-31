@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { UUID_RE } from '@/lib/shareUrl';
-import { buildShareMetaDescription, buildXrefShareMetaDescription } from '@/lib/shareMeta';
+import { buildShareMetaDescription, buildXrefShareMetaDescription, shareHeading } from '@/lib/shareMeta';
 import type { ImmTagExport } from '@/lib/communitySync';
 import SharedCompilationView from './SharedCompilationView';
 import SharedXrefsView from './SharedXrefsView';
@@ -19,7 +19,12 @@ interface Props {
 // pre-existing community_tags row was backfilled into shared_sets under the
 // SAME uuid (Part A6), so every Phase 5 link keeps resolving here. `kind`
 // picks the view: 'compilation' (payload snapshot) or 'xrefs' (live RPC).
-const SELECT = 'id, kind, title, payload, item_count';
+//
+// /d/<id> (shares made from Discover) renders this same page — see
+// src/app/d/[id]/page.tsx. /d/* is claimed as a universal / App Link, so with
+// Immerse installed the OS opens the app instead; this page is what everyone
+// else (and the pre-/d/ Discover links on /c/) sees.
+const SELECT = 'id, kind, title, ref, payload, item_count';
 
 // Kept out of the returned object literal so the i18n:check linter doesn't flag
 // it as a hardcoded UI string — this is page <title> metadata, which a server
@@ -30,6 +35,7 @@ type SharedSetRow = {
   id: string;
   kind: string | null;
   title: string | null;
+  ref: { bundled?: boolean } | null;
   payload: unknown;
   item_count: number | null;
 };
@@ -73,7 +79,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const payload = (Array.isArray(row.payload) ? row.payload : []) as ImmTagExport[];
   const description = buildShareMetaDescription(payload, row.item_count ?? payload.length);
-  const title = `${name} — a compilation on Immerse`;
+  const title = `${shareHeading(payload, name)} — a compilation on Immerse`;
   return {
     title: { absolute: title },
     description,
@@ -98,8 +104,12 @@ export default async function SharedSetPage({ params }: Props) {
         ) : (
           <SharedCompilationView
             id={row.id}
-            name={row.title ?? ''}
+            name={shareHeading(
+              (Array.isArray(row.payload) ? row.payload : []) as ImmTagExport[],
+              row.title ?? '',
+            )}
             payload={Array.isArray(row.payload) ? row.payload : []}
+            fromDiscover={row.ref?.bundled === true}
           />
         )}
       </main>

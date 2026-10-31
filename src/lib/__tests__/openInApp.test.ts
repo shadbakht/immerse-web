@@ -33,6 +33,13 @@ describe('openInApp', () => {
     expect(goSpy).toHaveBeenCalledWith('/read/uuid?p=1');
   });
 
+  it('stays on the page when no web fallback is given', () => {
+    openInApp('immerse://d/x');
+    goSpy.mockClear();
+    jest.advanceTimersByTime(1300);
+    expect(goSpy).not.toHaveBeenCalled();
+  });
+
   it('does NOT fall back if the page was hidden (app took over)', () => {
     openInApp('immerse://read/x?pid=1', '/read/uuid?p=1');
     goSpy.mockClear();

@@ -3,6 +3,7 @@
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { CompilationTree } from '@/components/CompilationTree';
 import { scriptScaleForText } from '@/lib/readerTypography';
+import { openInApp } from '@/lib/openInApp';
 import SaveOnLoad from './SaveOnLoad';
 
 /**
@@ -10,15 +11,21 @@ import SaveOnLoad from './SaveOnLoad';
  * only dynamic heading; everything else is chrome routed through t(). The
  * CompilationTree's built-in default open-book handler makes "Open in reader"
  * links work without wiring onOpenBook here.
+ *
+ * `fromDiscover` (a Discover bundle share) adds an "Open in Immerse Discover"
+ * button that hands off to the app's Discover tab via the immerse:// scheme —
+ * for browsers that reached the page without the universal link firing.
  */
 export default function SharedCompilationView({
   id,
   name,
   payload,
+  fromDiscover = false,
 }: {
   id: string;
   name: string;
   payload: any[];
+  fromDiscover?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -31,6 +38,16 @@ export default function SharedCompilationView({
         className="mt-1 text-2xl font-bold text-gray-900 dark:text-white"
         style={{ fontSize: `calc(1.5rem * ${scriptScaleForText(name)})` }}
       >{name}</h1>
+
+      {fromDiscover && (
+        <button
+          type="button"
+          onClick={() => openInApp(`immerse://d/${id}`)}
+          className="mt-3 inline-block rounded-lg border border-[#1B6B7B] px-4 py-2 text-sm font-medium text-[#1B6B7B] dark:border-[#2D9DB3] dark:text-[#2D9DB3]"
+        >
+          {t('sharePage.openInDiscover')}
+        </button>
+      )}
 
       <div className="mt-6 rounded-xl border border-gray-100 bg-white dark:border-[#2D4050] dark:bg-[#1B2A38]">
         <CompilationTree payload={payload} readOnly />
