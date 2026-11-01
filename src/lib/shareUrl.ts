@@ -1,7 +1,11 @@
 export const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function shareUrl(id: string, base = process.env.NEXT_PUBLIC_SITE_URL ?? ''): string {
+import { SITE_URL } from './siteUrl';
+
+// Always absolute: the link is copied into messages, so a bare /c/<id> (what an
+// unset NEXT_PUBLIC_SITE_URL used to produce) would lead nowhere.
+export function shareUrl(id: string, base = SITE_URL): string {
   return `${base.replace(/\/+$/, '')}/c/${id}`;
 }
 

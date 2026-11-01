@@ -17,6 +17,9 @@ describe('shareUrl', () => {
     expect(shareUrl('7f4a91c2-1a2b-4c3d-8e9f-0a1b2c3d4e5f', 'https://immerseresearch.app/'))
       .toBe('https://immerseresearch.app/c/7f4a91c2-1a2b-4c3d-8e9f-0a1b2c3d4e5f');
   });
+  it('is absolute by default, even with NEXT_PUBLIC_SITE_URL unset', () => {
+    expect(shareUrl('7f4a91c2-1a2b-4c3d-8e9f-0a1b2c3d4e5f')).toMatch(/^https:\/\/[^/]+\/c\/7f4a91c2-/);
+  });
 });
 
 describe('parseSharePath', () => {

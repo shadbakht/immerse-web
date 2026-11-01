@@ -122,6 +122,30 @@ export async function pushXref(xref: { id: string; user_id: string; selection_a_
   }
 }
 
+/**
+ * Delete a selection once nothing hangs off it — no note, no cross-reference,
+ * no compilation link — so deleting its last annotation doesn't leave a bare
+ * highlight behind. Mirrors mobile's cleanupOrphanedSelection. Any failed
+ * lookup keeps the selection: never delete on an uncertain answer.
+ */
+export async function cleanupOrphanedSelection(selectionId: string | null | undefined) {
+  if (!selectionId) return;
+  try {
+    const count = (table: string, column: string) =>
+      supabase.from(table).select('id', { count: 'exact', head: true }).eq(column, selectionId);
+    const results = await Promise.all([
+      count('notes', 'selection_id'),
+      count('xrefs', 'selection_a_id'),
+      count('xrefs', 'selection_b_id'),
+      count('selection_tags', 'selection_id'),
+    ]);
+    if (results.some(r => r.error || r.count === null)) return;
+    if (results.every(r => r.count === 0)) await deleteRemote('selections', selectionId);
+  } catch {
+    /* keep it */
+  }
+}
+
 export async function deleteRemote(table: 'tags' | 'notes' | 'xrefs' | 'selections', id: string) {
   try {
     const { error } = await supabase

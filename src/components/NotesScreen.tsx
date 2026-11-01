@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
-import { pushNote, deleteRemote } from '@/lib/annotationSync';
+import { pushNote, deleteRemote, cleanupOrphanedSelection } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogCategory, type CatalogBook } from '@/lib/catalog';
 import { Highlight } from './Highlight';
@@ -20,6 +20,7 @@ import { createNoteShareLink, findNoteShareForSelection, revokeSharedSet } from 
 
 interface NoteRow {
   noteId:       string;
+  selectionId:  string;
   content:      string;
   updatedAt:    string;
   createdAt:    string;
@@ -266,6 +267,7 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
 
         loaded.push({
           noteId:      n.id,
+          selectionId: n.selection_id,
           content:     n.content,
           updatedAt:   n.updated_at,
           createdAt:   n.created_at ?? n.updated_at,
@@ -289,7 +291,9 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
   }
 
   async function handleDeleteNote(id: string) {
+    const selectionId = notes.find(n => n.noteId === id)?.selectionId;
     await deleteRemote('notes', id).catch(() => {});
+    void cleanupOrphanedSelection(selectionId);
     setNotes(prev => prev.filter(n => n.noteId !== id));
     setSelectedIds(prev => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n; });
   }

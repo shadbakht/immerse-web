@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
-import { pushXref, deleteRemote } from '@/lib/annotationSync';
+import { pushXref, deleteRemote, cleanupOrphanedSelection } from '@/lib/annotationSync';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogBook } from '@/lib/catalog';
 import { scriptScale } from '@/lib/readerTypography';
@@ -308,8 +308,13 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
   }
 
   async function handleDelete(id: string) {
+    const row = rows.find(r => r.id === id);
     await deleteRemote('xrefs', id).catch(() => {});
     setRows(prev => prev.filter(r => r.id !== id));
+    if (row) {
+      void cleanupOrphanedSelection(row.selectionAId);
+      void cleanupOrphanedSelection(row.selectionBId);
+    }
   }
 
   async function handleLabelSave(id: string, label: string | null) {

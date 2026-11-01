@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { pushNote, pushXref, deleteRemote } from '@/lib/annotationSync';
+import { pushNote, pushXref, deleteRemote, cleanupOrphanedSelection } from '@/lib/annotationSync';
 import { buildCitation } from '@/lib/citationUtils';
 import { classifyTabletLine } from '@/lib/tabletFrame';
 import type { ReaderTarget, XRefPickFrom } from './AppShell';
@@ -1780,6 +1780,7 @@ async function handleCopy() {
     try {
       await supabase.from('notes').delete().eq('id', data.noteId);
       deleteRemote('notes', data.noteId).catch(() => {});
+      void cleanupOrphanedSelection(data.selectionId);
       setNotedPassageIds(prev => { const next = new Set(prev); next.delete(annotationPanel.passageId); return next; });
       setPassageToNote(prev => { const next = new Map(prev); next.delete(annotationPanel.passageId); return next; });
       closeAnnotationPanel();
@@ -1857,8 +1858,12 @@ async function handleCopy() {
   async function handleDeleteXref(passageId: string, xrefId: string) {
     if (!confirm(t('xrefs.deleteConfirm'))) return;
     try {
+      const { data: ends } = await supabase
+        .from('xrefs').select('selection_a_id, selection_b_id').eq('id', xrefId).maybeSingle();
       await supabase.from('xrefs').delete().eq('id', xrefId);
       deleteRemote('xrefs', xrefId).catch(() => {});
+      void cleanupOrphanedSelection(ends?.selection_a_id);
+      void cleanupOrphanedSelection(ends?.selection_b_id);
       const remaining = (passageToXrefs.get(passageId) ?? []).filter(e => e.xrefId !== xrefId);
       if (remaining.length === 0) {
         setPassageToXrefs(prev => { const next = new Map(prev); next.delete(passageId); return next; });
