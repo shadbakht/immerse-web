@@ -32,6 +32,18 @@ export function buildXrefShareMetaDescription(
   return `${count} ${noun} across the world’s scriptures.`;
 }
 
+interface NoteMetaEntry { quote?: string | null }
+
+export function buildNoteShareMetaDescription(entries: NoteMetaEntry[], count: number): string {
+  const first = entries.map(e => (e.quote ?? '').trim()).find(Boolean);
+  if (first) {
+    if (first.length <= 160) return first;
+    return first.slice(0, 160).trimEnd() + '…';
+  }
+  const noun = count === 1 ? 'note' : 'notes';
+  return `${count} ${noun} on the world’s scriptures.`;
+}
+
 /**
  * The heading for a shared compilation: the payload's single root node name.
  * Discover bundle shares used to store the source card's name as the row title

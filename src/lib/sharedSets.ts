@@ -12,6 +12,7 @@ import {
   type TagSubtreeRow,
 } from './communitySync';
 import { shareUrl } from './shareUrl';
+import type { NoteShareEntry } from './noteShare';
 import { translate } from '@immerse/i18n';
 import { getStoredUiLanguage } from './language';
 
@@ -446,6 +447,49 @@ export async function findXrefShareForSelection(
     .eq('owner_id', userId).eq('kind', 'xrefs');
   for (const r of (data ?? []) as XrefShareRow[]) {
     if (xrefIdSetEquals(r.ref?.xref_ids ?? [], xrefIds)) return { id: r.id, url: shareUrl(r.id) };
+  }
+  return null;
+}
+
+// ─── Shared note sets (kind='notes') ─────────────────────────────────────────
+
+type NoteShareRow = { id: string; ref: { note_ids?: string[] } };
+
+/** Create a link-only share of the given notes: a snapshot of each quote with
+ *  the note underneath, rendered read-only on /c/<id>. */
+export async function createNoteShareLink(
+  noteIds: string[], payload: NoteShareEntry[], title: string, userId: string,
+): Promise<{ id: string; url: string }> {
+  const supabase = createClient();
+  const { data: row, error } = await supabase.from('shared_sets').insert({
+    owner_id: userId, kind: 'notes', title: title.trim() || translate(getStoredUiLanguage(), 'notes.title'),
+    ref: { note_ids: noteIds }, payload, item_count: payload.length,
+  }).select('id').single();
+  if (error) throw error;
+  const id = (row as { id: string }).id;
+  void supabase.from('analytics_events').insert({
+    event_type: 'share_link_created', properties: { shared_set_id: id, kind: 'notes' }, platform: 'web',
+  }).then(() => {}, () => {});
+  return { id, url: shareUrl(id) };
+}
+
+/** An existing note share whose membership set-equals `noteIds`, or null. A
+ *  match has its snapshot refreshed to `payload` (fire-and-forget) so edits
+ *  since it was made reach the page. */
+export async function findNoteShareForSelection(
+  noteIds: string[], payload: NoteShareEntry[], userId: string,
+): Promise<{ id: string; url: string } | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('shared_sets').select('id, ref')
+    .eq('owner_id', userId).eq('kind', 'notes');
+  for (const r of (data ?? []) as NoteShareRow[]) {
+    if (xrefIdSetEquals(r.ref?.note_ids ?? [], noteIds)) {
+      void supabase.from('shared_sets').update({
+        payload, item_count: payload.length, updated_at: new Date().toISOString(),
+      }).eq('id', r.id).then(() => {}, () => {});
+      return { id: r.id, url: shareUrl(r.id) };
+    }
   }
   return null;
 }

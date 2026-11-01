@@ -2430,8 +2430,9 @@ async function handleCopy() {
         </>
       )}
 
-      {/* Selection action bar — the suggested-pick bar below replaces it */}
-      {selectionBar && !suggestedPickPid && (
+      {/* Selection action bar — the xref pick bar below replaces it while a
+          second passage is being picked */}
+      {selectionBar && !xrefPickFrom && (
         <div
           ref={selectionBarRef}
           className="absolute z-30 flex items-center bg-gray-900 rounded-2xl px-1.5 py-1.5 shadow-xl"
@@ -2439,8 +2440,6 @@ async function handleCopy() {
         >
           {(editingSel
             ? [{ label: savingEdit ? t('reader.updating') : t('reader.updateSelection'), onClick: confirmEditSelection, hint: undefined as string | undefined }]
-            : xrefPickFrom
-            ? [{ label: t('reader.pickAsXref'), onClick: handlePickFromSelection, hint: undefined as string | undefined }]
             : [
                 { label: t('reader.actionTag'),  onClick: () => openPanel('tag'), hint: 'Add this selection to a compilation' },
                 { label: t('reader.actionNote'), onClick: () => openPanel('note'), hint: 'Add a note about this selection' },
@@ -2500,14 +2499,7 @@ async function handleCopy() {
               </>
             )}
           </div>
-          {!pickSaving && (
-            <button
-              onClick={onXrefPickDone}
-              className="shrink-0 text-xs text-gray-500 dark:text-[#8FA4B8] hover:text-gray-700 dark:hover:text-[#B8C7D6] font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2D4050] transition-colors"
-            >
-              Cancel
-            </button>
-          )}
+          {/* No Cancel here — the pick bar at the bottom carries Cancel / Save. */}
         </div>
       )}
 
@@ -3047,8 +3039,9 @@ async function handleCopy() {
         );
       })()}
 
-      {/* Suggested xref target: pre-selected paragraph, adjustable, saved from here */}
-      {suggestedPickPid && xrefPickFrom && (
+      {/* Xref second passage (suggested and pre-selected, or selected by hand):
+          adjustable, saved from here. Save stays greyed until there is a selection. */}
+      {xrefPickFrom && (
         <div className="absolute bottom-0 inset-x-0 z-30 flex gap-3 px-5 py-4 bg-white/95 dark:bg-[#1A2633]/95 backdrop-blur border-t border-gray-200 dark:border-[#2D4050]">
           <button
             onClick={cancelSuggestedPick}

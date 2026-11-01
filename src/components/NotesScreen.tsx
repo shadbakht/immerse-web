@@ -13,6 +13,10 @@ import { useTranslation } from '@/contexts/LanguageProvider';
 import TeachingEmptyState from './TeachingEmptyState';
 import { NoteIcon } from './Icons';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
+import {
+  exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, buildNoteSharePayload, type NoteExportRow,
+} from '@/lib/noteExport';
+import { createNoteShareLink, findNoteShareForSelection, revokeSharedSet } from '@/lib/sharedSets';
 
 interface NoteRow {
   noteId:       string;
@@ -65,7 +69,7 @@ function monthKey(iso: string) {
 }
 
 function NoteItem({
-  note, searchQuery, onOpenBook, onDelete, onSave, dateIso,
+  note, searchQuery, onOpenBook, onDelete, onSave, dateIso, selected, onToggleSelected,
 }: {
   note: NoteRow;
   searchQuery: string;
@@ -73,6 +77,8 @@ function NoteItem({
   onDelete: (id: string) => void;
   onSave:   (id: string, content: string) => void;
   dateIso?: string;
+  selected: boolean;
+  onToggleSelected: () => void;
 }) {
   const { t, uiLanguage }       = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -94,7 +100,16 @@ function NoteItem({
   ];
 
   return (
-    <div className="ps-12 pe-4 py-1.5">
+    <div className="relative ps-12 pe-4 py-1.5">
+      <button
+        onClick={e => { e.stopPropagation(); onToggleSelected(); }}
+        className="absolute start-5 top-5 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors"
+        style={{ borderColor: selected ? '#1B6B7B' : '#CBD5E1', background: selected ? '#1B6B7B' : 'transparent' }}
+        aria-label={t('notes.exportSelected')}
+        aria-pressed={selected}
+      >
+        {selected && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+      </button>
       <AnnotationCard
         variant="note"
         quote={note.snapshotText}
@@ -152,6 +167,55 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
   const [searchQuery, setSearchQuery]   = useState('');
   const [openTraditions, setOpenTraditions] = useState<Set<string>>(new Set());
   const [openBooks, setOpenBooks]           = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds]       = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting]           = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Share link for the currently-selected set of notes.
+  const [shareInfo, setShareInfo]   = useState<{ id: string; url: string } | null>(null);
+  const [shareBusy, setShareBusy]   = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const closeExportMenu = () => {
+    setShowExportMenu(false);
+    setShareInfo(null);
+    setLinkCopied(false);
+  };
+
+  function selectedExportRows(): NoteExportRow[] {
+    return notes
+      .filter(n => selectedIds.has(n.noteId))
+      .map(n => ({
+        noteId: n.noteId, quote: n.snapshotText, note: n.content,
+        bookTitle: n.bookTitle, citation: n.citation, createdAt: n.createdAt,
+      }));
+  }
+
+  function toggleExportMenu() {
+    if (showExportMenu) { closeExportMenu(); return; }
+    setShowExportMenu(true);
+    if (selectedIds.size > 0 && userId) {
+      findNoteShareForSelection([...selectedIds], buildNoteSharePayload(selectedExportRows()), userId)
+        .then(setShareInfo).catch(() => setShareInfo(null));
+    }
+  }
+
+  // The selection changed while the menu was open — any pre-fetched link no
+  // longer describes it.
+  useEffect(() => { setShareInfo(null); setLinkCopied(false); }, [selectedIds]);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const h = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) closeExportMenu();
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showExportMenu]);
   // No By Book / By Date toggle on web — both groupings are always on screen.
 
   useEffect(() => { if (userId) load(); }, [userId]);
@@ -227,6 +291,66 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
   async function handleDeleteNote(id: string) {
     await deleteRemote('notes', id).catch(() => {});
     setNotes(prev => prev.filter(n => n.noteId !== id));
+    setSelectedIds(prev => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n; });
+  }
+
+  // Default title for a new note share link: the one book's title when every
+  // selected note is from it, else a generic label.
+  function defaultShareTitle(): string {
+    const titles = new Set(notes.filter(n => selectedIds.has(n.noteId)).map(n => n.bookTitle));
+    return titles.size === 1 ? [...titles][0] : t('notes.title');
+  }
+
+  async function handleCreateShareLink() {
+    if (shareBusy || selectedIds.size === 0) return;
+    const entered = window.prompt(t('share.createLink'), defaultShareTitle());
+    if (entered === null) return;
+    setShareBusy(true);
+    try {
+      const { id, url } = await createNoteShareLink(
+        [...selectedIds], buildNoteSharePayload(selectedExportRows()), entered || defaultShareTitle(), userId,
+      );
+      setShareInfo({ id, url });
+      try {
+        await navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
+      } catch { /* clipboard blocked — link is still created */ }
+    } catch {
+      /* create failed — no link */
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function handleRevokeShareLink() {
+    if (shareBusy || !shareInfo) return;
+    if (!confirm(t('share.revokeConfirm'))) return;
+    setShareBusy(true);
+    try {
+      await revokeSharedSet(shareInfo.id, userId);
+      setShareInfo(null);
+    } catch {
+      /* revoke failed — leave the link visible */
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function handleExport(format: 'pdf' | 'docx' | 'csv' | 'markdown') {
+    closeExportMenu();
+    setExporting(true);
+    try {
+      const chosen = selectedExportRows();
+      if (format === 'pdf')      await exportAsPdf(chosen);
+      if (format === 'docx')     await exportAsDocx(chosen);
+      if (format === 'csv')      await exportAsCsv(chosen);
+      if (format === 'markdown') await exportAsMarkdown(chosen);
+    } catch (e) {
+      console.error('[NoteExport] failed:', e);
+    } finally {
+      setExporting(false);
+    }
   }
 
   async function handleSaveEdit(id: string, content: string) {
@@ -348,6 +472,8 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
               onOpenBook={onOpenBook}
               onDelete={handleDeleteNote}
               onSave={handleSaveEdit}
+              selected={selectedIds.has(note.noteId)}
+              onToggleSelected={() => toggleSelected(note.noteId)}
             />
           ))}
         </div>
@@ -399,6 +525,8 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
                       onOpenBook={onOpenBook}
                       onDelete={handleDeleteNote}
                       onSave={handleSaveEdit}
+                      selected={selectedIds.has(note.noteId)}
+                      onToggleSelected={() => toggleSelected(note.noteId)}
                     />
                   ))}
                 </div>
@@ -440,7 +568,89 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
     <div className="h-full flex flex-col w-full bg-white dark:bg-[#1B2A38]">
       {/* Header + search — spans both columns */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2] mb-3">{t('notes.title')}</h1>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-[#E2EAF2]">{t('notes.title')}</h1>
+          {selectedIds.size > 0 && (
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={toggleExportMenu}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B6B7B] dark:bg-[#2D9DB3] text-white text-sm font-medium rounded-lg hover:bg-[#1B6B7B]/90 dark:hover:bg-[#2D9DB3]/90 disabled:opacity-60 transition-colors"
+                title={t('notes.exportSelected')}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                {exporting ? t('tags.exporting') : `${t('tags.export')} (${selectedIds.size})`}
+              </button>
+              {showExportMenu && (
+                <div className="absolute end-0 top-full mt-1 bg-white dark:bg-[#1B2A38] rounded-xl shadow-lg border border-gray-200 dark:border-[#2D4050] z-20 min-w-[200px]">
+                  <div className="py-1">
+                    {([
+                      { label: 'PDF',                 format: 'pdf'      },
+                      { label: t('export.docxShort'), format: 'docx'     },
+                      { label: 'CSV',                 format: 'csv'      },
+                      { label: 'MD',                  format: 'markdown' },
+                    ] as const).map(({ label, format }) => (
+                      <button
+                        key={format}
+                        onClick={() => handleExport(format)}
+                        className="w-full text-start px-4 py-2 text-sm text-gray-700 dark:text-[#B8C7D6] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="py-1 border-t border-gray-100 dark:border-[#2D4050]">
+                    {!shareInfo ? (
+                      <button
+                        disabled={shareBusy}
+                        onClick={handleCreateShareLink}
+                        className="w-full text-start px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors disabled:opacity-60"
+                      >
+                        <span className="block text-sm text-gray-700 dark:text-[#B8C7D6]">
+                          {linkCopied ? t('share.linkCopied') : t('share.createLink')}
+                        </span>
+                        <span className="block text-[11px] text-gray-400 dark:text-[#5C7A8E]">{t('share.createLinkNotesHint')}</span>
+                      </button>
+                    ) : (
+                      <div className="px-4 py-2">
+                        <p className="font-mono text-xs text-gray-500 dark:text-[#8FA4B8] truncate" title={shareInfo.url}>
+                          {shareInfo.url}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <button
+                            disabled={shareBusy}
+                            onClick={() => {
+                              navigator.clipboard.writeText(shareInfo.url)
+                                .then(() => {
+                                  setLinkCopied(true);
+                                  setTimeout(() => setLinkCopied(false), 2000);
+                                })
+                                .catch(() => {});
+                            }}
+                            className="text-sm font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:opacity-70 disabled:opacity-60"
+                          >
+                            {linkCopied ? t('share.linkCopied') : t('share.copyLink')}
+                          </button>
+                          <button
+                            disabled={shareBusy}
+                            onClick={handleRevokeShareLink}
+                            className="text-sm font-medium text-red-600 dark:text-red-400 hover:opacity-70 disabled:opacity-60"
+                          >
+                            {t('share.revoke')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="relative">
           <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#5C7A8E] w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -451,8 +661,8 @@ export default function NotesScreen({ userId, onOpenBook, onOpenLibrary }: Notes
             placeholder={t('notes.searchPlaceholder')}
             className="w-full ps-9 pe-14 py-2 text-sm text-gray-900 dark:text-[#E2EAF2] border border-gray-200 dark:border-[#2D4050] rounded-xl outline-none focus:ring-2 focus:ring-[#1B6B7B]/30 dark:focus:ring-[#2D9DB3]/30 focus:border-[#1B6B7B] dark:focus:border-[#2D9DB3] bg-gray-50 dark:bg-[#243040]"
           />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
+          {(searchQuery || selectedIds.size > 0) && (
+            <button onClick={() => { setSearchQuery(''); setSelectedIds(new Set()); }} className="absolute end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3] hover:text-[#0f4a56]">{t('common.clear')}</button>
           )}
         </div>
       </div>

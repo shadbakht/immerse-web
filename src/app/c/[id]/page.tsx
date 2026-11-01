@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { UUID_RE } from '@/lib/shareUrl';
-import { buildShareMetaDescription, buildXrefShareMetaDescription, shareHeading } from '@/lib/shareMeta';
+import { buildShareMetaDescription, buildNoteShareMetaDescription, buildXrefShareMetaDescription, shareHeading } from '@/lib/shareMeta';
+import type { NoteShareEntry } from '@/lib/noteShare';
 import type { ImmTagExport } from '@/lib/communitySync';
 import SharedCompilationView from './SharedCompilationView';
 import SharedXrefsView from './SharedXrefsView';
+import SharedNotesView from './SharedNotesView';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -18,7 +20,8 @@ interface Props {
 // Phase 8: the row comes from `shared_sets`, not `community_tags` — every
 // pre-existing community_tags row was backfilled into shared_sets under the
 // SAME uuid (Part A6), so every Phase 5 link keeps resolving here. `kind`
-// picks the view: 'compilation' (payload snapshot) or 'xrefs' (live RPC).
+// picks the view: 'compilation' (payload snapshot), 'xrefs' (live RPC) or
+// 'notes' (payload snapshot of quote + note pairs).
 //
 // /d/<id> (shares made from Discover) renders this same page — see
 // src/app/d/[id]/page.tsx. /d/* is claimed as a universal / App Link, so with
@@ -77,6 +80,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  if (row.kind === 'notes') {
+    const entries = (Array.isArray(row.payload) ? row.payload : []) as NoteShareEntry[];
+    const title = `${name} — notes on Immerse`;
+    const description = buildNoteShareMetaDescription(entries, entries.length);
+    return {
+      title: { absolute: title },
+      description,
+      robots: { index: false, follow: false },
+      openGraph: { title, description, type: 'article' },
+      twitter: { card: 'summary', title, description },
+    };
+  }
+
   const payload = (Array.isArray(row.payload) ? row.payload : []) as ImmTagExport[];
   const description = buildShareMetaDescription(payload, row.item_count ?? payload.length);
   const title = `${shareHeading(payload, name)} — a compilation on Immerse`;
@@ -101,6 +117,11 @@ export default async function SharedSetPage({ params }: Props) {
       <main className="mx-auto max-w-2xl px-4 py-10">
         {row.kind === 'xrefs' ? (
           <SharedXrefsView id={row.id} title={row.title ?? ''} />
+        ) : row.kind === 'notes' ? (
+          <SharedNotesView
+            title={row.title ?? ''}
+            entries={(Array.isArray(row.payload) ? row.payload : []) as NoteShareEntry[]}
+          />
         ) : (
           <SharedCompilationView
             id={row.id}
