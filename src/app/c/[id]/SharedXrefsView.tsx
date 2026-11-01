@@ -9,6 +9,7 @@ import { loadCatalog, loadSlugMaps, bookLanguage } from '@/lib/catalog';
 import { openInApp } from '@/lib/openInApp';
 import { groupXrefsByPair } from '@/lib/xrefGrouping';
 import { makeTraditionResolver } from '@/lib/tradition';
+import { traditionLabelKey } from '@/lib/traditionKey';
 import { traditionPairOf, getSharedXrefSet, type XrefShareSide } from '@/lib/sharedSets';
 import SaveOnLoad from './SaveOnLoad';
 
@@ -105,7 +106,9 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
         ((bookData ?? []) as BookRow[]).map(b => [b.id, b]),
       );
 
-      const traditionOf = makeTraditionResolver(catalog, uuidToSlug, t('common.otherTradition'));
+      const traditionOf = makeTraditionResolver(
+        catalog, uuidToSlug, t('common.otherTradition'), k => t(traditionLabelKey(k)),
+      );
 
       const resolveSide = (side: XrefShareSide): ResolvedSide => {
         const passage = side.passage_id ? passMap.get(side.passage_id) : null;

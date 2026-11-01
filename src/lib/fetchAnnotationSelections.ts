@@ -18,6 +18,8 @@ export interface SelInfo {
   /** The book's language (BCP-47-ish, e.g. 'fa', 'zh'), for per-script sizing.
    *  Undefined for imported books (no catalog language). */
   book_language?: string;
+  /** The selection's own book slug — still set when its passage row is gone. */
+  book_local_id?: string;
   /** True for a selection on a synced imported book: it has a real title to
    *  show, but there is no web reader for it, so "open in reader" must be
    *  suppressed. */
@@ -65,6 +67,7 @@ export async function fetchSelectionsByUser(userId: string): Promise<Record<stri
       book_title:    book?.title       ?? '',
       citation:      buildCitation(passage, book, (author as any)?.name),
       book_language: book?.language ?? undefined,
+      book_local_id: sel.book_local_id ?? undefined,
     };
   }
 

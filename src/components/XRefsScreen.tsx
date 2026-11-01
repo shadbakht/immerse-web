@@ -8,6 +8,7 @@ import { ContextMenu, type MenuOption } from './ContextMenu';
 import { loadCatalog, loadSlugMaps, type CatalogBook } from '@/lib/catalog';
 import { scriptScale } from '@/lib/readerTypography';
 import { makeTraditionResolver } from '@/lib/tradition';
+import { traditionLabelKey } from '@/lib/traditionKey';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import TeachingEmptyState from './TeachingEmptyState';
 import { XRefIcon } from './Icons';
@@ -252,28 +253,35 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
 
       // Shared with the public /c/<id> xref share page so both group by the
       // same tradition pairs (Phase 8).
-      const getTradition = makeTraditionResolver(catalog, uuidToSlug, t('common.otherTradition'));
+      const getTradition = makeTraditionResolver(
+        catalog, uuidToSlug, t('common.otherTradition'), k => t(traditionLabelKey(k)),
+      );
 
       function getSel(id: string) {
         const s = selMap[id] ?? { snapshot_text: '', citation: '', passage_id: '', book_id: '', book_title: '' };
-        return { snapshot: s.snapshot_text, citation: s.citation, bookId: s.book_id, passageId: s.passage_id, bookTitle: s.book_title ?? '' };
+        return {
+          snapshot: s.snapshot_text, citation: s.citation, bookId: s.book_id, passageId: s.passage_id,
+          bookTitle: s.book_title ?? '',
+          // A selection whose passage row is gone still knows its book's slug.
+          bookKey: s.book_id || s.book_local_id || '',
+        };
       }
 
       const bookTitle = (bookUuid: string): string => {
-        const slug = uuidToSlug.get(bookUuid) ?? '';
+        const slug = uuidToSlug.get(bookUuid) ?? (bookMap.has(bookUuid) ? bookUuid : '');
         return (slug ? bookMap.get(slug)?.title : '') ?? '';
       };
 
       const bookLang = (bookUuid: string): string => {
-        const slug = uuidToSlug.get(bookUuid) ?? '';
+        const slug = uuidToSlug.get(bookUuid) ?? (bookMap.has(bookUuid) ? bookUuid : '');
         return (slug ? bookMap.get(slug)?.language : '') || 'en';
       };
 
       const loaded: XRefRow[] = (xrefData ?? []).map((x: any) => {
         const a    = getSel(x.selection_a_id);
         const b    = getSel(x.selection_b_id);
-        const tradA = getTradition(a.bookId);
-        const tradB = getTradition(b.bookId);
+        const tradA = getTradition(a.bookKey);
+        const tradB = getTradition(b.bookKey);
 
         // Normalize the pair via the shared helper so the on-screen grouping and
         // the public /c/<id> xref-share page can't drift (Phase 8).
@@ -287,10 +295,10 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
           selectionBId: x.selection_b_id,
           snapshotA: a.snapshot,  citationA:  a.citation,  bookIdA:  a.bookId,  passageIdA: a.passageId,
           snapshotB: b.snapshot,  citationB:  b.citation,  bookIdB:  b.bookId,  passageIdB: b.passageId,
-          bookTitleA: bookTitle(a.bookId) || a.bookTitle,
-          bookTitleB: bookTitle(b.bookId) || b.bookTitle,
-          bookLanguageA: bookLang(a.bookId),
-          bookLanguageB: bookLang(b.bookId),
+          bookTitleA: bookTitle(a.bookKey) || a.bookTitle,
+          bookTitleB: bookTitle(b.bookKey) || b.bookTitle,
+          bookLanguageA: bookLang(a.bookKey),
+          bookLanguageB: bookLang(b.bookKey),
           pairKey,
           pairName,
         };

@@ -12,12 +12,17 @@
  */
 import type { Catalog, CatalogBook, CatalogCategory } from '@/lib/catalog';
 import type { Tradition } from '@/lib/sharedSets';
+import { traditionGroupId, traditionKeyFromRootCategoryId, type TraditionKey } from '@/lib/traditionKey';
 
 /**
- * Build a `bookUuid → { id, name }` resolver.
+ * Build a `bookUuid → { id, name }` resolver. A catalog slug (a selection's
+ * `book_local_id`) is accepted too, for a selection whose passage row is gone.
  *
- * `otherName` is the caller's translated `common.otherTradition` — this module
- * stays free of React/i18n so it can be unit-tested and reused server-side.
+ * Traditions are language-neutral: every language's root for one tradition
+ * (`cat-bahai`, `cat-fr-bahai`, …) resolves to the same id, named by `label`
+ * in the UI language. `otherName` is the caller's translated
+ * `common.otherTradition` — this module stays free of React/i18n so it can be
+ * unit-tested and reused server-side.
  *
  * An unmapped book falls back to its own uuid as the tradition id (so two
  * different unknown books never collapse into one pair) with `otherName` as
@@ -27,7 +32,8 @@ export function makeTraditionResolver(
   catalog: Catalog,
   uuidToSlug: Map<string, string>,
   otherName: string,
-): (bookUuid: string) => Tradition {
+  label: (key: TraditionKey) => string,
+): (bookUuidOrSlug: string) => Tradition {
   const catMap = new Map<string, CatalogCategory>(catalog.categories.map(c => [c.id, c]));
   const bookMap = new Map<string, CatalogBook>(catalog.books.map(b => [b.id, b]));
 
@@ -37,10 +43,12 @@ export function makeTraditionResolver(
     return c ?? null;
   };
 
-  return (bookUuid: string): Tradition => {
-    const slug = uuidToSlug.get(bookUuid) ?? '';
+  return (bookUuidOrSlug: string): Tradition => {
+    const slug = uuidToSlug.get(bookUuidOrSlug) ?? (bookMap.has(bookUuidOrSlug) ? bookUuidOrSlug : '');
     const catBook = slug ? bookMap.get(slug) : null;
     const root = catBook ? rootCat(catBook.categoryId) : null;
-    return { id: root?.id ?? bookUuid, name: root?.name ?? otherName };
+    const key = root ? traditionKeyFromRootCategoryId(root.id) : null;
+    if (key) return { id: traditionGroupId(key), name: label(key) };
+    return { id: root?.id ?? bookUuidOrSlug, name: root?.name ?? otherName };
   };
 }
