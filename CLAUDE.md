@@ -84,6 +84,9 @@ Guest users see a `SignInPrompt` on Tags/Notes/XRefs/Settings tabs and a sign-in
 | `src/components/SettingsPanel.tsx` | Profile, font size, appearance, Stripe upgrade |
 | `src/components/Sidebar.tsx` | Left nav drawer |
 | `src/components/SignInPrompt.tsx` | Reusable guest sign-in prompt (✦ icon + button) |
+| `src/lib/traditionKey.ts` | Language-neutral tradition key for X-Ref grouping (`cat-fr-bahai` → `bahai`). Same code as mobile `src/utils/traditionKey.ts` — change both |
+| `src/lib/noteShare.ts` / `noteExport.ts` | Note share payload (`shared_sets` kind `notes`) + PDF/DOCX/CSV/MD export; page view `src/app/c/[id]/SharedNotesView.tsx` |
+| `src/lib/annotationSync.ts` → `cleanupOrphanedSelection` | Call after deleting a note or X-Ref so its selection doesn't linger |
 | `src/lib/fetchAnnotationSelections.ts` | Shared helper: fetches selections→passages→books in 3 queries (avoids RLS cross-table join issues) |
 | `src/proxy.ts` | Next.js middleware: redirects unauthenticated users to `/login` |
 | `src/app/login/page.tsx` | Login page: sign-in / sign-up toggle, username validation |
@@ -117,6 +120,8 @@ $0.99/month Pro subscription. Required Vercel env vars:
 - `STRIPE_PRICE_ID` — `price_1TdN423sbi6DBTBwNUC5Yd7L`
 - `STRIPE_WEBHOOK_SECRET` — `whsec_...`
 - `NEXT_PUBLIC_SITE_URL` — `https://immerse-two.vercel.app`
+  ⚠️ Found **unset** in production on 2026-11-01 (share links came out as a bare `/c/<id>`). Every
+  reader of it must fall back to `SITE_URL` (`src/lib/siteUrl.ts`, `https://immerseresearch.app`).
 
 Webhook endpoint: `https://immerse-two.vercel.app/api/stripe/webhook`
 Listens to: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
