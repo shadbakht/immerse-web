@@ -84,7 +84,7 @@ const legalEn: LegalContent = {
   ],
   privacySections: [
     { title: '1. Information We Collect', paras: [
-      { label: '1.1 Account Information', text: 'When you create an account, we may collect your full name, a unique username, your email address, and your password (handled securely via authentication services). You may also use Immerse as a guest without creating an account.' },
+      { label: '1.1 Account Information', text: 'When you create an account, we may collect the full name you provide, a unique username, your email address, and your password (handled securely via authentication services). You may also use Immerse as a guest without creating an account.' },
       { label: '1.2 Annotation and Reading Data', text: 'We collect and store content you create within the App, including highlighted text and selections, tags and notes, cross-references between passages (“Xrefs”), and your reading progress and preferences.' },
       { label: '1.3 Public Content', text: 'If you choose to share content with the Immerse community, your tags, notes, and Xrefs may be visible to other users, and your username will be displayed alongside that content.' },
       { label: '1.4 Imported Books', text: 'Immerse Pro subscribers may import their own files (e.g., EPUB or text files). Imported books and any annotations made on them are stored locally on your device only and are never uploaded to our servers.' },
@@ -163,7 +163,7 @@ const legalEs: LegalContent = {
   ],
   privacySections: [
     { title: '1. Información que recopilamos', paras: [
-      { label: '1.1 Información de la cuenta', text: 'Cuando creas una cuenta, podemos recopilar tu nombre completo, un nombre de usuario único, tu dirección de correo electrónico y tu contraseña (gestionada de forma segura mediante servicios de autenticación). También puedes usar Immerse como invitado sin crear una cuenta.' },
+      { label: '1.1 Información de la cuenta', text: 'Cuando creas una cuenta, podemos recopilar el nombre completo que proporciones, un nombre de usuario único, tu dirección de correo electrónico y tu contraseña (gestionada de forma segura mediante servicios de autenticación). También puedes usar Immerse como invitado sin crear una cuenta.' },
       { label: '1.2 Datos de anotaciones y lectura', text: 'Recopilamos y almacenamos el contenido que creas dentro de la App, incluidos los textos subrayados y las selecciones, las etiquetas y notas, las remisiones entre pasajes («Remisiones») y tu progreso y preferencias de lectura.' },
       { label: '1.3 Contenido público', text: 'Si decides compartir contenido con la comunidad de Immerse, tus etiquetas, notas y remisiones pueden ser visibles para otros usuarios, y tu nombre de usuario se mostrará junto a ese contenido.' },
       { label: '1.4 Libros importados', text: 'Los suscriptores de Immerse Pro pueden importar sus propios archivos (por ejemplo, EPUB o archivos de texto). Los libros importados y cualquier anotación realizada sobre ellos se almacenan únicamente de forma local en tu dispositivo y nunca se suben a nuestros servidores.' },
