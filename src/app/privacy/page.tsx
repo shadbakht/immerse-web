@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { legalContent, resolveLocale, type Locale, type LegalSection } from '../legalContent';
+import SiteHeader from '@/components/SiteHeader';
+import { legalContent, resolveLocale, type LegalSection } from '../legalContent';
 
 function Section({ title }: { title: string }) {
   return <h2 className="text-base font-bold text-gray-900 dark:text-[#E2EAF2] mt-8 mb-2">{title}</h2>;
@@ -24,16 +25,6 @@ function Block({ section }: { section: LegalSection }) {
   );
 }
 
-// Language toggle — preserves the page, only flips ?lang.
-function LangToggle({ locale, otherLabel }: { locale: Locale; otherLabel: string }) {
-  const other = locale === 'es' ? '/privacy' : '/privacy?lang=es';
-  return (
-    <Link href={other} className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">
-      {otherLabel}
-    </Link>
-  );
-}
-
 interface Props {
   searchParams: Promise<{ lang?: string }>;
 }
@@ -46,9 +37,16 @@ export default async function PrivacyPage({ searchParams }: Props) {
   return (
     <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
       <div className="max-w-2xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="text-sm text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">{c.back}</Link>
-          <LangToggle locale={locale} otherLabel={c.otherLanguage} />
+        <div className="mb-8">
+          <SiteHeader
+            homeLabel={c.home}
+            languageLabel={c.language}
+            currentLanguage={locale}
+            languages={[
+              { code: 'en', label: 'English', href: '/privacy' },
+              { code: 'es', label: 'Español', href: '/privacy?lang=es' },
+            ]}
+          />
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 dark:text-[#E2EAF2] mb-1">{c.legalHeading}</h1>

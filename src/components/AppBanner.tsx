@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useTranslation } from '@/contexts/LanguageProvider';
 
 interface AppBannerProps {
@@ -15,6 +16,8 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [platform, setPlatform] = useState<'android' | 'ios' | null>(null);
+  // /get is itself the store-links page — the banner would only repeat it.
+  const onGetPage = usePathname() === '/get';
 
   useEffect(() => {
     // Don't show if dismissed this session
@@ -50,7 +53,7 @@ export default function AppBanner({ playStoreId, appStoreId }: AppBannerProps) {
     }
   }
 
-  if (!visible) return null;
+  if (!visible || onGetPage) return null;
 
   return (
     <div className="flex items-center gap-3.5 px-5 py-3.5 bg-[#1C2B35] text-white w-full z-50">

@@ -30,6 +30,10 @@ export interface Guideline {
 
 interface LegalContent {
   back: string;
+  /** Accessible name for the home-icon link in SiteHeader. */
+  home: string;
+  /** Accessible name for the language menu button. */
+  language: string;
   legalHeading: string;
   effectiveDate: string;
   otherLanguage: string;       // label of the toggle that switches to the OTHER locale
@@ -49,6 +53,10 @@ interface LegalContent {
 
 interface SupportContent {
   back: string;
+  /** Accessible name for the home-icon link in SiteHeader. */
+  home: string;
+  /** Accessible name for the language menu button. */
+  language: string;
   title: string;
   intro: string;
   contactLabel: string;
@@ -63,6 +71,8 @@ interface SupportContent {
 
 const legalEn: LegalContent = {
   back: '← Back to Immerse',
+  home: 'Go to immerseresearch.app',
+  language: 'Language',
   legalHeading: 'Legal',
   effectiveDate: 'Effective Date: June 4, 2026',
   otherLanguage: 'Español',
@@ -140,6 +150,8 @@ const legalEn: LegalContent = {
 
 const legalEs: LegalContent = {
   back: '← Volver a Immerse',
+  home: 'Ir a immerseresearch.app',
+  language: 'Idioma',
   legalHeading: 'Legal',
   effectiveDate: 'Fecha de entrada en vigor: 4 de junio de 2026',
   otherLanguage: 'English',
@@ -217,6 +229,8 @@ const legalEs: LegalContent = {
 
 const supportEn: SupportContent = {
   back: '← Back to Immerse',
+  home: 'Go to immerseresearch.app',
+  language: 'Language',
   title: 'Support',
   intro: 'Need help with Immerse? We’re happy to assist. Email us and we’ll get back to you as soon as we can.',
   contactLabel: 'Contact',
@@ -234,6 +248,8 @@ const supportEn: SupportContent = {
 
 const supportEs: SupportContent = {
   back: '← Volver a Immerse',
+  home: 'Ir a immerseresearch.app',
+  language: 'Idioma',
   title: 'Soporte',
   intro: '¿Necesitas ayuda con Immerse? Con gusto te ayudamos. Escríbenos y te responderemos lo antes posible.',
   contactLabel: 'Contacto',

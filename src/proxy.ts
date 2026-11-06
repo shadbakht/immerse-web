@@ -40,8 +40,9 @@ export async function proxy(request: NextRequest) {
   // without this it is 307'd to /login and never reaches the handler (which
   // verifies Stripe's signature itself) — the webhook could not have worked
   // before. '/lifetime' is the unlisted one-time-purchase page; it shows its own
-  // "Sign in to continue" link for signed-out visitors.
-  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/d/', '/.well-known', '/api/stripe/webhook', '/lifetime'];
+  // "Sign in to continue" link for signed-out visitors. '/get' is the
+  // share-the-app page (both store buttons) — the whole point is strangers.
+  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/d/', '/.well-known', '/api/stripe/webhook', '/lifetime', '/get'];
   const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {

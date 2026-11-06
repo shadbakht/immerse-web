@@ -4,18 +4,11 @@ import './globals.css';
 import AppBanner from '@/components/AppBanner';
 import { LanguageProvider } from '@/contexts/LanguageProvider';
 import { SITE_URL } from '@/lib/siteUrl';
+import { APP_STORE_ID, PLAY_STORE_ID } from '@/lib/storeLinks';
 
 const geist = Geist({ subsets: ['latin'] });
 
-// ─── App Store IDs ────────────────────────────────────────────────────────────
-// iOS:     Set APP_STORE_ID to your numeric Apple ID (from App Store Connect →
-//          App Information → Apple ID) once the app is approved.
-//          Example: "6478293847"
-const APP_STORE_ID    = '6774657926';
-
-// Android: Set PLAY_STORE_ID to your package name once the app is live.
-//          Example: "com.shadbakht.immerse"
-const PLAY_STORE_ID   = 'com.shadbakht.immerse';
+// Store IDs live in src/lib/storeLinks.ts (also used by the /get share page).
 
 export const metadata: Metadata = {
   // metadataBase resolves every relative URL used in per-page metadata

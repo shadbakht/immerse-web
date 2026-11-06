@@ -21,6 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // enumerating community_tags into the sitemap would contradict that.
   return [
     { url: SITE_URL, lastModified, changeFrequency: 'daily', priority: 1 },
+    { url: `${SITE_URL}/get`, lastModified, changeFrequency: 'monthly', priority: 0.8 },
     ...catalog.books.map(book => ({
       url: `${SITE_URL}/read/${book.id}`,
       lastModified,
