@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,22 +15,34 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Reuse existing Stripe customer if we have one
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('stripe_customer_id, full_name')
-    .eq('id', user.id)
-    .single();
+  // Stripe ids live in the private `billing` table (service role only):
+  // profiles is publicly readable, so they must not be stored there.
+  const admin = createAdminClient();
 
-  let customerId = profile?.stripe_customer_id as string | undefined;
+  // Reuse existing Stripe customer if we have one
+  const { data: billing } = await admin
+    .from('billing')
+    .select('stripe_customer_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  let customerId = billing?.stripe_customer_id as string | undefined;
   if (!customerId) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .maybeSingle();
     const customer = await stripe.customers.create({
       email: user.email,
       name:  profile?.full_name || undefined,
       metadata: { supabase_user_id: user.id },
     });
     customerId = customer.id;
-    await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user.id);
+    const { error } = await admin
+      .from('billing')
+      .upsert({ user_id: user.id, stripe_customer_id: customerId, updated_at: new Date().toISOString() });
+    if (error) console.error('[stripe/checkout] could not save customer id', error);
   }
 
   const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://immerseresearch.app';

@@ -42,15 +42,19 @@ export async function POST(request: Request) {
         // Read the old subscription BEFORE overwriting the row, so a monthly
         // subscriber who buys lifetime stops being billed.
         const { data: prior } = await supabase
-          .from('profiles').select('stripe_subscription_id').eq('id', userId).maybeSingle();
+          .from('billing').select('stripe_subscription_id').eq('user_id', userId).maybeSingle();
 
         const { error } = await supabase.from('profiles').update({
           is_pro:                     true,
-          stripe_subscription_id:     null,
           stripe_subscription_status: LIFETIME,
         }).eq('id', userId);
-        if (error) {
-          console.error('[stripe/webhook] lifetime grant failed', error);
+        const { error: bErr } = await supabase.from('billing').upsert({
+          user_id:                userId,
+          stripe_subscription_id: null,
+          updated_at:             new Date().toISOString(),
+        });
+        if (error || bErr) {
+          console.error('[stripe/webhook] lifetime grant failed', error ?? bErr);
           return NextResponse.json({ error: 'db_error' }, { status: 500 });
         }
 
@@ -59,14 +63,20 @@ export async function POST(request: Request) {
           catch (e) { console.error('[stripe/webhook] could not cancel prior subscription', e); }
         }
       }
-    } else if (userId && session.subscription) {
+    } else if (userId && session.subscription && !(await isLifetime(userId))) {
+      // isLifetime() rather than .neq('stripe_subscription_status', LIFETIME):
+      // neq never matches a NULL status, which is every first-time subscriber.
       const { error } = await supabase.from('profiles').update({
         is_pro:                    true,
-        stripe_subscription_id:    session.subscription as string,
         stripe_subscription_status: 'active',
-      }).eq('id', userId).neq('stripe_subscription_status', LIFETIME);
-      if (error) {
-        console.error('[stripe/webhook] subscription grant failed', error);
+      }).eq('id', userId);
+      const { error: bErr } = await supabase.from('billing').upsert({
+        user_id:                userId,
+        stripe_subscription_id: session.subscription as string,
+        updated_at:             new Date().toISOString(),
+      });
+      if (error || bErr) {
+        console.error('[stripe/webhook] subscription grant failed', error ?? bErr);
         return NextResponse.json({ error: 'db_error' }, { status: 500 });
       }
     }

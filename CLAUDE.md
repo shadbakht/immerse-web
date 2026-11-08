@@ -101,7 +101,12 @@ Guest users see a `SignInPrompt` on Tags/Notes/XRefs/Settings tabs and a sign-in
 
 **`profiles` table columns** (relevant to web):
 - `id`, `full_name`, `username`, `is_pro`, `font_size`, `seeded_defaults`
-- `stripe_customer_id`, `stripe_subscription_id`, `stripe_subscription_status`
+- `stripe_subscription_status` (the iOS app reads it for "Manage subscription")
+- ⚠️ `profiles` is **publicly readable** (Community shows names/avatars). Never add private fields to it.
+- Clients can't change `is_pro` / `stripe_subscription_status` — a trigger reverts it; only server code (service role) can.
+
+**`billing` table** (private — service role only, no RLS policies): `user_id`, `stripe_customer_id`, `stripe_subscription_id`.
+Read/write it only from server routes via `createAdminClient()`.
 - ⚠️ **No `color_mode` column** — color mode is stored in `localStorage` only
 
 **`selections` table** (web-created):

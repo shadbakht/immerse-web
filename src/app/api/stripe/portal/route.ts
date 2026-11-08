@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { classifyStripeError } from '@/lib/stripePortal';
 
 export const dynamic = 'force-dynamic';
@@ -16,13 +17,14 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-    const { data: profile } = await supabase
-      .from('profiles')
+    // Stripe ids live in the private `billing` table (service role only).
+    const { data: billing } = await createAdminClient()
+      .from('billing')
       .select('stripe_customer_id')
-      .eq('id', user.id)
-      .single();
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    if (!profile?.stripe_customer_id) {
+    if (!billing?.stripe_customer_id) {
       return NextResponse.json({ error: 'no_customer' }, { status: 400 });
     }
 
@@ -32,7 +34,7 @@ export async function POST() {
     // AppShell — so land back on the root with ?tab=settings, which AppShell
     // reads on mount to switch to that tab. Plain `/settings` 404s.
     const session = await stripe.billingPortal.sessions.create({
-      customer:   profile.stripe_customer_id,
+      customer:   billing.stripe_customer_id,
       return_url: `${origin}/?tab=settings`,
     });
 
