@@ -2516,6 +2516,12 @@ async function handleCopy() {
               <h1 className="text-base font-semibold text-gray-900 dark:text-[#E2EAF2] truncate">{book.title}</h1>
             </div>
           )}
+          {/* A view-only PDF is a scan with no text layer. Say why nothing can be
+              selected and point to an OCR app — the app does no OCR itself
+              (owner's decision, mobile docs/backlog.md). */}
+          <p className="px-6 py-2.5 text-sm text-gray-600 dark:text-[#9FB0C0] bg-gray-50 dark:bg-[#1A2733] border-b border-gray-100 dark:border-[#2D4050] shrink-0">
+            {t('reader.scannedPdfNotice')}
+          </p>
           <embed src={pdfUrl} type="application/pdf" className="flex-1 w-full" />
         </div>
       )}
