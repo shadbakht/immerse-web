@@ -28,6 +28,12 @@ import {
 
 const EMPTY_SET: Set<string> = new Set();
 
+// Guests (no session) are not allowed to read profiles.full_name — asking for
+// it fails the whole query — so they get usernames only.
+function cardSelect(signedIn: boolean) {
+  return `id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(${signedIn ? 'full_name, ' : ''}username, avatar_url)`;
+}
+
 /** Build export-ready TagRow[] from a community tag's payload, keeping only the
  *  selected nodes (quotes + citations only — no notes/xrefs). */
 function payloadToTagRows(ct: CommunityTag, exportIds: Set<string>): TagRow[] {
@@ -322,7 +328,7 @@ function ProfileView({
   useEffect(() => {
     supabase
       .from('community_tags')
-      .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username, avatar_url)')
+      .select(cardSelect(!!currentUserId))
       .eq('user_id', profile.userId)
       .eq('listed', true)
       .order('updated_at', { ascending: false })
@@ -644,7 +650,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     try {
       const { data } = await supabase
         .from('community_tags')
-        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username, avatar_url)')
+        .select(cardSelect(!!user))
         .eq('listed', true)
         .order('published_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
@@ -659,7 +665,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     try {
       const { data } = await (supabase
         .from('community_tags')
-        .select('id, user_id, name, payload, selection_count, import_count, published_at, updated_at, profiles(full_name, username, avatar_url)')
+        .select(cardSelect(!!user))
         .eq('listed', true)
         .order('import_count', { ascending: false }) as any)
         .order('published_at', { ascending: false })
