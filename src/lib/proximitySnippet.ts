@@ -45,6 +45,18 @@ export const STOPWORDS_BY_LANG: Record<string, Set<string>> = {
     'es', 'son', 'era', 'fue', 'ser', 'está', 'esta', 'estan', 'están', 'ha', 'han',
     'no', 'ni', 'más', 'mas', 'como', 'pero', 'este', 'estos', 'estas',
   ]),
+  // Portuguese (pt). Articles, contractions of preposition + article, the
+  // clitic pronouns and the commonest forms of ser/estar/ter/haver.
+  pt: new Set([
+    'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas', 'de', 'do', 'da', 'dos',
+    'das', 'em', 'no', 'na', 'nos', 'nas', 'ao', 'aos', 'à', 'às', 'por',
+    'pelo', 'pela', 'pelos', 'pelas', 'para', 'com', 'sem', 'e', 'ou', 'que',
+    'se', 'me', 'te', 'lhe', 'lhes', 'vos', 'seu', 'sua', 'seus', 'suas',
+    'meu', 'minha', 'teu', 'tua', 'é', 'são', 'era', 'foi', 'ser', 'está',
+    'estão', 'há', 'tem', 'têm', 'não', 'nem', 'mais', 'como', 'mas', 'este',
+    'esta', 'estes', 'estas', 'esse', 'essa', 'isso', 'isto', 'ele', 'ela',
+    'eles', 'elas', 'eu', 'tu', 'nós', 'vós',
+  ]),
   fr: new Set([
     'le', 'la', 'les', "l'", 'un', 'une', 'des', 'de', 'du', "d'", 'au', 'aux',
     'et', 'ou', 'que', 'qui', 'ne', 'pas', 'ce', 'cet', 'cette', 'ces', 'son',
