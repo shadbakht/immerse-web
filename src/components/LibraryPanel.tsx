@@ -1239,8 +1239,10 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
             );
           })}
 
-          {/* ── My Books ── */}
-          {(importedBooks.length > 0 || (userId && isPro)) && (
+          {/* ── My Books ── shown only when there is at least one imported book.
+              Importing starts from the button by the search bar, so an empty
+              section added nothing. */}
+          {importedBooks.length > 0 && (
             <div className="border-t border-gray-200 dark:border-[#2D4050] mt-1">
               <div className="flex items-center border-b border-gray-100 dark:border-[#2D4050] hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors">
                 <Checkbox
@@ -1254,29 +1256,21 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 >
                   <span className="text-sm font-medium text-gray-800 dark:text-[#D2DCE8] truncate">{t('library.myBooks')}</span>
                   <div className="flex items-center gap-2 shrink-0 ms-2">
-                    {importedBooks.length > 0 && (
-                      <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{importedBooks.length}</span>
-                    )}
+                    <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{importedBooks.length}</span>
                     <span className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform duration-150 inline-block ${myBooksOpen ? 'rotate-90' : ''} rtl:-scale-x-100`}>›</span>
                   </div>
                 </button>
               </div>
               {myBooksOpen && (
                 <div className="bg-gray-50/30">
-                  {importedBooks.length === 0 ? (
-                    <p className="text-xs text-gray-400 dark:text-[#5C7A8E] ps-9 pe-4 py-3">
-                      {t('library.noImportedBooks')}
-                    </p>
-                  ) : (
-                    importedBooks.map(book => (
-                      <ImportedBookRow
-                        key={book.id}
-                        book={book}
-                        onOpen={() => onOpenBook(book.id)}
-                        onDelete={() => handleDeleteBook(book.id)}
-                      />
-                    ))
-                  )}
+                  {importedBooks.map(book => (
+                    <ImportedBookRow
+                      key={book.id}
+                      book={book}
+                      onOpen={() => onOpenBook(book.id)}
+                      onDelete={() => handleDeleteBook(book.id)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
