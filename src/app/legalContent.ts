@@ -2,17 +2,28 @@
  * Content for the Privacy / Terms / Community Guidelines page and the Support
  * page, in each supported locale.
  *
- * The page components render from this so the English and Spanish versions share
- * one layout — only the strings differ, and the English output is unchanged from
- * when the copy lived inline. Add a locale by adding a key here.
+ * The page components render from this so every language shares one layout —
+ * only the strings differ. English and Spanish live here; the other app
+ * languages each have a file in ./legal/. Add a locale by adding a file there,
+ * importing it below and adding its code to Locale.
  *
  * These are the canonical legal texts the mobile app deep-links to. English is
- * authoritative; the Spanish is a courtesy translation.
+ * authoritative; every other language is a courtesy translation and says so
+ * on the page (translationNotice).
  */
 
-export type Locale = 'en' | 'es';
+import { LANGUAGE_LABELS, UI_LANGUAGES } from '@immerse/i18n';
+import { legal as legalFr, support as supportFr } from './legal/fr';
+import { legal as legalDe, support as supportDe } from './legal/de';
+import { legal as legalPt, support as supportPt } from './legal/pt';
+import { legal as legalTr, support as supportTr } from './legal/tr';
+import { legal as legalRu, support as supportRu } from './legal/ru';
+import { legal as legalZh, support as supportZh } from './legal/zh';
+import { legal as legalFa, support as supportFa } from './legal/fa';
+import { legal as legalAr, support as supportAr } from './legal/ar';
+import { legal as legalHi, support as supportHi } from './legal/hi';
 
-export const LOCALES: Locale[] = ['en', 'es'];
+export type Locale = 'en' | 'es' | 'fr' | 'de' | 'pt' | 'tr' | 'ru' | 'zh' | 'fa' | 'ar' | 'hi';
 
 /** A titled block of one or more paragraphs; a paragraph may carry a bold lead-in. */
 export interface Para {
@@ -28,7 +39,7 @@ export interface Guideline {
   text: string;
 }
 
-interface LegalContent {
+export interface LegalContent {
   back: string;
   /** Accessible name for the home-icon link in SiteHeader. */
   home: string;
@@ -36,7 +47,8 @@ interface LegalContent {
   language: string;
   legalHeading: string;
   effectiveDate: string;
-  otherLanguage: string;       // label of the toggle that switches to the OTHER locale
+  /** Translations only: says the English text governs. Shown under the date. */
+  translationNotice?: string;
 
   privacyTitle: string;
   privacyIntro: string[];
@@ -51,7 +63,7 @@ interface LegalContent {
   guidelines: Guideline[];
 }
 
-interface SupportContent {
+export interface SupportContent {
   back: string;
   /** Accessible name for the home-icon link in SiteHeader. */
   home: string;
@@ -64,7 +76,6 @@ interface SupportContent {
   privacyLinkText: string;
   privacyLinkIntro: string;
   privacyTermsTitle: string;
-  otherLanguage: string;
 }
 
 // ─── English (authoritative) ─────────────────────────────────────────────────
@@ -75,7 +86,6 @@ const legalEn: LegalContent = {
   language: 'Language',
   legalHeading: 'Legal',
   effectiveDate: 'Effective Date: June 4, 2026',
-  otherLanguage: 'Español',
 
   privacyTitle: 'Privacy Policy for Immerse',
   privacyIntro: [
@@ -154,7 +164,7 @@ const legalEs: LegalContent = {
   language: 'Idioma',
   legalHeading: 'Legal',
   effectiveDate: 'Fecha de entrada en vigor: 4 de junio de 2026',
-  otherLanguage: 'English',
+  translationNotice: 'Esta traducción se ofrece por cortesía. En caso de discrepancia, prevalece la versión en inglés.',
 
   privacyTitle: 'Política de privacidad de Immerse',
   privacyIntro: [
@@ -238,12 +248,11 @@ const supportEn: SupportContent = {
     { title: 'Resetting your password', html: 'On the sign-in screen, tap <b>Forgot password?</b> and enter your email. We’ll send a link to set a new password. (Check your spam folder if it doesn’t arrive within a few minutes.)' },
     { title: 'Managing your subscription', html: 'Immerse Pro subscriptions are managed where you bought them: on <b>iOS</b> via your Apple ID subscriptions, on <b>Android</b> via Google Play subscriptions, and on the <b>web</b> from Settings. New accounts include a free trial; you can cancel anytime before it ends to avoid being charged.' },
     { title: 'Deleting your account', html: 'Open <b>Settings</b> in the app and choose <b>Delete Account</b>. This permanently removes your account and the content stored on our servers.' },
-    { title: 'Annotations not syncing', html: 'Make sure you’re signed in to the same account on each device and have an internet connection. Your highlights, tags, notes, and reading progress sync automatically. If something still looks off, email us the details and we’ll help.' },
+    { title: 'Annotations not syncing', html: 'Make sure you’re signed in to the same account on each device and have an internet connection. Your highlights, compilations, notes, cross-references, and reading progress sync automatically. If something still looks off, email us the details and we’ll help.' },
   ],
   privacyLinkIntro: 'See our ',
   privacyLinkText: 'Privacy Policy, Terms of Service, and Community Guidelines',
   privacyTermsTitle: 'Privacy & Terms',
-  otherLanguage: 'Español',
 };
 
 const supportEs: SupportContent = {
@@ -257,21 +266,39 @@ const supportEs: SupportContent = {
     { title: 'Restablecer tu contraseña', html: 'En la pantalla de inicio de sesión, toca <b>¿Olvidaste tu contraseña?</b> e introduce tu correo. Te enviaremos un enlace para establecer una nueva contraseña. (Revisa tu carpeta de spam si no llega en unos minutos.)' },
     { title: 'Gestionar tu suscripción', html: 'Las suscripciones de Immerse Pro se gestionan donde las compraste: en <b>iOS</b> desde las suscripciones de tu Apple ID, en <b>Android</b> desde las suscripciones de Google Play y en la <b>web</b> desde Ajustes. Las cuentas nuevas incluyen una prueba gratuita; puedes cancelar en cualquier momento antes de que termine para evitar el cobro.' },
     { title: 'Eliminar tu cuenta', html: 'Abre <b>Ajustes</b> en la app y elige <b>Eliminar cuenta</b>. Esto elimina de forma permanente tu cuenta y el contenido almacenado en nuestros servidores.' },
-    { title: 'Las anotaciones no se sincronizan', html: 'Asegúrate de haber iniciado sesión con la misma cuenta en cada dispositivo y de tener conexión a internet. Tus subrayados, etiquetas, notas y progreso de lectura se sincronizan automáticamente. Si algo sigue sin funcionar, escríbenos los detalles y te ayudaremos.' },
+    { title: 'Las anotaciones no se sincronizan', html: 'Asegúrate de haber iniciado sesión con la misma cuenta en cada dispositivo y de tener conexión a internet. Tus subrayados, compilaciones, notas, remisiones y progreso de lectura se sincronizan automáticamente. Si algo sigue sin funcionar, escríbenos los detalles y te ayudaremos.' },
   ],
   privacyLinkIntro: 'Consulta nuestra ',
   privacyLinkText: 'Política de privacidad, Términos del servicio y Normas de la comunidad',
   privacyTermsTitle: 'Privacidad y Términos',
-  otherLanguage: 'English',
 };
 
 // ─── exports ─────────────────────────────────────────────────────────────────
 
-export const legalContent: Record<Locale, LegalContent> = { en: legalEn, es: legalEs };
-export const supportContent: Record<Locale, SupportContent> = { en: supportEn, es: supportEs };
+export const legalContent: Record<Locale, LegalContent> = {
+  en: legalEn, es: legalEs, fr: legalFr, de: legalDe, pt: legalPt, tr: legalTr,
+  ru: legalRu, zh: legalZh, fa: legalFa, ar: legalAr, hi: legalHi,
+};
+export const supportContent: Record<Locale, SupportContent> = {
+  en: supportEn, es: supportEs, fr: supportFr, de: supportDe, pt: supportPt, tr: supportTr,
+  ru: supportRu, zh: supportZh, fa: supportFa, ar: supportAr, hi: supportHi,
+};
 
-/** Narrow an arbitrary ?lang value to a supported locale, defaulting to English. */
-export function resolveLocale(raw: string | string[] | undefined): Locale {
+/** Menu order and labels for /privacy and /support: the app's interface languages. */
+export const LEGAL_LANGUAGES = UI_LANGUAGES
+  .filter(l => l.code in legalContent)
+  .map(l => ({ code: l.code as Locale, label: LANGUAGE_LABELS[l.code] ?? l.label }));
+
+/**
+ * Pick the page language: an explicit ?lang wins; otherwise the first
+ * Accept-Language entry we have a translation for; otherwise English.
+ */
+export function resolveLocale(raw: string | string[] | undefined, acceptLanguage: string | null = null): Locale {
   const v = Array.isArray(raw) ? raw[0] : raw;
-  return v === 'es' ? 'es' : 'en';
+  if (v && v in legalContent) return v as Locale;
+  for (const part of (acceptLanguage ?? '').split(',')) {
+    const code = part.split(';')[0].trim().split('-')[0].toLowerCase();
+    if (code && code in legalContent) return code as Locale;
+  }
+  return 'en';
 }

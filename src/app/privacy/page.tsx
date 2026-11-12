@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
+import { directionOf } from '@immerse/i18n';
 import SiteHeader from '@/components/SiteHeader';
-import { legalContent, resolveLocale, type LegalSection } from '../legalContent';
+import { legalContent, resolveLocale, LEGAL_LANGUAGES, type LegalSection } from '../legalContent';
 
 function Section({ title }: { title: string }) {
   return <h2 className="text-base font-bold text-gray-900 dark:text-[#E2EAF2] mt-8 mb-2">{title}</h2>;
@@ -26,31 +28,32 @@ function Block({ section }: { section: LegalSection }) {
 }
 
 interface Props {
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string | string[] }>;
 }
 
 export default async function PrivacyPage({ searchParams }: Props) {
   const { lang } = await searchParams;
-  const locale = resolveLocale(lang);
+  const locale = resolveLocale(lang, (await headers()).get('accept-language'));
   const c = legalContent[locale];
+  const dir = directionOf(locale);
 
   return (
-    <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
+    <div lang={locale} dir={dir} className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
       <div className="max-w-2xl mx-auto px-6 py-12">
         <div className="mb-8">
           <SiteHeader
             homeLabel={c.home}
             languageLabel={c.language}
             currentLanguage={locale}
-            languages={[
-              { code: 'en', label: 'English', href: '/privacy' },
-              { code: 'es', label: 'Español', href: '/privacy?lang=es' },
-            ]}
+            languages={LEGAL_LANGUAGES.map(l => ({ ...l, href: `/privacy?lang=${l.code}` }))}
           />
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 dark:text-[#E2EAF2] mb-1">{c.legalHeading}</h1>
-        <p className="text-sm text-gray-400 dark:text-[#5C7A8E] mb-10">{c.effectiveDate}</p>
+        <p className={`text-sm text-gray-400 dark:text-[#5C7A8E] ${c.translationNotice ? 'mb-2' : 'mb-10'}`}>{c.effectiveDate}</p>
+        {c.translationNotice && (
+          <p className="text-sm italic text-gray-500 dark:text-[#7F95A8] mb-10">{c.translationNotice}</p>
+        )}
 
         {/* ── Privacy Policy ── */}
         <h2 className="text-xl font-bold text-gray-900 dark:text-[#E2EAF2] mb-1">{c.privacyTitle}</h2>

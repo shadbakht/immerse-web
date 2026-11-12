@@ -30,6 +30,8 @@ function LanguageGlyph() {
  */
 export default function LanguageMenu({ links, current, label }: { links: LanguageLink[]; current: string; label: string }) {
   const [open, setOpen] = useState(false);
+  // A–Z by the two-letter code shown in the pill: ar, de, en, es … zh.
+  const sorted = [...links].sort((x, y) => x.code.localeCompare(y.code));
   const ref = useRef<HTMLDivElement>(null);
 
   // These pages render outside AppShell, which is what normally applies the
@@ -66,7 +68,7 @@ export default function LanguageMenu({ links, current, label }: { links: Languag
           role="menu"
           className="absolute end-0 top-full mt-1.5 z-20 w-48 p-1.5 rounded-xl border border-gray-200 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] shadow-[0_10px_30px_rgba(0,0,0,0.15)]"
         >
-          {links.map(l => {
+          {sorted.map(l => {
             const on = l.code === current;
             return (
               <Link

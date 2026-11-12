@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
+import { directionOf } from '@immerse/i18n';
 import SiteHeader from '@/components/SiteHeader';
 import type { Metadata } from 'next';
-import { supportContent, resolveLocale } from '../legalContent';
+import { supportContent, resolveLocale, LEGAL_LANGUAGES } from '../legalContent';
 
 export const metadata: Metadata = {
   title: 'Support — Immerse',
@@ -13,27 +15,25 @@ function Section({ title }: { title: string }) {
 }
 
 interface Props {
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string | string[] }>;
 }
 
 export default async function SupportPage({ searchParams }: Props) {
   const { lang } = await searchParams;
-  const locale = resolveLocale(lang);
+  const locale = resolveLocale(lang, (await headers()).get('accept-language'));
   const c = supportContent[locale];
-  const privacyHref = locale === 'es' ? '/privacy?lang=es' : '/privacy';
+  const dir = directionOf(locale);
+  const privacyHref = `/privacy?lang=${locale}`;
 
   return (
-    <div className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
+    <div lang={locale} dir={dir} className="min-h-screen bg-[#F8F7F4] dark:bg-[#0F1923]">
       <div className="max-w-2xl mx-auto px-6 py-12">
         <div className="mb-8">
           <SiteHeader
             homeLabel={c.home}
             languageLabel={c.language}
             currentLanguage={locale}
-            languages={[
-              { code: 'en', label: 'English', href: '/support' },
-              { code: 'es', label: 'Español', href: '/support?lang=es' },
-            ]}
+            languages={LEGAL_LANGUAGES.map(l => ({ ...l, href: `/support?lang=${l.code}` }))}
           />
         </div>
 
@@ -45,6 +45,7 @@ export default async function SupportPage({ searchParams }: Props) {
           <p className="text-xs font-bold tracking-widest uppercase text-gray-400 dark:text-[#5C7A8E] mb-2">{c.contactLabel}</p>
           <a
             href="mailto:support@immerseresearch.app"
+            dir="ltr"
             className="text-lg font-semibold text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
           >
             support@immerseresearch.app
