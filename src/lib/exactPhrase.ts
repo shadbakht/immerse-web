@@ -23,7 +23,7 @@ export function exactFold(s: string): string {
 }
 
 const CJK_RUN = /[\u3400-\u9fff\u3040-\u30ff]/;
-const WORD_CHAR = /[\p{L}\p{N}]/u;
+const WORD_CHAR = /[\p{L}\p{M}\p{N}]/u;
 
 /**
  * True when `text` contains `phrase` verbatim (modulo case + diacritics), as whole words: the

@@ -45,6 +45,14 @@ export const STOPWORDS_BY_LANG: Record<string, Set<string>> = {
     'es', 'son', 'era', 'fue', 'ser', 'está', 'esta', 'estan', 'están', 'ha', 'han',
     'no', 'ni', 'más', 'mas', 'como', 'pero', 'este', 'estos', 'estas',
   ]),
+  // Hindi (hi). Postpositions, the copula होना's commonest forms, pronouns and
+  // conjunctions — the words that fill every Devanagari sentence.
+  hi: new Set([
+    'का', 'की', 'के', 'को', 'में', 'से', 'पर', 'ने', 'तक', 'और', 'या', 'कि', 'जो',
+    'है', 'हैं', 'था', 'थी', 'थे', 'हो', 'होता', 'होती', 'होते', 'भी', 'ही', 'तो',
+    'यह', 'वह', 'ये', 'वे', 'इस', 'उस', 'इन', 'उन', 'मैं', 'हम', 'तुम', 'आप',
+    'एक', 'न', 'नहीं', 'लिए', 'साथ', 'द्वारा', 'अपने', 'अपनी', 'अपना',
+  ]),
   // Portuguese (pt). Articles, contractions of preposition + article, the
   // clitic pronouns and the commonest forms of ser/estar/ter/haver.
   pt: new Set([
