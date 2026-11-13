@@ -415,13 +415,11 @@ function ProfileView({
           <button
             onClick={profile.userId === currentUserId ? undefined : handleFollowToggle}
             disabled={profile.userId === currentUserId || followLoading}
-            className={`text-xs font-semibold px-4 py-1.5 rounded-full border-[1.5px] transition-colors disabled:opacity-60 ${
-              profile.userId === currentUserId
-                ? 'border-gray-300 dark:border-[#3A4D60] text-gray-400 dark:text-[#5C7A8E] cursor-not-allowed'
-                : isFollowing
-                  ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3] text-white'
-                  : 'border-[#1B6B7B] dark:border-[#2D9DB3] text-[#1B6B7B] dark:text-[#2D9DB3] hover:bg-[#1B6B7B]/5 dark:hover:bg-[#2D9DB3]/5'
-            }`}
+            className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
+              profile.userId === currentUserId || isFollowing
+                ? 'text-gray-400 dark:text-[#5C7A8E] bg-gray-100 dark:bg-[#2D4050]'
+                : 'text-white bg-[#1B6B7B] dark:bg-[#2D9DB3] hover:bg-[#155a68] dark:hover:bg-[#2589A0] disabled:opacity-60'
+            } ${profile.userId === currentUserId ? 'cursor-not-allowed' : ''}`}
           >
             {profile.userId === currentUserId ? t('usertags.follow') : followLoading ? '…' : isFollowing ? t('usertags.unfollow') : t('usertags.follow')}
           </button>
