@@ -104,8 +104,9 @@ function NoteItem({
     <div className="relative ps-12 pe-4 py-1.5">
       <button
         onClick={e => { e.stopPropagation(); onToggleSelected(); }}
-        className="absolute start-5 top-5 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors"
-        style={{ borderColor: selected ? '#1B6B7B' : '#CBD5E1', background: selected ? '#1B6B7B' : 'transparent' }}
+        className={`absolute start-5 top-5 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
+          selected ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3]' : 'border-gray-300 dark:border-[#3A4D60]'
+        }`}
         aria-label={t('notes.exportSelected')}
         aria-pressed={selected}
       >

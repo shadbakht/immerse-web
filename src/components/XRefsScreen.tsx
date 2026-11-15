@@ -137,8 +137,9 @@ function XRefCard({
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100 dark:border-[#2D4050]">
         <button
           onClick={e => { e.stopPropagation(); onToggleSelected(); }}
-          className="shrink-0 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors"
-          style={{ borderColor: selected ? '#1B6B7B' : '#CBD5E1', background: selected ? '#1B6B7B' : 'transparent' }}
+          className={`shrink-0 w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors ${
+            selected ? 'bg-[#1B6B7B] dark:bg-[#2D9DB3] border-[#1B6B7B] dark:border-[#2D9DB3]' : 'border-gray-300 dark:border-[#3A4D60]'
+          }`}
           aria-label={t('xrefs.exportSelected')}
         >
           {selected && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
