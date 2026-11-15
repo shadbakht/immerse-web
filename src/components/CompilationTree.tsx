@@ -112,7 +112,7 @@ export function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; o
   return (
     <div className="pe-4 py-1.5" style={{ paddingInlineStart: 32 + depth * 16 }}>
       <AnnotationCard
-        variant="discover"
+        variant="tag"
         quote={sel.snapshotText}
         sizeScale={resolved?.appLink.lang ? scriptScale(resolved.appLink.lang) : scriptScaleForText(sel.snapshotText)}
         citation={citation}

@@ -21,8 +21,8 @@ import { DiscoverIcon } from './Icons';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import {
   CompilationTree,
-  CommunitySelection,
   Checkbox,
+  openCommunitySelection,
   rootNodeOf,
   subtreeExportIds,
   nodeCheckState,
@@ -210,6 +210,45 @@ function TagCard({
   );
 }
 
+// Both passages side by side with the green X-Ref rail — same card as the
+// X-Refs screen. Click toggles full text.
+function XrefPair({ sides, onOpenBook }: { sides: CommunityXrefRow['payload']['a'][]; onOpenBook?: OpenBookFn }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="ps-16 pe-4 pb-3">
+      <div className="flex rounded-xl border border-gray-200 dark:border-[#2D4050] bg-white dark:bg-[#1B2A38] overflow-hidden">
+        <div className="w-1 shrink-0 bg-[#5A9460] dark:bg-[#6BB073]" aria-hidden />
+        <div
+          className="flex-1 min-w-0 grid grid-cols-2 divide-x rtl:divide-x-reverse divide-gray-100 dark:divide-[#2D4050] cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+          onClick={() => setExpanded(v => !v)}
+        >
+          {sides.map((side, i) => (
+            <div key={i} className="px-4 py-4 flex flex-col gap-2 min-w-0">
+              <p className={`font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}
+                style={{ fontSize: `calc(var(--quote-font-size) * ${scriptScaleForText(side.snapshotText)})` }}>
+                &quot;{side.snapshotText}&quot;
+              </p>
+              <p className="uppercase tracking-wide text-gray-400 dark:text-[#5C7A8E] leading-snug truncate"
+                style={{ fontSize: `calc(10px * ${scriptScaleForText(side.snapshotText)})` }}>
+                {side.citation || side.bookTitle}
+              </p>
+              {expanded && onOpenBook && side.bookId && (
+                <button
+                  onClick={e => { e.stopPropagation(); void openCommunitySelection(side, onOpenBook); }}
+                  className="text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline text-start"
+                >
+                  {t('common.openInReader')} →
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function XrefCard({
   cx, isImported, isOwn, onImport, onOpenBook, selected, onToggleSelect, open, onToggleOpen,
 }: {
@@ -246,11 +285,7 @@ function XrefCard({
           <Chevron open={open} onClick={onToggleOpen} />
         </div>
       </div>
-      {open && (
-        <div className="ps-6">
-          {sides.map((sel, i) => <CommunitySelection key={i} sel={sel} depth={0} onOpenBook={onOpenBook} />)}
-        </div>
-      )}
+      {open && sides.length > 0 && <XrefPair sides={sides} onOpenBook={onOpenBook} />}
     </div>
   );
 }
