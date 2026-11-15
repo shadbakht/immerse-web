@@ -42,3 +42,53 @@ export function hasExactPhrase(text: string, phrase: string): boolean {
   }
   return false;
 }
+
+function foldChar(c: string): string {
+  return c
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[‘’‚‛ʼʻʽʾʿ`´]/g, "'")
+    .replace(/[‐‑‒–—―−]/g, '-')
+    .replace(/[“”„‟«»]/g, '"');
+}
+
+/**
+ * Every place `phrase` occurs in `text` under the exact same rules as hasExactPhrase, as
+ * [start, end) offsets into the ORIGINAL `text` — so a result row can bold the phrase as one
+ * continuous run instead of word by word. Folding changes string length (diacritics drop,
+ * whitespace collapses), so the folded text keeps a per-character map back to `text`.
+ */
+export function findExactPhraseRanges(text: string, phrase: string): { start: number; end: number }[] {
+  const np = exactFold(phrase);
+  if (!np || !text) return [];
+  let folded = '';
+  const origStart: number[] = [];
+  const origEnd: number[] = [];
+  let i = 0;
+  for (const c of text) {
+    const len = c.length;
+    if (/\s/.test(c)) {
+      if (folded.length === 0 || folded[folded.length - 1] !== ' ') {
+        folded += ' '; origStart.push(i); origEnd.push(i + len);
+      } else {
+        origEnd[origEnd.length - 1] = i + len;
+      }
+    } else {
+      for (const f of foldChar(c)) {
+        folded += f; origStart.push(i); origEnd.push(i + len);
+      }
+    }
+    i += len;
+  }
+  const cjk = CJK_RUN.test(np);
+  const out: { start: number; end: number }[] = [];
+  for (let k = folded.indexOf(np); k !== -1; k = folded.indexOf(np, k + 1)) {
+    if (!cjk) {
+      const before = k === 0 ? '' : folded[k - 1];
+      const after = folded[k + np.length] ?? '';
+      if ((before && WORD_CHAR.test(before)) || (after && WORD_CHAR.test(after))) continue;
+    }
+    out.push({ start: origStart[k], end: origEnd[k + np.length - 1] });
+  }
+  return out;
+}

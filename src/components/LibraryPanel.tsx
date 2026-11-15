@@ -12,7 +12,7 @@ import { importBook, removeImportedBook } from '@/lib/bookImportWeb';
 import { listLocalBooks, getLocalBook } from '@/lib/importedBooksDb';
 import { semanticSearch } from '@/lib/semanticSearch';
 import { planAiSearch, weightedRankFusion, fusionWeights, orderForDisplay, traditionsForSlugs, AI_SEARCH_ENABLED } from '@/lib/aiSearch';
-import { hasExactPhrase } from '@/lib/exactPhrase';
+import { hasExactPhrase, findExactPhraseRanges } from '@/lib/exactPhrase';
 import { proximityTokens, clusterCoverage, dropStopwords } from '@/lib/proximitySnippet';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import { LANGUAGE_LABELS, translate } from '@immerse/i18n';
@@ -52,6 +52,7 @@ interface SearchResult {
   vector?:      boolean;  // found by embedding similarity: a whole passage, nothing to highlight
   matchPhrase?: string;   // the AI phrase that found it, if any
   proximity?:   boolean;  // matched loosely (bag / cross-row) — cluster-anchor its snippet + highlight
+  exactPhrase?: string;   // found verbatim by an unquoted in-order query — bold it as one run
 }
 
 interface LibraryPanelProps {
@@ -549,15 +550,18 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       // paragraphs that merely mention each word (and, for a 3+ word query, under
       // AI "Related" rows). So run the quoted-search path as well and put its hits
       // first. Fewer than two words has no order to honour; operators and
-      // wildcards are the reader asking for something else.
+      // wildcards are the reader asking for something else. No upper bound: a
+      // whole pasted sentence is the clearest "I mean this line" there is, and
+      // the exact-phrase path verifies against the real text, so length can't
+      // produce false matches. (Mirrors mobile LibraryScreen.)
       const wordCount = q.split(/\s+/).filter(Boolean).length;
       let literal: SearchResult[] = [];
-      if (!exactPhrase && wordCount >= 2 && wordCount <= 12 && !/[|&!()"*]|\b(AND|OR|NOT)\b/.test(q)) {
+      if (!exactPhrase && wordCount >= 2 &&!/[|&!()"*]|\b(AND|OR|NOT)\b/.test(q)) {
         const [localLiteral, remoteLiteral] = await Promise.all([
           searchLocalBooks(q, localBookIds, q),
           onlyImportedSelected ? Promise.resolve([] as SearchResult[]) : runExactPhraseSearch(q, regularUUIDs).catch(() => [] as SearchResult[]),
         ]);
-        literal = [...localLiteral, ...remoteLiteral];
+        literal = [...localLiteral, ...remoteLiteral].map(r => ({ ...r, exactPhrase: q }));
       }
       const literalIds = new Set(literal.map(r => r.passageId));
       // The ordinary row for a passage the literal list already leads with is dropped.
@@ -898,7 +902,15 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     }));
   }
 
-  function getSnippet(content: string, query: string, proximity = false): string {
+  function getSnippet(content: string, query: string, proximity = false, phrase: string | null = null): string {
+    // A verbatim phrase: centre on it and keep ALL of it in the snippet, so a long
+    // pasted sentence isn't cut off partway through its bold run.
+    const run = phrase ? findExactPhraseRanges(content, phrase)[0] : undefined;
+    if (run) {
+      const start = Math.max(0, run.start - 80);
+      const end   = Math.min(content.length, Math.max(run.end + 40, run.start + 220));
+      return (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
+    }
     const normContent = normalize(content);
     let bestIdx = -1;
     if (proximity) {
@@ -922,7 +934,11 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
     return (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
   }
 
-  function highlightQuery(text: string, query: string, proximity = false) {
+  function highlightQuery(text: string, query: string, proximity = false, phrase: string | null = null) {
+    // A verbatim phrase (quoted, or a literal in-order hit) is marked as one
+    // continuous run — every word, articles included — not word by word.
+    const runs = phrase ? findExactPhraseRanges(text, phrase) : [];
+    if (runs.length) return renderMarked(text, runs);
     // A loose match: tint the phrase's significant words (drops "he"/"be"/"ye"
     // by length, "the"/"and"/pronouns by the stopword set, and no synonym
     // expansion) so the marked run reads as the phrase, not every article.
@@ -951,8 +967,12 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
       }
     }
     if (!ranges.length) return <span>{text}</span>;
-    ranges.sort((a, b) => a.start - b.start);
-    const merged = [ranges[0]];
+    return renderMarked(text, ranges);
+  }
+
+  function renderMarked(text: string, ranges: { start: number; end: number }[]) {
+    ranges = [...ranges].sort((a, b) => a.start - b.start);
+    const merged = [{ ...ranges[0] }];
     for (let i = 1; i < ranges.length; i++) {
       const last = merged[merged.length - 1];
       if (ranges[i].start <= last.end) last.end = Math.max(last.end, ranges[i].end);
@@ -1159,7 +1179,8 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 const isExpanded = expandedResults.has(result.passageId);
                 const isChecked  = checkedResultIds.has(result.passageId);
                 const matchQuery = result.vector ? '' : (result.matchPhrase ?? searchQuery);
-                const snippet    = result.vector ? result.content : getSnippet(result.content, matchQuery, result.proximity);
+                const phrase     = result.vector ? null : (result.exactPhrase ?? extractExactPhrase(searchQuery));
+                const snippet    = result.vector ? result.content : getSnippet(result.content, matchQuery, result.proximity, phrase);
                 const location   = result.chapterLabel || result.sectionTitle;
                 return (
                   <div key={result.passageId} className={`border-b border-gray-100 dark:border-[#2D4050] ${isChecked ? 'bg-[#1B6B7B]/5 dark:bg-[#2D9DB3]/5' : ''}`}>
@@ -1177,7 +1198,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                           {result.semantic ? `${t('library.relatedPrefix')} · ` : ''}{result.bookTitle}{location ? ` · ${location}` : ''}
                         </p>
                         <p className="font-serif text-gray-700 dark:text-[#B8C7D6] leading-relaxed" style={{ fontSize: `calc(var(--quote-font-size) * ${treeScale})` }}>
-                          {isExpanded ? highlightQuery(result.content, matchQuery, result.proximity) : highlightQuery(snippet, matchQuery, result.proximity)}
+                          {isExpanded ? highlightQuery(result.content, matchQuery, result.proximity, phrase) : highlightQuery(snippet, matchQuery, result.proximity, phrase)}
                         </p>
                         {isExpanded && (
                           <button
@@ -1187,7 +1208,7 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                               // significant words (minus stopwords), not "the"/"he".
                               const hq = result.vector ? '' : result.proximity && result.matchPhrase
                                 ? dropStopwords(proximityTokens(result.matchPhrase), contentLang).join(' ')
-                                : (result.matchPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim());
+                                : (result.matchPhrase ?? result.exactPhrase ?? extractExactPhrase(searchQuery) ?? searchQuery.trim());
                               onOpenBook(result.bookId, result.passageId, hq);
                             }}
                             className="mt-2 text-xs text-[#1B6B7B] dark:text-[#2D9DB3] font-medium hover:underline"

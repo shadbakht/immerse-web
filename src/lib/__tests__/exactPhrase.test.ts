@@ -1,4 +1,4 @@
-import { exactFold, hasExactPhrase } from '../exactPhrase';
+import { exactFold, hasExactPhrase, findExactPhraseRanges } from '../exactPhrase';
 
 // Spec: a quoted search is tolerant of ONLY case and diacritics. Punctuation is literal
 // and word order is exact. (Typographic variants of one mark are the same character.)
@@ -55,5 +55,31 @@ describe('exactFold', () => {
   it('strips diacritics, lowercases, folds mark variants, collapses whitespace — nothing else', () => {
     expect(exactFold('  Kitáb–i–Aqdas ‘Abdu’l‑Bahá  “Hi”  ')).toBe('kitab-i-aqdas \'abdu\'l-baha "hi"');
     expect(exactFold("was, I am.")).toBe('was, i am.');
+  });
+});
+
+describe('findExactPhraseRanges — offsets into the original text', () => {
+  const slices = (text: string, phrase: string) =>
+    findExactPhraseRanges(text, phrase).map(r => text.slice(r.start, r.end));
+
+  it('returns the whole run, punctuation and accents intact', () => {
+    expect(slices('Lo, the Kitáb–i–Aqdas says', 'kitab-i-aqdas')).toEqual(['Kitáb–i–Aqdas']);
+    expect(slices('the Bahá’í Faith and the Bahá’í Faith', "Baha'i Faith")).toEqual(['Bahá’í Faith', 'Bahá’í Faith']);
+  });
+
+  it('maps back across collapsed whitespace', () => {
+    expect(slices('Before  Abraham \n was I am.', 'Abraham was I am')).toEqual(['Abraham \n was I am']);
+  });
+
+  it('marks a long pasted sentence as one range', () => {
+    const s = 'What else could these weighty words signify if they did not point to the inevitable curtailment of unfettered national sovereignty?';
+    const text = `“${s}” And so on.`;
+    expect(slices(text, s)).toEqual([s]);
+  });
+
+  it('agrees with hasExactPhrase on word boundaries', () => {
+    expect(findExactPhraseRanges('the delight of it', 'light')).toEqual([]);
+    expect(findExactPhraseRanges('Before Abraham was, I am', 'Before Abraham was I am')).toEqual([]);
+    expect(slices('愿你们光明磊落', '光明')).toEqual(['光明']);
   });
 });
