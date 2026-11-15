@@ -30,6 +30,7 @@ import {
 } from './CompilationTree';
 
 const EMPTY_SET: Set<string> = new Set();
+const isUserKey = (k: string) => /^(?:trending|recent):user:/.test(k);
 
 // Guests (no session) are not allowed to read profiles.full_name — asking for
 // it fails the whole query — so they get usernames only.
@@ -642,6 +643,9 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   // Not persisted. While searching, matches open on their own; a click during a
   // search overrides that until the query changes.
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+  // User rows start open so their compilations and X-Refs show at a glance;
+  // this holds the ones the viewer collapsed.
+  const [closedUsers, setClosedUsers] = useState<Set<string>>(new Set());
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
   useEffect(() => { setOverrides(new Map()); }, [searchQuery]);
   const searchOpen = useMemo(() => {
@@ -656,12 +660,15 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     }
     return out;
   }, [searchQuery, trendingGroups, recentGroups]);
-  const isOpen = useCallback((k: string) =>
-    overrides.has(k) ? !!overrides.get(k) : (searchOpen.has(k) || openKeys.has(k)),
-  [overrides, searchOpen, openKeys]);
+  const isOpen = useCallback((k: string) => {
+    if (overrides.has(k)) return !!overrides.get(k);
+    if (isUserKey(k)) return !closedUsers.has(k);
+    return searchOpen.has(k) || openKeys.has(k);
+  }, [overrides, searchOpen, openKeys, closedUsers]);
   const toggleOpen = useCallback((k: string) => {
     if (searchQuery.trim()) { setOverrides(prev => new Map(prev).set(k, !isOpen(k))); return; }
-    setOpenKeys(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+    const flip = (prev: Set<string>) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; };
+    if (isUserKey(k)) setClosedUsers(flip); else setOpenKeys(flip);
   }, [searchQuery, isOpen]);
 
   const renderGroup = (prefix: string) => function DiscoverUser(g: Group) {
