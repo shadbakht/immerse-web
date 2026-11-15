@@ -10,6 +10,8 @@ import {
   unfollowUser,
   type CommunityTagRow,
 } from '@/lib/communitySync';
+import { importCommunityXref, liveSubscribedXrefIds, type CommunityXrefRow } from '@/lib/communityXrefs';
+import { groupDiscoverFeed, initialsFor, type DiscoverGroup } from '@/lib/discoverGroups';
 import { exportAsDocx, exportAsPdf, exportAsCsv, exportAsMarkdown, type TagRow } from '@/lib/tagExport';
 import { createDiscoverBundleShare, revokeSharedSet } from '@/lib/sharedSets';
 import { shareUrl } from '@/lib/shareUrl';
@@ -19,6 +21,7 @@ import { DiscoverIcon } from './Icons';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import {
   CompilationTree,
+  CommunitySelection,
   Checkbox,
   rootNodeOf,
   subtreeExportIds,
@@ -31,10 +34,33 @@ const EMPTY_SET: Set<string> = new Set();
 // Guests (no session) are not allowed to read profiles.full_name — asking for
 // it fails the whole query — so they get usernames only.
 const CARD_COLS = 'id, user_id, name, payload, selection_count, import_count, published_at, updated_at';
-const CARD_SELECT_SIGNED_IN = `${CARD_COLS}, profiles(full_name, username, avatar_url)`;
-const CARD_SELECT_GUEST = `${CARD_COLS}, profiles(username, avatar_url)`;
-function cardSelect(signedIn: boolean) {
-  return signedIn ? CARD_SELECT_SIGNED_IN : CARD_SELECT_GUEST;
+const XREF_COLS = 'id, user_id, xref_id, label, payload, import_count, published_at, updated_at';
+const PROFILE_SIGNED_IN = 'profiles(full_name, username, avatar_url)';
+const PROFILE_GUEST = 'profiles(username, avatar_url)';
+const withProfiles = (cols: string, signedIn: boolean) =>
+  `${cols}, ${signedIn ? PROFILE_SIGNED_IN : PROFILE_GUEST}`;
+function cardSelect(signedIn: boolean) { return withProfiles(CARD_COLS, signedIn); }
+// Every listed row is loaded once and grouped by publisher here — paging rows
+// would split one user's compilations across pages. FEED_LIMIT is the ceiling.
+const FEED_LIMIT = 1000;
+
+const compilationText = (ct: CommunityTag) => ct.name ?? '';
+const xrefText = (cx: CommunityXrefRow) => [cx.label, cx.payload?.a?.snapshotText, cx.payload?.b?.snapshotText,
+  cx.payload?.a?.citation, cx.payload?.b?.citation].filter(Boolean).join(' ');
+/** A public X-Ref with no label is named by its two books. */
+const xrefTitle = (cx: CommunityXrefRow) => cx.label?.trim()
+  || `${cx.payload?.a?.bookTitle ?? ''} ↔ ${cx.payload?.b?.bookTitle ?? ''}`;
+
+/** Export rows for selected public X-Refs: one level each, its two quotes. */
+function xrefsToTagRows(xrefs: CommunityXrefRow[]): TagRow[] {
+  return xrefs.map(cx => ({
+    id: `xref:${cx.id}`, name: xrefTitle(cx), parent_id: null, depth: 0, sort_order: 0,
+    created_at: '', visibility: 'published',
+    selections: [cx.payload?.a, cx.payload?.b].filter(Boolean).map((s, i) => ({
+      id: `xref:${cx.id}:${i}`, snapshot_text: s.snapshotText ?? '', passage_id: '', book_id: '',
+      citation: s.citation ?? s.bookTitle ?? '',
+    })),
+  }));
 }
 
 /** Build export-ready TagRow[] from a community tag's payload, keeping only the
@@ -66,19 +92,10 @@ interface CommunityTag extends CommunityTagRow {
   profiles: { full_name: string | null; username: string | null; avatar_url: string | null } | null;
 }
 
-interface ProfileUser {
-  userId:      string;
-  displayName: string;
-  username:    string | null;
-  avatarUrl:   string | null;
-}
-
 interface CommunityPanelProps {
   user: import('@supabase/supabase-js').User | null;
   onOpenBook?: (bookId: string, passageId?: string, passageSnapshot?: string) => void;
 }
-
-const PAGE_SIZE = 20;
 
 // Module-level, so the locale has to be handed in rather than hooked for.
 function formatDate(
@@ -97,169 +114,227 @@ function formatDate(
   return d.toLocaleDateString(uiLanguage, { month: 'short', day: 'numeric' });
 }
 
-// ── Tag card (feed + profile views) ──────────────────────────────────────────
+// ── Second tier: compilation / X-Ref cards ───────────────────────────────────
+
+const BTN_PRIMARY = 'text-xs font-semibold text-white bg-[#1B6B7B] dark:bg-[#2D9DB3] hover:bg-[#155a68] dark:hover:bg-[#2589A0] disabled:opacity-60 px-3 py-1 rounded-full transition-colors';
+const BTN_MUTED = 'text-xs font-semibold text-gray-400 dark:text-[#5C7A8E] bg-gray-100 dark:bg-[#2D4050] px-3 py-1 rounded-full';
+
+/** Import / Imported — and nothing at all on your own items (owner, 2026-11-14). */
+function ImportButton({ isOwn, isImported, onImport }: { isOwn: boolean; isImported: boolean; onImport: () => Promise<void> }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  if (isOwn) return null;
+  if (isImported) {
+    return <button disabled title={t('discover.alreadyImported')} className={`${BTN_MUTED} cursor-not-allowed`}>{t('discover.imported')}</button>;
+  }
+  return (
+    <button
+      onClick={async e => { e.stopPropagation(); setBusy(true); await onImport(); setBusy(false); }}
+      disabled={busy}
+      className={BTN_PRIMARY}
+    >
+      {busy ? '…' : t('discover.import')}
+    </button>
+  );
+}
+
+function Chevron({ open, onClick }: { open: boolean; onClick?: () => void }) {
+  return (
+    <span
+      className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform cursor-pointer rtl:-scale-x-100 ${open ? 'rotate-90' : ''}`}
+      onClick={onClick}
+    >›</span>
+  );
+}
 
 function TagCard({
-  ct,
-  isImported,
-  isOwn,
-  onImport,
-  onProfilePress,
-  onOpenBook,
-  selectedIds,
-  onToggleSelect,
-  showAuthor = true,
+  ct, isImported, isOwn, onImport, onOpenBook, selectedIds, onToggleSelect, open, onToggleOpen,
 }: {
   ct:             CommunityTag;
   isImported:     boolean;
-  isOwn?:         boolean;
-  onImport:       (ct: CommunityTag) => void;
-  onProfilePress: (ct: CommunityTag) => void;
+  isOwn:          boolean;
+  onImport:       (ct: CommunityTag) => Promise<void>;
   onOpenBook?:    OpenBookFn;
   selectedIds:    Set<string>;
   onToggleSelect: (ct: CommunityTag, exportId: string) => void;
-  showAuthor?:    boolean;
+  open:           boolean;
+  onToggleOpen:   () => void;
 }) {
   const { t, uiLanguage } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const displayName = ct.profiles?.username ?? t('discover.anonymous');
-
   const payload = Array.isArray(ct.payload) ? ct.payload : [];
   const root = rootNodeOf(payload);
 
-  const allSelections = useMemo(() => payload.flatMap((t: any) => t.selections ?? []), [payload]);
-
   const lastAddedAt = useMemo(() => {
-    const dates = allSelections.map((s: any) => s.createdAt).filter(Boolean);
+    const dates = payload.flatMap((n: any) => n.selections ?? []).map((s: any) => s.createdAt).filter(Boolean);
     if (dates.length === 0) return ct.updated_at;
     return dates.reduce((max: string, d: string) => (d > max ? d : max), dates[0]);
-  }, [allSelections, ct.updated_at]);
-
-  async function handleImport(e: React.MouseEvent) {
-    e.stopPropagation();
-    setImporting(true);
-    await onImport(ct);
-    setImporting(false);
-  }
+  }, [payload, ct.updated_at]);
 
   return (
     <div className="border-b border-gray-100 dark:border-[#2D4050]">
-      <div className="flex items-center px-4 py-3.5 gap-2">
+      <div className="flex items-center ps-10 pe-4 py-3 gap-2">
         {root && (
           <Checkbox
             state={nodeCheckState(payload, root.exportId, selectedIds)}
             onChange={() => onToggleSelect(ct, root.exportId)}
           />
         )}
-        <div
-          className="flex-1 min-w-0 cursor-pointer"
-          onClick={() => setExpanded(e => !e)}
-        >
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleOpen}>
           <div
             className="text-gray-800 dark:text-[#D2DCE8] truncate leading-5"
-            style={{
-              fontSize: `calc(0.875rem * ${scriptScaleForText(ct.name)})`,
-              fontWeight: treeDepthWeight(0),
-            }}
+            style={{ fontSize: `calc(0.875rem * ${scriptScaleForText(ct.name)})`, fontWeight: treeDepthWeight(0) }}
           >{ct.name}</div>
           <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5">
-            {showAuthor && (
-              <>
-                <button
-                  className="text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline"
-                  onClick={e => { e.stopPropagation(); onProfilePress(ct); }}
-                >
-                  @{displayName}
-                </button>
-                {'  ·  '}
-              </>
-            )}
             {formatDate(lastAddedAt, t, uiLanguage)}
             {'  ·  '}{t('discover.import', { count: ct.import_count })}
           </div>
         </div>
-
         <div className="flex items-center gap-2 shrink-0">
-          {(isOwn || isImported) ? (
-            <button
-              disabled
-              title={isOwn ? t('discover.ownTag') : t('discover.alreadyImported')}
-              className="text-xs font-semibold text-gray-400 dark:text-[#5C7A8E] bg-gray-100 dark:bg-[#2D4050] px-3 py-1 rounded-full cursor-not-allowed"
-            >
-              {isOwn ? t('discover.import') : t('discover.imported')}
-            </button>
-          ) : (
-            <button
-              onClick={handleImport}
-              disabled={importing}
-              className="text-xs font-semibold text-white bg-[#1B6B7B] dark:bg-[#2D9DB3] hover:bg-[#155a68] dark:hover:bg-[#2589A0] disabled:opacity-60 px-3 py-1 rounded-full transition-colors"
-            >
-              {importing ? '…' : t('discover.import')}
-            </button>
-          )}
-
+          <ImportButton isOwn={isOwn} isImported={isImported} onImport={() => onImport(ct)} />
           <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{ct.selection_count}</span>
-
-          <span
-            className={`text-gray-400 dark:text-[#5C7A8E] text-sm transition-transform cursor-pointer rtl:-scale-x-100 ${expanded ? 'rotate-90' : ''}`}
-            onClick={() => setExpanded(e => !e)}
-          >
-            ›
-          </span>
+          <Chevron open={open} onClick={onToggleOpen} />
         </div>
       </div>
-
-      {expanded && (
-        <CompilationTree
-          payload={payload}
-          onOpenBook={onOpenBook}
-          selectedIds={selectedIds}
-          onToggleSelect={(exportId) => onToggleSelect(ct, exportId)}
-        />
+      {open && (
+        <div className="ps-6">
+          <CompilationTree
+            payload={payload}
+            onOpenBook={onOpenBook}
+            selectedIds={selectedIds}
+            onToggleSelect={(exportId) => onToggleSelect(ct, exportId)}
+          />
+        </div>
       )}
+    </div>
+  );
+}
+
+function XrefCard({
+  cx, isImported, isOwn, onImport, onOpenBook, selected, onToggleSelect, open, onToggleOpen,
+}: {
+  cx: CommunityXrefRow;
+  isImported: boolean;
+  isOwn: boolean;
+  onImport: (cx: CommunityXrefRow) => Promise<void>;
+  onOpenBook?: OpenBookFn;
+  selected: boolean;
+  onToggleSelect: (cx: CommunityXrefRow) => void;
+  open: boolean;
+  onToggleOpen: () => void;
+}) {
+  const { t, uiLanguage } = useTranslation();
+  const title = xrefTitle(cx);
+  const sides = [cx.payload?.a, cx.payload?.b].filter(Boolean);
+  return (
+    <div className="border-b border-gray-100 dark:border-[#2D4050]">
+      <div className="flex items-center ps-10 pe-4 py-3 gap-2">
+        <Checkbox state={selected ? 'checked' : 'unchecked'} onChange={() => onToggleSelect(cx)} />
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleOpen}>
+          <div
+            className="text-gray-800 dark:text-[#D2DCE8] truncate leading-5"
+            style={{ fontSize: `calc(0.875rem * ${scriptScaleForText(title)})`, fontWeight: treeDepthWeight(0) }}
+          >{title}</div>
+          <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5">
+            {t('nav.xrefs')}
+            {'  ·  '}{formatDate(cx.updated_at ?? cx.published_at, t, uiLanguage)}
+            {'  ·  '}{t('discover.import', { count: cx.import_count })}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <ImportButton isOwn={isOwn} isImported={isImported} onImport={() => onImport(cx)} />
+          <Chevron open={open} onClick={onToggleOpen} />
+        </div>
+      </div>
+      {open && (
+        <div className="ps-6">
+          {sides.map((sel, i) => <CommunitySelection key={i} sel={sel} depth={0} onOpenBook={onOpenBook} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── First tier: the publisher ────────────────────────────────────────────────
+
+function Avatar({ profile }: { profile: DiscoverGroup<CommunityTag, CommunityXrefRow>['profile'] }) {
+  const [failed, setFailed] = useState(false);
+  const url = profile?.avatar_url;
+  return (
+    <div className="w-9 h-9 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] flex items-center justify-center shrink-0 overflow-hidden">
+      {url && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} />
+      ) : (
+        <span className="text-white font-bold text-sm">{initialsFor(profile?.full_name, profile?.username)}</span>
+      )}
+    </div>
+  );
+}
+
+type Group = DiscoverGroup<CommunityTag, CommunityXrefRow>;
+
+function UserRow({
+  group, isOwn, isFollowing, onFollowToggle, open, onToggleOpen, children,
+}: {
+  group: Group;
+  isOwn: boolean;
+  isFollowing: boolean;
+  onFollowToggle: (userId: string, following: boolean) => Promise<void>;
+  open: boolean;
+  onToggleOpen: () => void;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const fullName = group.profile?.full_name?.trim();
+  const username = group.profile?.username;
+  const counts = [
+    group.compilations.length ? t('discover.compilationCount', { count: group.compilations.length }) : null,
+    group.xrefs.length ? t('discover.xrefCount', { count: group.xrefs.length }) : null,
+  ].filter(Boolean).join('  ·  ');
+  return (
+    <div>
+      <div className="flex items-center px-4 py-3 gap-3 border-b border-gray-100 dark:border-[#2D4050]">
+        <div className="flex-1 min-w-0 flex items-center gap-3 cursor-pointer" onClick={onToggleOpen}>
+          <Avatar profile={group.profile} />
+          <div className="min-w-0">
+            {fullName && <div className="text-sm font-bold text-gray-900 dark:text-[#E2EAF2] truncate">{fullName}</div>}
+            <div className="text-xs text-gray-400 dark:text-[#5C7A8E] truncate">
+              {username ? `@${username}` : t('discover.anonymous')}
+              {counts ? `  ·  ${counts}` : ''}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!isOwn && (
+            <button
+              onClick={async e => { e.stopPropagation(); setBusy(true); await onFollowToggle(group.userId, isFollowing); setBusy(false); }}
+              disabled={busy}
+              title={isFollowing ? undefined : t('usertags.autoImports')}
+              className={isFollowing ? `${BTN_MUTED} hover:opacity-80` : BTN_PRIMARY}
+            >
+              {busy ? '…' : isFollowing ? t('usertags.following') : t('usertags.follow')}
+            </button>
+          )}
+          <Chevron open={open} onClick={onToggleOpen} />
+        </div>
+      </div>
+      {open && children}
     </div>
   );
 }
 
 // ── Feed column ───────────────────────────────────────────────────────────────
 
-function FeedColumn({
-  title,
-  tags,
-  loading,
-  searchQuery,
-  subscribedIds,
-  onImport,
-  onProfilePress,
-  onOpenBook,
-  selection,
-  onToggleSelect,
-  currentUserId,
-}: {
-  title:          string;
-  tags:           CommunityTag[];
-  loading:        boolean;
-  searchQuery:    string;
-  subscribedIds:  Set<string>;
-  onImport:       (ct: CommunityTag) => void;
-  onProfilePress: (ct: CommunityTag) => void;
-  onOpenBook?:    OpenBookFn;
-  selection:      Map<string, Set<string>>;
-  onToggleSelect: (ct: CommunityTag, exportId: string) => void;
-  currentUserId?: string;
+function FeedColumn({ title, groups, loading, searchQuery, hasAny, renderGroup }: {
+  title: string;
+  groups: Group[];
+  loading: boolean;
+  searchQuery: string;
+  hasAny: boolean;
+  renderGroup: (g: Group) => React.ReactNode;
 }) {
   const { t } = useTranslation();
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return tags;
-    return tags.filter(ct =>
-      ct.name?.toLowerCase().includes(q) ||
-      ct.profiles?.username?.toLowerCase().includes(q) ||
-      ct.profiles?.full_name?.toLowerCase().includes(q),
-    );
-  }, [tags, searchQuery]);
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
       <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#2D4050] shrink-0">
@@ -270,191 +345,14 @@ function FeedColumn({
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-            <p className="text-3xl mb-3">{searchQuery ? '🔍' : '🏷️'}</p>
-            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{searchQuery ? t('discover.noResults') : t('discover.noneYet')}</p>
-            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{searchQuery ? t('discover.tryDifferent') : t('discover.beFirst')}</p>
+            <p className="text-3xl mb-3">{searchQuery && hasAny ? '🔍' : '🏷️'}</p>
+            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{searchQuery && hasAny ? t('discover.noResults') : t('discover.noneYet')}</p>
+            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{searchQuery && hasAny ? t('discover.tryDifferent') : t('discover.beFirst')}</p>
           </div>
         ) : (
-          <div>
-            {filtered.map(ct => (
-              <TagCard
-                key={ct.id}
-                ct={ct}
-                isImported={subscribedIds.has(ct.id)}
-                isOwn={!!currentUserId && ct.user_id === currentUserId}
-                onImport={onImport}
-                onProfilePress={onProfilePress}
-                onOpenBook={onOpenBook}
-                selectedIds={selection.get(ct.id) ?? EMPTY_SET}
-                onToggleSelect={onToggleSelect}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Publisher profile view ────────────────────────────────────────────────────
-
-function ProfileView({
-  profile,
-  currentUserId,
-  subscribedIds,
-  onImport,
-  onBack,
-  onOpenBook,
-  selection,
-  onToggleSelect,
-  onRequireSignIn,
-}: {
-  profile:       ProfileUser;
-  /** Null for a guest, who can read a profile but not follow it. */
-  currentUserId: string | null;
-  subscribedIds: Set<string>;
-  onImport:      (ct: CommunityTagRow) => void;
-  onBack:        () => void;
-  onOpenBook?:   OpenBookFn;
-  selection:      Map<string, Set<string>>;
-  onToggleSelect: (ct: CommunityTag, exportId: string) => void;
-  onRequireSignIn: () => void;
-}) {
-  const supabase      = createClient();
-  const [tags, setTags]               = useState<CommunityTag[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
-      .from('community_tags')
-      .select(cardSelect(!!currentUserId))
-      .eq('user_id', profile.userId)
-      .eq('listed', true)
-      .order('updated_at', { ascending: false })
-      .then(({ data }) => {
-        setTags((data ?? []) as unknown as CommunityTag[]);
-        setLoading(false);
-      });
-
-    if (!currentUserId || profile.userId === currentUserId) {
-      setFollowLoading(false);
-      return;
-    }
-    supabase
-      .from('community_user_follows')
-      .select('id')
-      .eq('subscriber_id', currentUserId)
-      .eq('followed_user_id', profile.userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        setIsFollowing(!!data);
-        setFollowLoading(false);
-      });
-  }, [profile.userId, currentUserId]);
-
-  async function handleFollowToggle() {
-    if (!currentUserId) { onRequireSignIn(); return; }
-    if (followLoading) return;
-    setFollowLoading(true);
-    try {
-      if (isFollowing) {
-        await unfollowUser(currentUserId, profile.userId);
-        setIsFollowing(false);
-      } else {
-        await followUser(currentUserId, profile.userId);
-        setIsFollowing(true);
-      }
-    } catch (e) {
-      console.warn('[CommunityPanel] follow toggle error:', e);
-    }
-    setFollowLoading(false);
-  }
-
-  const { t } = useTranslation();
-  const initials = profile.displayName[0]?.toUpperCase() ?? '?';
-
-  return (
-    <div className="h-full flex flex-col bg-white dark:bg-[#1B2A38]">
-      {/* Header */}
-      <div className="px-6 pt-5 pb-4 shrink-0 border-b border-gray-100 dark:border-[#2D4050] flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="text-2xl text-[#1B6B7B] dark:text-[#2D9DB3] leading-none w-8 shrink-0"
-          aria-label={t('common.back')}
-        >
-          ‹
-        </button>
-
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] flex items-center justify-center shrink-0 overflow-hidden">
-            {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-white font-bold text-base">{initials}</span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-gray-900 dark:text-[#E2EAF2] truncate">{profile.displayName}</div>
-            {profile.username && (
-              <div className="text-xs text-gray-400 dark:text-[#5C7A8E]">@{profile.username}</div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {profile.userId !== currentUserId && (
-            <span className="text-[10px] leading-tight text-gray-400 dark:text-[#5C7A8E] text-end max-w-[120px]">
-              {t('usertags.autoImports')}
-            </span>
-          )}
-          <button
-            onClick={profile.userId === currentUserId ? undefined : handleFollowToggle}
-            disabled={profile.userId === currentUserId || followLoading}
-            className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
-              profile.userId === currentUserId || isFollowing
-                ? 'text-gray-400 dark:text-[#5C7A8E] bg-gray-100 dark:bg-[#2D4050]'
-                : 'text-white bg-[#1B6B7B] dark:bg-[#2D9DB3] hover:bg-[#155a68] dark:hover:bg-[#2589A0] disabled:opacity-60'
-            } ${profile.userId === currentUserId ? 'cursor-not-allowed' : ''}`}
-          >
-            {profile.userId === currentUserId ? t('usertags.follow') : followLoading ? '…' : isFollowing ? t('usertags.unfollow') : t('usertags.follow')}
-          </button>
-        </div>
-      </div>
-
-      {/* Tag list */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#1B6B7B] dark:border-[#2D9DB3] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : tags.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-3xl mb-3">🏷️</p>
-            <p className="text-sm font-semibold text-gray-700 dark:text-[#B8C7D6] mb-1">{t('usertags.noTags')}</p>
-            <p className="text-xs text-gray-400 dark:text-[#5C7A8E]">{t('usertags.noTagsBody')}</p>
-          </div>
-        ) : (
-          <div>
-            {tags.map(ct => (
-              <TagCard
-                key={ct.id}
-                ct={ct}
-                isImported={subscribedIds.has(ct.id)}
-                isOwn={ct.user_id === currentUserId}
-                onImport={onImport}
-                onProfilePress={() => {}}
-                onOpenBook={onOpenBook}
-                selectedIds={selection.get(ct.id) ?? EMPTY_SET}
-                onToggleSelect={onToggleSelect}
-                showAuthor={false}
-              />
-            ))}
-          </div>
+          <div>{groups.map(g => <div key={g.userId}>{renderGroup(g)}</div>)}</div>
         )}
       </div>
     </div>
@@ -509,18 +407,19 @@ function GuestSignInCard({ onClose }: { onClose: () => void }) {
 export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
-  const [recentTags, setRecentTags]       = useState<CommunityTag[]>([]);
-  const [trendingTags, setTrendingTags]   = useState<CommunityTag[]>([]);
-  const [recentLoading, setRecentLoading]   = useState(true);
-  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [allTags, setAllTags]   = useState<CommunityTag[]>([]);
+  const [allXrefs, setAllXrefs] = useState<CommunityXrefRow[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [searchQuery, setSearchQuery]     = useState('');
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
-  const [profileView, setProfileView]     = useState<ProfileUser | null>(null);
+  const [subscribedXrefIds, setSubscribedXrefIds] = useState<Set<string>>(new Set());
+  const [followingIds, setFollowingIds]   = useState<Set<string>>(new Set());
   // A guest tapped Import, Follow or Export: show the sign-in card.
   const [askSignIn, setAskSignIn]         = useState(false);
 
-  // Export selection: ctId → set of selected exportIds (tag nodes within that card).
+  // Export selection: ctId → set of selected exportIds; plus selected public X-Refs.
   const [selection, setSelection] = useState<Map<string, { ct: CommunityTag; ids: Set<string> }>>(new Map());
+  const [xrefSelection, setXrefSelection] = useState<Map<string, CommunityXrefRow>>(new Map());
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -528,7 +427,6 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   const [shareBusy, setShareBusy] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  // Per-ct view of the selection (just the id sets) for passing to cards.
   const selectionIds = useMemo(() => {
     const m = new Map<string, Set<string>>();
     for (const [ctId, { ids }] of selection) m.set(ctId, ids);
@@ -536,8 +434,8 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, [selection]);
 
   const selectedCount = useMemo(
-    () => [...selection.values()].reduce((sum, { ids }) => sum + ids.size, 0),
-    [selection],
+    () => [...selection.values()].reduce((sum, { ids }) => sum + ids.size, 0) + xrefSelection.size,
+    [selection, xrefSelection],
   );
 
   const toggleSelect = useCallback((ct: CommunityTag, exportId: string) => {
@@ -554,13 +452,21 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       return next;
     });
   }, []);
+  const toggleXrefSelect = useCallback((cx: CommunityXrefRow) => {
+    setXrefSelection(prev => {
+      const next = new Map(prev);
+      if (next.has(cx.id)) next.delete(cx.id); else next.set(cx.id, cx);
+      return next;
+    });
+  }, []);
 
-  const clearSelection = useCallback(() => setSelection(new Map()), []);
+  const clearSelection = useCallback(() => { setSelection(new Map()); setXrefSelection(new Map()); }, []);
 
   // A bundle link is a snapshot of the exact selection — drop it when it changes.
-  useEffect(() => { setShareState(null); }, [selection]);
+  useEffect(() => { setShareState(null); }, [selection, xrefSelection]);
 
-  // ImmTagExport-shaped nodes for the selected published tags, re-keyed globally.
+  // ImmTagExport-shaped nodes for the selection, re-keyed globally. A selected
+  // X-Ref travels as a one-level node holding its two quotes.
   const collectSelectedNodes = useCallback(() => {
     const out: {
       exportId: string; parentExportId: string | null; name: string;
@@ -580,16 +486,24 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         });
       }
     }
+    for (const cx of xrefSelection.values()) {
+      out.push({
+        exportId: `xref:${cx.id}`, parentExportId: null, name: xrefTitle(cx), depth: 0, sortOrder: 0,
+        selections: [cx.payload?.a, cx.payload?.b].filter(Boolean)
+          .map(s => ({ ...s, createdAt: cx.published_at, notes: [], xrefCitations: [] })),
+      });
+    }
     return out;
-  }, [selection]);
+  }, [selection, xrefSelection]);
 
   const bundleShareTitle = useCallback(() => {
-    if (selection.size === 1) {
+    if (selection.size === 1 && xrefSelection.size === 0) {
       const only = [...selection.values()][0].ct;
       if (only?.name) return only.name;
     }
+    if (selection.size === 0 && xrefSelection.size === 1) return xrefTitle([...xrefSelection.values()][0]);
     return t('share.bundleTitle');
-  }, [selection, t]);
+  }, [selection, xrefSelection, t]);
 
   async function createBundleLink() {
     if (!user?.id || shareBusy) return;
@@ -615,7 +529,10 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     setShowExportMenu(false);
     setExporting(true);
     try {
-      const tagRows = [...selection.values()].flatMap(({ ct, ids }) => payloadToTagRows(ct, ids));
+      const tagRows = [
+        ...[...selection.values()].flatMap(({ ct, ids }) => payloadToTagRows(ct, ids)),
+        ...xrefsToTagRows([...xrefSelection.values()]),
+      ];
       const opts = { includeNotes: false, includeXrefs: false };
       if (format === 'pdf')       await exportAsPdf(tagRows, opts);
       if (format === 'docx')      await exportAsDocx(tagRows, opts);
@@ -637,50 +554,39 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     return () => document.removeEventListener('mousedown', onDown);
   }, [showExportMenu]);
 
-  const loadSubscribedIds = useCallback(async () => {
-    if (!user?.id) return;
-    const { data } = await supabase
-      .from('community_tag_subscriptions')
-      .select('community_tag_id')
-      .eq('subscriber_id', user.id);
-    setSubscribedIds(new Set((data ?? []).map((r: { community_tag_id: string }) => r.community_tag_id)));
-  }, [user?.id]);
+  const uid = user?.id;
+  const loadViewerState = useCallback(async () => {
+    if (!uid) return;
+    const [{ data: subs }, { data: follows }, xrefSubs] = await Promise.all([
+      supabase.from('community_tag_subscriptions').select('community_tag_id').eq('subscriber_id', uid),
+      supabase.from('community_user_follows').select('followed_user_id').eq('subscriber_id', uid),
+      liveSubscribedXrefIds(uid).catch(() => new Set<string>()),
+    ]);
+    setSubscribedIds(new Set((subs ?? []).map((r: { community_tag_id: string }) => r.community_tag_id)));
+    setFollowingIds(new Set((follows ?? []).map((r: { followed_user_id: string }) => r.followed_user_id)));
+    setSubscribedXrefIds(xrefSubs);
+  }, [uid]);
 
-  async function loadRecent() {
-    setRecentLoading(true);
+  async function loadFeed() {
+    setLoading(true);
     try {
-      const { data } = await supabase
-        .from('community_tags')
-        .select(cardSelect(!!user))
-        .eq('listed', true)
-        .order('published_at', { ascending: false })
-        .range(0, PAGE_SIZE - 1);
-      setRecentTags((data ?? []) as unknown as CommunityTag[]);
+      const [tagsRes, xrefsRes] = await Promise.all([
+        supabase.from('community_tags').select(cardSelect(!!user)).eq('listed', true)
+          .order('published_at', { ascending: false }).range(0, FEED_LIMIT - 1),
+        supabase.from('community_xrefs').select(withProfiles(XREF_COLS, !!user)).eq('listed', true)
+          .order('published_at', { ascending: false }).range(0, FEED_LIMIT - 1),
+      ]);
+      setAllTags((tagsRes.data ?? []) as unknown as CommunityTag[]);
+      // X-Refs failing must not blank the compilations.
+      setAllXrefs(xrefsRes.error ? [] : ((xrefsRes.data ?? []) as unknown as CommunityXrefRow[]));
     } finally {
-      setRecentLoading(false);
-    }
-  }
-
-  async function loadTrending() {
-    setTrendingLoading(true);
-    try {
-      const { data } = await (supabase
-        .from('community_tags')
-        .select(cardSelect(!!user))
-        .eq('listed', true)
-        .order('import_count', { ascending: false }) as any)
-        .order('published_at', { ascending: false })
-        .range(0, PAGE_SIZE - 1);
-      setTrendingTags((data ?? []) as unknown as CommunityTag[]);
-    } finally {
-      setTrendingLoading(false);
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadRecent();
-    loadTrending();
-    loadSubscribedIds();
+    loadFeed();
+    loadViewerState();
     if (user?.id) {
       syncSubscribedTags(user.id).catch(e => console.warn('[Community] syncSubscribed error:', e));
       syncFollowedUsers(user.id).catch(e => console.warn('[Community] syncFollowed error:', e));
@@ -688,39 +594,120 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   }, []);
 
   const handleImport = useCallback(async (ct: CommunityTagRow) => {
-    if (!user?.id) { setAskSignIn(true); return; }
+    if (!uid) { setAskSignIn(true); return; }
     try {
-      await importCommunityTag(ct, user.id);
+      await importCommunityTag(ct, uid);
       setSubscribedIds(prev => new Set(prev).add(ct.id));
     } catch (e) {
       console.warn('[Community] import error:', e);
     }
-  }, [user?.id]);
+  }, [uid]);
 
-  const handleProfilePress = useCallback((ct: CommunityTag) => {
-    const displayName = ct.profiles?.full_name?.trim() || ct.profiles?.username || t('discover.anonymous');
-    setProfileView({ userId: ct.user_id, displayName, username: ct.profiles?.username ?? null, avatarUrl: ct.profiles?.avatar_url ?? null });
-  }, [t]);
+  const handleImportXref = useCallback(async (cx: CommunityXrefRow) => {
+    if (!uid) { setAskSignIn(true); return; }
+    try {
+      await importCommunityXref(cx, uid);
+      setSubscribedXrefIds(prev => new Set(prev).add(cx.id));
+    } catch (e) {
+      console.warn('[Community] xref import error:', e);
+      alert(`${t('discover.importFailed')}: ${(e as Error)?.message ?? t('discover.unknownError')}`);
+    }
+  }, [uid, t]);
 
-  // ── Profile view ────────────────────────────────────────────────────────────
-  if (profileView) {
+  // Following auto-imports the user's public compilations (communitySync).
+  const handleFollowToggle = useCallback(async (targetId: string, following: boolean) => {
+    if (!uid) { setAskSignIn(true); return; }
+    try {
+      if (following) {
+        await unfollowUser(uid, targetId);
+        setFollowingIds(prev => { const n = new Set(prev); n.delete(targetId); return n; });
+      } else {
+        await followUser(uid, targetId);
+        setFollowingIds(prev => new Set(prev).add(targetId));
+        loadViewerState().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[CommunityPanel] follow toggle error:', e);
+    }
+  }, [uid, loadViewerState]);
+
+  // ── Groups + open state ─────────────────────────────────────────────────────
+  const trendingGroups = useMemo(
+    () => groupDiscoverFeed(allTags, allXrefs, { mode: 'trending', query: searchQuery, compilationText, xrefText }),
+    [allTags, allXrefs, searchQuery]);
+  const recentGroups = useMemo(
+    () => groupDiscoverFeed(allTags, allXrefs, { mode: 'recent', query: searchQuery, compilationText, xrefText }),
+    [allTags, allXrefs, searchQuery]);
+
+  // Not persisted. While searching, matches open on their own; a click during a
+  // search overrides that until the query changes.
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map());
+  useEffect(() => { setOverrides(new Map()); }, [searchQuery]);
+  const searchOpen = useMemo(() => {
+    const out = new Set<string>();
+    if (!searchQuery.trim()) return out;
+    for (const [prefix, groups] of [['trending:', trendingGroups], ['recent:', recentGroups]] as const) {
+      for (const g of groups) {
+        if (!g.openForSearch) continue;
+        out.add(`${prefix}user:${g.userId}`);
+        for (const id of g.matchedIds) out.add(`${prefix}${id}`);
+      }
+    }
+    return out;
+  }, [searchQuery, trendingGroups, recentGroups]);
+  const isOpen = useCallback((k: string) =>
+    overrides.has(k) ? !!overrides.get(k) : (searchOpen.has(k) || openKeys.has(k)),
+  [overrides, searchOpen, openKeys]);
+  const toggleOpen = useCallback((k: string) => {
+    if (searchQuery.trim()) { setOverrides(prev => new Map(prev).set(k, !isOpen(k))); return; }
+    setOpenKeys(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  }, [searchQuery, isOpen]);
+
+  const renderGroup = (prefix: string) => function DiscoverUser(g: Group) {
+    const isOwn = !!user?.id && g.userId === user.id;
+    const uk = `${prefix}user:${g.userId}`;
     return (
-      <div className="h-full relative">
-        <ProfileView
-          profile={profileView}
-          currentUserId={user?.id ?? null}
-          subscribedIds={subscribedIds}
-          onImport={handleImport}
-          onBack={() => setProfileView(null)}
-          onOpenBook={onOpenBook}
-          selection={selectionIds}
-          onToggleSelect={toggleSelect}
-          onRequireSignIn={() => setAskSignIn(true)}
-        />
-        {askSignIn && <GuestSignInCard onClose={() => setAskSignIn(false)} />}
-      </div>
+      <UserRow
+        group={g}
+        isOwn={isOwn}
+        isFollowing={followingIds.has(g.userId)}
+        onFollowToggle={handleFollowToggle}
+        open={isOpen(uk)}
+        onToggleOpen={() => toggleOpen(uk)}
+      >
+        {g.compilations.map(ct => (
+          <TagCard
+            key={ct.id}
+            ct={ct}
+            isImported={subscribedIds.has(ct.id)}
+            isOwn={isOwn}
+            onImport={handleImport}
+            onOpenBook={onOpenBook}
+            selectedIds={selectionIds.get(ct.id) ?? EMPTY_SET}
+            onToggleSelect={toggleSelect}
+            open={isOpen(`${prefix}${ct.id}`)}
+            onToggleOpen={() => toggleOpen(`${prefix}${ct.id}`)}
+          />
+        ))}
+        {g.xrefs.map(cx => (
+          <XrefCard
+            key={cx.id}
+            cx={cx}
+            isImported={subscribedXrefIds.has(cx.id)}
+            isOwn={isOwn}
+            onImport={handleImportXref}
+            onOpenBook={onOpenBook}
+            selected={xrefSelection.has(cx.id)}
+            onToggleSelect={toggleXrefSelect}
+            open={isOpen(`${prefix}${cx.id}`)}
+            onToggleOpen={() => toggleOpen(`${prefix}${cx.id}`)}
+          />
+        ))}
+      </UserRow>
     );
-  }
+  };
+  const hasAny = allTags.length + allXrefs.length > 0;
 
   // ── Feed view ───────────────────────────────────────────────────────────────
   return (
@@ -837,30 +824,20 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       <div className="flex-1 flex overflow-hidden">
         <FeedColumn
           title={t('discover.trending')}
-          tags={trendingTags}
-          loading={trendingLoading}
+          groups={trendingGroups}
+          loading={loading}
           searchQuery={searchQuery}
-          subscribedIds={subscribedIds}
-          onImport={handleImport}
-          onProfilePress={handleProfilePress}
-          onOpenBook={onOpenBook}
-          selection={selectionIds}
-          onToggleSelect={toggleSelect}
-          currentUserId={user?.id}
+          hasAny={hasAny}
+          renderGroup={renderGroup('trending:')}
         />
         <div className="w-px bg-gray-200 dark:bg-[#354759] shrink-0" />
         <FeedColumn
           title={t('discover.recent')}
-          tags={recentTags}
-          loading={recentLoading}
+          groups={recentGroups}
+          loading={loading}
           searchQuery={searchQuery}
-          subscribedIds={subscribedIds}
-          onImport={handleImport}
-          onProfilePress={handleProfilePress}
-          onOpenBook={onOpenBook}
-          selection={selectionIds}
-          onToggleSelect={toggleSelect}
-          currentUserId={user?.id}
+          hasAny={hasAny}
+          renderGroup={renderGroup('recent:')}
         />
       </div>
 

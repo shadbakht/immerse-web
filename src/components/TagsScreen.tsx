@@ -304,7 +304,9 @@ function TagCard({ tag, selectState, onToggleSelect, searchQuery, onOpenBook, on
         </div>
       )}
       <div
-        className="flex items-center py-3.5 pe-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
+        // py-0.5: the checkbox's 44px tap target already sets the height, so
+        // the row lands on the same 48px as the X-Refs and Notes headers.
+        className="flex items-center py-0.5 pe-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-[#243040] transition-colors"
         style={{ paddingInlineStart: rowPaddingLeft }}
         onClick={() => onToggleOpen?.()}
       >

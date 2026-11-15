@@ -168,6 +168,16 @@ function bcp47(language: string | undefined): string {
 // Prayer-style books use a centred layout where a floated initial would fight
 // the centring. RTL/CJK are filtered in CSS (globals.css) off the .reader-page
 // lang/dir, not here.
+// Psalm 119's acrostic stanza headings ("נ NUN") — split out of their verses
+// 2026-11-14 (mobile scripts/fixPsalm119Stanzas.mjs), shipped as unnumbered
+// rows. Mobile styles the same line as p.subchapter-heading; this mirrors it.
+// Matched on the exact 22 names (both editions' spellings), never a pattern
+// loose enough to catch body text.
+const PSALM_STANZA_RE = /^(?:[\u05D0-\u05EA] )?(?:ALEPH|BETH|GIMEL|DALETH|HE|VAU|VAV|ZAIN|CHETH|HETH|TETH|JOD|CAPH|LAMED|MEM|NUN|SAMECH|AIN|PE|TZADDI|TZADE|KOPH|RESH|SCHIN|TAU|TAV)$/;
+export function isPsalmStanzaHeading(p: { paragraph_number?: number | null; content: string }): boolean {
+  return !p.paragraph_number && PSALM_STANZA_RE.test(p.content.trim());
+}
+
 export function dropCapEligible(p: {
   showChapter: boolean;
   isPrayerStyle: boolean;
@@ -2575,6 +2585,7 @@ async function handleCopy() {
             // p.letter-date class set by fix4cSectionEyebrows.mjs).
             const isLetterDate = /^\[?\s*(?:circa\s+)?(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\[?\d{4}\]?/.test(passage.content);
             const isCredit = isCreditPassage(passage);
+            const isStanza = isPsalmStanzaHeading(passage);
             // A Persian/Arabic tablet's frame — «هواللّه», a closing «حیفا» /
             // date, a compilation's «(… شمارۀ ۶۸) [۱]» source line. The packs
             // ship these unnumbered (paragraph_number 0), so only those rows are
@@ -2591,7 +2602,7 @@ async function handleCopy() {
             if (showChapter && isHeadingEcho) pendingDropCapAfterHeading = true;
             const applyDropCap = dropCapEligible({
               showChapter: !!showChapter, isPrayerStyle, isHeadingEcho,
-              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate, isCredit: isCredit || isInvocation,
+              pendingAfterHeading: pendingDropCapAfterHeading, isLetterDate, isCredit: isCredit || isInvocation || isStanza,
             });
             if (applyDropCap) pendingDropCapAfterHeading = false;
 
@@ -2793,7 +2804,10 @@ async function handleCopy() {
                       they are per-passage semantics, not preferences. */}
                   {!isHeadingEcho && <p
                     data-pid={passage.id}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isCredit ? ' credit' : ''}${!isCredit && book?.isBuddhist && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
+                    // Inline: the reader's paragraph rule (alignment + first-line
+                    // indent) outranks a utility class.
+                    style={isStanza ? { textAlign: 'center', textIndent: 0 } : undefined}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isStanza ? 'font-semibold text-[0.95em] mt-6 mb-1' : ''}${isCredit ? ' credit' : ''}${!isCredit && book?.isBuddhist && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}

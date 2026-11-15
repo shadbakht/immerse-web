@@ -22,6 +22,23 @@ import {
   findXrefShareForSelection,
   revokeSharedSet,
 } from '@/lib/sharedSets';
+import {
+  publishXref, unpublishXref, fetchPublicXrefIds, pruneOrphanedCommunityXrefs, XrefNotPublishableError,
+} from '@/lib/communityXrefs';
+
+/** Same globe the Compilations screen puts on a public row. */
+function GlobeIcon() {
+  const { t } = useTranslation();
+  return (
+    <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="currentColor" strokeWidth={2.2}
+      strokeLinecap="round" strokeLinejoin="round" aria-label={t('tags.publicTag')}
+      className="shrink-0 text-[#5B8EC4] dark:text-[#7BAFD8]">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+      <path d="M2 12h20" />
+    </svg>
+  );
+}
 
 interface XRefRow {
   id:           string;
@@ -68,9 +85,11 @@ function formatDate(
 }
 
 function XRefCard({
-  row, searchQuery, onOpenBook, onDelete, onLabelSave, selected, onToggleSelected,
+  row, searchQuery, onOpenBook, onDelete, onLabelSave, selected, onToggleSelected, isPublic, onTogglePublic,
 }: {
   row: XRefRow;
+  isPublic: boolean;
+  onTogglePublic: () => void;
   searchQuery: string;
   onOpenBook: (b: string, p?: string, s?: string) => void;
   onDelete: (id: string) => void;
@@ -103,6 +122,9 @@ function XRefCard({
   ];
 
   const menuOptions: MenuOption[] = [
+    // Publish to / remove from Discover — the web's stand-in for mobile's swipe,
+    // worded like the Compilations screen's menu.
+    { label: isPublic ? t('share.stopDiscover') : t('share.discoverToggle'), icon: isPublic ? '🔓' : '🔒', onClick: onTogglePublic },
     { label: t('common.delete'), icon: '🗑️', color: 'danger', onClick: () => { if (confirm(t('xrefs.deleteConfirm'))) onDelete(row.id); } },
   ];
 
@@ -140,6 +162,7 @@ function XRefCard({
             {t('xrefs.addLabel')}
           </button>
         )}
+        {isPublic && <GlobeIcon />}
         <p className="text-xs text-gray-300 dark:text-[#4A6478] shrink-0">{formatDate(row.createdAt, t, uiLanguage)}</p>
         <div onClick={e => e.stopPropagation()}>
           <ContextMenu options={menuOptions} />
@@ -181,6 +204,8 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
   const supabase = createClient();
   const { t } = useTranslation();
   const [rows, setRows]               = useState<XRefRow[]>([]);
+  // This user's X-Refs that are public on Discover (community_xrefs rows).
+  const [publicIds, setPublicIds]     = useState<Set<string>>(new Set());
   const [loading, setLoading]         = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [openPairKeys, setOpenPairKeys] = useState<Set<string>>(new Set());
@@ -308,7 +333,13 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
       // fetch that did not error (an errored fetch yields [], which would
       // otherwise wipe every xref share).
       if (!xrefErr) {
-        void pruneDeletedXrefsFromShares(userId, (xrefData ?? []).map((x: any) => x.id)).catch(() => {});
+        const liveIds = (xrefData ?? []).map((x: any) => x.id);
+        void pruneDeletedXrefsFromShares(userId, liveIds).catch(() => {});
+        void pruneOrphanedCommunityXrefs(userId, liveIds)
+          .catch(() => {})
+          .then(() => fetchPublicXrefIds(userId))
+          .then(setPublicIds)
+          .catch(() => {});
       }
     } finally {
       setLoading(false);
@@ -318,6 +349,10 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
   async function handleDelete(id: string) {
     const row = rows.find(r => r.id === id);
     await deleteRemote('xrefs', id).catch(() => {});
+    if (publicIds.has(id)) {
+      void unpublishXref(id, userId).catch(() => {});
+      setPublicIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
     setRows(prev => prev.filter(r => r.id !== id));
     if (row) {
       void cleanupOrphanedSelection(row.selectionAId);
@@ -336,6 +371,23 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
       selection_b_id: row.selectionBId,
       label,
     }).catch(() => {});
+    // A public X-Ref's Discover copy carries the label — refresh it.
+    if (publicIds.has(id)) void publishXref({ ...row, label }, userId).catch(() => {});
+  }
+
+  async function handleTogglePublic(row: XRefRow) {
+    const makePublic = !publicIds.has(row.id);
+    try {
+      if (makePublic) {
+        await publishXref(row, userId);
+        setPublicIds(prev => new Set(prev).add(row.id));
+      } else {
+        await unpublishXref(row.id, userId);
+        setPublicIds(prev => { const n = new Set(prev); n.delete(row.id); return n; });
+      }
+    } catch (e) {
+      alert(e instanceof XrefNotPublishableError ? t('discover.importedOnlyError') : t('discover.publishFailed'));
+    }
   }
 
   // Default title for a new xref share link: the single shared pair name when
@@ -574,6 +626,8 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
                           onLabelSave={handleLabelSave}
                           selected={selectedIds.has(row.id)}
                           onToggleSelected={() => toggleSelected(row.id)}
+                          isPublic={publicIds.has(row.id)}
+                          onTogglePublic={() => handleTogglePublic(row)}
                         />
                       ))}
                     </div>

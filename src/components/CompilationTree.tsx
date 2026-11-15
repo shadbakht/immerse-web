@@ -84,7 +84,7 @@ export async function openCommunitySelection(sel: any, onOpenBook: OpenBookFn) {
 
 // ── One expandable quote (feed + profile + share page) ───────────────────────
 
-function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBook?: OpenBookFn; depth?: number }) {
+export function CommunitySelection({ sel, onOpenBook, depth = 0 }: { sel: any; onOpenBook?: OpenBookFn; depth?: number }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [opening, setOpening]   = useState(false);
