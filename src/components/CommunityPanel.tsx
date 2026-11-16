@@ -148,6 +148,21 @@ function Chevron({ open, onClick }: { open: boolean; onClick?: () => void }) {
   );
 }
 
+// Row-type mark at the start of the gray meta line (2026-11-15): a small blue
+// tag for a compilation, a small green hexagon for an X-Ref. Same shapes as the
+// nav icons, same colors as the quote rails. Mirrors mobile CommunityScreen TypeMark.
+function TypeMark({ kind }: { kind: 'compilation' | 'xref' }) {
+  return kind === 'xref' ? (
+    <svg width={14} height={11.5} viewBox="0 0 16 13" className="shrink-0 text-[#5A9460] dark:text-[#6BB073]" aria-hidden>
+      <path d="M4.5 1h7l3.5 5.5-3.5 5.5h-7L1 6.5z" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg width={14} height={10.5} viewBox="0 0 16 12" className="shrink-0 text-[#5B8EC4] dark:text-[#7BAFD8]" aria-hidden>
+      <path d="M1.5 2.5a1.5 1.5 0 0 1 1.5-1.5h7.6l4 5-4 5H3a1.5 1.5 0 0 1-1.5-1.5z" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function TagCard({
   ct, isImported, isOwn, onImport, onOpenBook, selectedIds, onToggleSelect, open, onToggleOpen,
 }: {
@@ -185,7 +200,8 @@ function TagCard({
             className="text-gray-800 dark:text-[#D2DCE8] truncate leading-5"
             style={{ fontSize: `calc(0.875rem * ${scriptScaleForText(ct.name)})`, fontWeight: treeDepthWeight(0) }}
           >{ct.name}</div>
-          <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5">
+          <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 flex items-center gap-1.5">
+            <TypeMark kind="compilation" />
             {formatDate(lastAddedAt, t, uiLanguage)}
             {'  ·  '}{t('discover.import', { count: ct.import_count })}
           </div>
@@ -274,9 +290,9 @@ function XrefCard({
             className="text-gray-800 dark:text-[#D2DCE8] truncate leading-5"
             style={{ fontSize: `calc(0.875rem * ${scriptScaleForText(title)})`, fontWeight: treeDepthWeight(0) }}
           >{title}</div>
-          <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5">
-            {t('nav.xrefs')}
-            {'  ·  '}{formatDate(cx.updated_at ?? cx.published_at, t, uiLanguage)}
+          <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 flex items-center gap-1.5">
+            <TypeMark kind="xref" />
+            {formatDate(cx.updated_at ?? cx.published_at, t, uiLanguage)}
             {'  ·  '}{t('discover.import', { count: cx.import_count })}
           </div>
         </div>
