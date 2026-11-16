@@ -154,11 +154,11 @@ function Chevron({ open, onClick }: { open: boolean; onClick?: () => void }) {
 function TypeMark({ kind }: { kind: 'compilation' | 'xref' }) {
   return kind === 'xref' ? (
     <svg width={14} height={11.5} viewBox="0 0 16 13" className="shrink-0 text-[#5A9460] dark:text-[#6BB073]" aria-hidden>
-      <path d="M4.5 1h7l3.5 5.5-3.5 5.5h-7L1 6.5z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M4.5 1h7l3.5 5.5-3.5 5.5h-7L1 6.5z" fill="currentColor" fillOpacity={0.25} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
     </svg>
   ) : (
     <svg width={14} height={10.5} viewBox="0 0 16 12" className="shrink-0 text-[#5B8EC4] dark:text-[#7BAFD8]" aria-hidden>
-      <path d="M1.5 2.5a1.5 1.5 0 0 1 1.5-1.5h7.6l4 5-4 5H3a1.5 1.5 0 0 1-1.5-1.5z" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M1.5 2.5a1.5 1.5 0 0 1 1.5-1.5h7.6l4 5-4 5H3a1.5 1.5 0 0 1-1.5-1.5z" fill="currentColor" fillOpacity={0.25} stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
     </svg>
   );
 }
