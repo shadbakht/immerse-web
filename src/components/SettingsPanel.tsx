@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isInTrial } from '@/lib/proStatus';
 import { applyFontSize, DEFAULT_FONT_SIZE, type FontSize } from '@/lib/fontSize';
@@ -10,6 +10,11 @@ import AppearanceSection from './AppearanceSection';
 import { UI_LANGUAGES, type TranslationKey } from '@immerse/i18n';
 import { useLanguage, useTranslation } from '@/contexts/LanguageProvider';
 import Onboarding from './Onboarding';
+import AvatarCropDialog from './AvatarCropDialog';
+import {
+  cropToAvatar, uploadAvatar, pruneOldAvatars, providerPhotoFor, providerLabelFor,
+  secondaryAvatarAction, isUploadedAvatar,
+} from '@/lib/avatarUpload';
 import type { User } from '@supabase/supabase-js';
 import pkg from '../../package.json';
 
@@ -88,6 +93,12 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
   const [username, setUsername] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
+  // Profile photo: the menu under the avatar, the file waiting in the cropper, and a busy/error state.
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [nameInput, setNameInput] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
@@ -182,6 +193,50 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     }
   }
 
+  // Only offer the provider's photo back when the provider can be named.
+  const providerLabel = providerLabelFor(user);
+  const providerUrl = providerLabel ? providerPhotoFor(user) : null;
+  const secondPhotoAction = secondaryAvatarAction(avatarUrl, providerUrl);
+
+  async function saveAvatarUrl(url: string | null) {
+    if (!user) return;
+    // avatar_hidden stops the sign-in trigger from refilling a removed Google photo.
+    const { error } = await supabase.from('profiles').update({ avatar_url: url, avatar_hidden: !url }).eq('id', user.id);
+    if (error) throw error;
+    setAvatarUrl(url);
+    pruneOldAvatars(supabase, user.id, isUploadedAvatar(url) ? url : null);
+  }
+
+  async function runPhotoChange(fn: () => Promise<void>) {
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setPhotoError(`${t('settings.photoUpdateFailed')}${e instanceof Error && e.message ? ` (${e.message})` : ''}`);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  function handleAvatarClick() {
+    if (photoBusy) return;
+    setPhotoError(null);
+    if (secondPhotoAction) setPhotoMenuOpen(o => !o);
+    else fileInputRef.current?.click();
+  }
+
+  function handleCropConfirm(rect: { originX: number; originY: number; width: number; height: number }) {
+    const file = cropFile;
+    if (!file || !user) return;
+    runPhotoChange(async () => {
+      const blob = await cropToAvatar(file, rect);
+      const url = await uploadAvatar(supabase, user.id, blob);
+      await saveAvatarUrl(url);
+      setCropFile(null);
+    });
+  }
+
   async function handleSaveName() {
     if (!user) return;
     const trimmed = nameInput.trim();
@@ -235,16 +290,16 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-[#E2EAF2] mb-8">{t('nav.settings')}</h1>
 
         {/* Profile header — mirrors mobile's avatar + name/Edit atop Settings
-            (src/screens/SettingsScreen.js). `avatar_url` is only ever
-            populated from a Google Sign-In account's own photo (seeded once
-            at signup — see the handle_new_user migration; Apple provides no
-            photo, so those users always fall through to initials). Everyone
-            else's identity is initials, same as mobile's AvatarButton. Full
+            (src/screens/SettingsScreen.js). `avatar_url` is the Google/Discord
+            photo copied in at signup (Apple provides none) or one the user
+            uploaded here (lib/avatarUpload.ts + AvatarCropDialog); without
+            one the identity is initials, same as mobile's AvatarButton. Full
             Name's row (and Edit) and the Username row both moved up here from
             the Account section below, since the name would otherwise show
             twice on the page. */}
         {!loading && (
           <div className="flex flex-col items-center gap-1.5 mb-8">
+            {isGuest ? (
             <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/15 border border-[#1B6B7B]/20 dark:border-[#2D9DB3]/25 overflow-hidden">
               {!isGuest && avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -258,6 +313,82 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 <span className="text-xl font-semibold text-[#1B6B7B] dark:text-[#2D9DB3]">{initialsFor(fullName, username)}</span>
               )}
             </div>
+            ) : (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={handleAvatarClick}
+                  disabled={photoBusy}
+                  aria-label={t('settings.changePhoto')}
+                  aria-haspopup={secondPhotoAction ? 'menu' : undefined}
+                  aria-expanded={secondPhotoAction ? photoMenuOpen : undefined}
+                  className="relative block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1B6B7B] dark:focus-visible:ring-[#2D9DB3] focus-visible:ring-offset-2"
+                >
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center bg-[#1B6B7B]/10 dark:bg-[#2D9DB3]/15 border border-[#1B6B7B]/20 dark:border-[#2D9DB3]/25 overflow-hidden">
+                    {!isGuest && avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : isGuest ? (
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#1B6B7B] dark:text-[#2D9DB3]" aria-hidden="true">
+                        <path d="M20 21a8 8 0 0 0-16 0" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    ) : (
+                      <span className="text-xl font-semibold text-[#1B6B7B] dark:text-[#2D9DB3]">{initialsFor(fullName, username)}</span>
+                    )}
+                  </div>
+                  {/* Camera badge: says "tap to change". */}
+                  <span className="absolute -bottom-0.5 -end-0.5 w-6 h-6 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] border-2 border-white dark:border-[#0F1923] flex items-center justify-center" aria-hidden="true">
+                    {photoBusy ? (
+                      <span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                        <circle cx="12" cy="13" r="3" />
+                      </svg>
+                    )}
+                  </span>
+                </button>
+                {photoMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setPhotoMenuOpen(false)} />
+                    <div role="menu" className="absolute z-20 top-full mt-2 left-1/2 -translate-x-1/2 min-w-48 rounded-xl bg-white dark:bg-[#16222E] border border-gray-200 dark:border-[#2D4050] shadow-lg py-1 text-sm">
+                      <button role="menuitem" className="w-full text-start px-4 py-2 text-gray-800 dark:text-[#E2EAF2] hover:bg-gray-50 dark:hover:bg-[#1E2D3A]"
+                        onClick={() => { setPhotoMenuOpen(false); fileInputRef.current?.click(); }}>
+                        {t('settings.choosePhoto')}
+                      </button>
+                      {secondPhotoAction === 'useProvider' && (
+                        <button role="menuitem" className="w-full text-start px-4 py-2 text-gray-800 dark:text-[#E2EAF2] hover:bg-gray-50 dark:hover:bg-[#1E2D3A]"
+                          onClick={() => { setPhotoMenuOpen(false); runPhotoChange(() => saveAvatarUrl(providerUrl)); }}>
+                          {t('settings.useProviderPhoto', { provider: providerLabel ?? '' })}
+                        </button>
+                      )}
+                      {secondPhotoAction === 'remove' && (
+                        <button role="menuitem" className="w-full text-start px-4 py-2 text-red-600 hover:bg-gray-50 dark:hover:bg-[#1E2D3A]"
+                          onClick={() => { setPhotoMenuOpen(false); runPhotoChange(() => saveAvatarUrl(null)); }}>
+                          {t('settings.removePhoto')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) setCropFile(f);
+                  }}
+                />
+              </div>
+            )}
+            {photoError && <span role="alert" className="text-xs text-red-600 mt-1">{photoError}</span>}
+            {cropFile && (
+              <AvatarCropDialog file={cropFile} busy={photoBusy} onCancel={() => setCropFile(null)} onConfirm={handleCropConfirm} />
+            )}
             {isGuest ? (
               <span className="text-sm font-semibold text-gray-900 dark:text-[#E2EAF2] mt-1">{t('nav.browsingAsGuest')}</span>
             ) : editingName ? (
