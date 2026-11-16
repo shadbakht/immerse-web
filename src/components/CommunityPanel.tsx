@@ -312,12 +312,12 @@ function Avatar({ profile }: { profile: DiscoverGroup<CommunityTag, CommunityXre
   const [failed, setFailed] = useState(false);
   const url = profile?.avatar_url;
   return (
-    <div className="w-9 h-9 rounded-full bg-[#1B6B7B] dark:bg-[#2D9DB3] flex items-center justify-center shrink-0 overflow-hidden">
+    <div className="w-9 h-9 rounded-full bg-[#E5E7EB] dark:bg-[#2D4050] flex items-center justify-center shrink-0 overflow-hidden">
       {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} />
       ) : (
-        <span className="text-white font-bold text-sm">{initialsFor(profile?.full_name, profile?.username)}</span>
+        <span className="text-[#6B7280] dark:text-[#8FA4B8] font-bold text-sm">{initialsFor(profile?.full_name, profile?.username)}</span>
       )}
     </div>
   );
