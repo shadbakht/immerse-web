@@ -100,6 +100,10 @@ interface BookMeta {
   // \n-separated lines inside one passage (one stanza per passage, as the
   // mobile reader shows them with <br>) — those lines must not collapse.
   isBuddhist?: boolean;
+  // Whether it is on a Jain shelf (en More › Jainism, hi और › जैन, de Weiteres ›
+  // Jainismus): every verse/sūtra is numbered, so an unnumbered body row is the
+  // credit line, and the Samayasāra Nāṭaka's verses carry \n-separated lines.
+  isJain?: boolean;
 }
 
 /** catalog.json's categoryId for a book, by its Supabase uuid — resolved via the
@@ -115,8 +119,8 @@ async function resolveCategoryId(uuid: string, supabase: ReturnType<typeof creat
   }
 }
 
-function shelfFlags(categoryId: string | undefined): Pick<BookMeta, 'isBahai' | 'isBuddhist'> {
-  return { isBahai: !!categoryId?.includes('bahai'), isBuddhist: !!categoryId?.startsWith('cat-buddhist') };
+function shelfFlags(categoryId: string | undefined): Pick<BookMeta, 'isBahai' | 'isBuddhist' | 'isJain'> {
+  return { isBahai: !!categoryId?.includes('bahai'), isBuddhist: !!categoryId?.startsWith('cat-buddhist'), isJain: !!categoryId?.includes('jain') };
 }
 
 /** A translator's colophon ("translated from the Pali by / Thanissaro Bhikkhu /
@@ -127,8 +131,15 @@ function isTabletScript(language: string | null | undefined): boolean {
   return base === 'fa' || base === 'ar';
 }
 
-export function isCreditPassage(p: { content: string; paragraph_number: number | null }): boolean {
-  return !p.paragraph_number && /^translated (from|into)\b/i.test(p.content);
+export function isCreditPassage(
+  p: { content: string; paragraph_number: number | null; chapter_label?: string | null; section_title?: string | null },
+  opts: { jainShelf?: boolean } = {},
+): boolean {
+  if (p.paragraph_number) return false;
+  if (/^translated (from|into)\b/i.test(p.content)) return true;
+  // On a Jain shelf the only unnumbered rows are heading echoes and the credit,
+  // whatever language the credit is written in (Hindi, German).
+  return !!opts.jainShelf && p.content !== p.chapter_label && p.content !== p.section_title;
 }
 
 /**
@@ -2584,7 +2595,7 @@ async function handleCopy() {
             // "circa" forms This Decisive Hour uses (mirrors the corpus
             // p.letter-date class set by fix4cSectionEyebrows.mjs).
             const isLetterDate = /^\[?\s*(?:circa\s+)?(?:\d{1,2}\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\[?\d{4}\]?/.test(passage.content);
-            const isCredit = isCreditPassage(passage);
+            const isCredit = isCreditPassage(passage, { jainShelf: book?.isJain });
             const isStanza = isPsalmStanzaHeading(passage);
             // A Persian/Arabic tablet's frame — «هواللّه», a closing «حیفا» /
             // date, a compilation's «(… شمارۀ ۶۸) [۱]» source line. The packs
@@ -2807,7 +2818,7 @@ async function handleCopy() {
                     // Inline: the reader's paragraph rule (alignment + first-line
                     // indent) outranks a utility class.
                     style={isStanza ? { textAlign: 'center', textIndent: 0 } : undefined}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isStanza ? 'font-semibold text-[0.95em] mt-6 mb-1' : ''}${isCredit ? ' credit' : ''}${!isCredit && book?.isBuddhist && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (book?.isBuddhist && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isStanza ? 'font-semibold text-[0.95em] mt-6 mb-1' : ''}${isCredit ? ' credit' : ''}${!isCredit && (book?.isBuddhist || book?.isJain) && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || ((book?.isBuddhist || book?.isJain) && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}

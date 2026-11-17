@@ -39,4 +39,14 @@ describe('isCreditPassage', () => {
     expect(isCreditPassage({ content: 'translated from the Pali by\nThanissaro Bhikkhu', paragraph_number: 1 })).toBe(false);
     expect(isCreditPassage({ content: 'I have heard that on one occasion…', paragraph_number: 0 })).toBe(false);
   });
+  it('on a Jain shelf, takes any unnumbered non-heading row as the credit, in any language', () => {
+    const credit = { content: 'पं. बनारसीदास (वि. सं. १६९३)\nपाठ स्कैन से OCR द्वारा लिया गया है', paragraph_number: 0, chapter_label: 'उत्थानिका' };
+    expect(isCreditPassage(credit, { jainShelf: true })).toBe(true);
+    expect(isCreditPassage({ content: 'Übersetzt von Hermann Jacobi', paragraph_number: 0, chapter_label: 'Erstes Kapitel' }, { jainShelf: true })).toBe(true);
+    expect(isCreditPassage(credit)).toBe(false);
+  });
+  it('on a Jain shelf, leaves heading echoes and numbered verses alone', () => {
+    expect(isCreditPassage({ content: 'उत्थानिका', paragraph_number: 0, chapter_label: 'उत्थानिका' }, { jainShelf: true })).toBe(false);
+    expect(isCreditPassage({ content: 'करम-भरम जग-तिमिर-हरन खग,\nउरग-लखन-पग सिवमगदरसी ।', paragraph_number: 1, chapter_label: 'उत्थानिका' }, { jainShelf: true })).toBe(false);
+  });
 });
