@@ -3,7 +3,7 @@
 // jest 'test' environment. Stub it so we can import the pure helper.
 jest.mock('@/lib/supabase/client', () => ({ createClient: () => ({}) }));
 
-import { dropCapEligible, isCreditPassage } from '../ReaderPanel';
+import { dropCapEligible, isCreditPassage, keepsVerseLines } from '../ReaderPanel';
 
 describe('dropCapEligible', () => {
   const base = { showChapter: false, isPrayerStyle: false, isHeadingEcho: false, pendingAfterHeading: false, isLetterDate: false };
@@ -48,5 +48,19 @@ describe('isCreditPassage', () => {
   it('on a Jain shelf, leaves heading echoes and numbered verses alone', () => {
     expect(isCreditPassage({ content: 'उत्थानिका', paragraph_number: 0, chapter_label: 'उत्थानिका' }, { jainShelf: true })).toBe(false);
     expect(isCreditPassage({ content: 'करम-भरम जग-तिमिर-हरन खग,\nउरग-लखन-पग सिवमगदरसी ।', paragraph_number: 1, chapter_label: 'उत्थानिका' }, { jainShelf: true })).toBe(false);
+  });
+});
+
+describe('keepsVerseLines', () => {
+  it('keeps line breaks for Buddhist/Jain shelves and Persian/Russian books', () => {
+    expect(keepsVerseLines({ isBuddhist: true, language: 'en' })).toBe(true);
+    expect(keepsVerseLines({ isJain: true, language: 'hi' })).toBe(true);
+    expect(keepsVerseLines({ language: 'fa' })).toBe(true);
+    expect(keepsVerseLines({ language: 'ru' })).toBe(true);
+  });
+  it('leaves other books alone', () => {
+    expect(keepsVerseLines({ language: 'en' })).toBe(false);
+    expect(keepsVerseLines({ language: 'fr' })).toBe(false);
+    expect(keepsVerseLines(null)).toBe(false);
   });
 });

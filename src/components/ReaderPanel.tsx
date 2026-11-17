@@ -131,6 +131,19 @@ function isTabletScript(language: string | null | undefined): boolean {
   return base === 'fa' || base === 'ar';
 }
 
+/**
+ * Books whose passages carry verse as \n-separated lines that must not collapse:
+ * the English Buddhist and every Jain shelf, and all Persian and Russian books —
+ * their web text gained real line breaks on 2026-11-17 (Persian poetry's two
+ * half-lines, Russian prayers), where before the sync glued the lines together.
+ * Other languages are left out on purpose: English prose carries stray \n that
+ * reads as one paragraph today.
+ */
+export function keepsVerseLines(book: { isBuddhist?: boolean; isJain?: boolean; language?: string } | null | undefined): boolean {
+  if (!book) return false;
+  return !!book.isBuddhist || !!book.isJain || /^(fa|ru)(-|$)/i.test(book.language ?? '');
+}
+
 export function isCreditPassage(
   p: { content: string; paragraph_number: number | null; chapter_label?: string | null; section_title?: string | null },
   opts: { jainShelf?: boolean } = {},
@@ -2818,7 +2831,7 @@ async function handleCopy() {
                     // Inline: the reader's paragraph rule (alignment + first-line
                     // indent) outranks a utility class.
                     style={isStanza ? { textAlign: 'center', textIndent: 0 } : undefined}
-                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isStanza ? 'font-semibold text-[0.95em] mt-6 mb-1' : ''}${isCredit ? ' credit' : ''}${!isCredit && (book?.isBuddhist || book?.isJain) && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || ((book?.isBuddhist || book?.isJain) && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
+                    className={`${isLetterDate ? 'font-bold mt-6' : ''}${isStanza ? 'font-semibold text-[0.95em] mt-6 mb-1' : ''}${isCredit ? ' credit' : ''}${!isCredit && keepsVerseLines(book) && !hasParagraphBreaks && bodyText.includes('\n') ? ' verse' : ''}${isPrayerStyle || isCredit || (keepsVerseLines(book) && !hasParagraphBreaks) ? ' whitespace-pre-line' : ''}${isPrayerStyle && !passage.chapter_label ? ' italic text-center' : ''}${isInvocation ? ' text-center font-semibold' : ''}${isFrameEnd ? ' text-end italic text-gray-500 dark:text-[#8FA4B8]' : ''}${applyDropCap ? ' dropcap-open' : ''}`}
                   >
                     <PassageContent
                       text={bodyText}
