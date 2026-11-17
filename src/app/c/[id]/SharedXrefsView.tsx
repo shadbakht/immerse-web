@@ -26,6 +26,7 @@ interface BookRow {
   id: string;
   title: string | null;
   citation_format: string | null;
+  language?: string | null;
   // PostgREST returns the embedded author as an object for a to-one FK, but
   // types it as an array in some client versions — accept both.
   authors: { name: string | null } | { name: string | null }[] | null;
@@ -100,7 +101,7 @@ export default function SharedXrefsView({ id, title }: { id: string; title: stri
       const bookUuids = [...new Set([...passMap.values()].map(p => p.book_id).filter(Boolean) as string[])];
       const { data: bookData } = await supabase
         .from('books')
-        .select('id, title, citation_format, authors(name)')
+        .select('id, title, citation_format, language, authors(name)')
         .in('id', bookUuids.length ? bookUuids : [NIL_UUID]);
       const bookByUuid = new Map<string, BookRow>(
         ((bookData ?? []) as BookRow[]).map(b => [b.id, b]),

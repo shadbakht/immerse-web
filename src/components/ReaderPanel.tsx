@@ -1752,7 +1752,7 @@ async function handleCopy() {
     for (const p of (pass ?? []) as any[]) passMap[p.id] = p;
     const bIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
     const { data: bks } = bIds.length > 0
-      ? await supabase.from('books').select('id, title, citation_format').in('id', bIds)
+      ? await supabase.from('books').select('id, title, citation_format, language').in('id', bIds)
       : { data: [] as any[] };
     const bookMap: Record<string, any> = {};
     for (const b of (bks ?? []) as any[]) bookMap[b.id] = b;
@@ -1845,7 +1845,7 @@ async function handleCopy() {
     for (const p of (passData ?? []) as any[]) passMap[p.id] = p;
     const bookIds = [...new Set(Object.values(passMap).map((p: any) => p.book_id).filter(Boolean))];
     const { data: bookDataArr } = bookIds.length > 0
-      ? await supabase.from('books').select('id, title, citation_format').in('id', bookIds)
+      ? await supabase.from('books').select('id, title, citation_format, language').in('id', bookIds)
       : { data: [] as any[] };
     const bookMap: Record<string, any> = {};
     for (const b of (bookDataArr ?? []) as any[]) bookMap[b.id] = b;

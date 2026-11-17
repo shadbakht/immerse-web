@@ -1,4 +1,4 @@
-import { translate, type TranslationKey } from '@immerse/i18n';
+import { translate, SUPPORTED_UI_LANGUAGES, type TranslationKey } from '@immerse/i18n';
 import { getStoredUiLanguage } from './language';
 
 /**
@@ -88,6 +88,9 @@ export interface CitationPassage {
 export interface CitationBook {
   title?: string | null;
   citation_format?: string | null;
+  /** The book's own language. The collection label ("The Bible", 圣经, …) is
+   *  written in it, not the UI language — see bookLabelLocale. */
+  language?: string | null;
 }
 
 export interface CitationOptions {
@@ -106,7 +109,13 @@ export function buildCitation(
   opts?: CitationOptions,
 ): string {
   const fmt = book?.citation_format ?? 'author_book_paragraph';
-  const locale = opts?.locale ?? getStoredUiLanguage();
+  // The label follows the BOOK's language when the i18n package has a table for
+  // it: a Chinese Bible quote reads "圣经, 加拉太书 3:28", never "The Bible, 加拉太书
+  // 3:28" (2026-11-17). Mirrors mobile citation.ts citationLocale.
+  const bookLang = book?.language;
+  const locale = bookLang && SUPPORTED_UI_LANGUAGES.includes(bookLang)
+    ? bookLang
+    : (opts?.locale ?? getStoredUiLanguage());
   const label = (key: CollectionKey) => translate(locale, key as TranslationKey);
 
   // ── Bible ──────────────────────────────────────────────────────────────────

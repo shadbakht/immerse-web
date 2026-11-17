@@ -132,6 +132,13 @@ describe('buildCitation — translated collection labels', () => {
       .toBe('圣经, Genesis 1:1');
   });
 
+  it("follows the BOOK's language over the UI locale", () => {
+    // 2026-11-17: "THE BIBLE, 加拉太书 3:28" on Discover from an English UI.
+    const zhBook = { title: '加拉太书', citation_format: 'book_chapter_verse', language: 'zh' };
+    expect(buildCitation({ chapter_label: '加拉太书 3', paragraph_number: 28 }, zhBook, null, { locale: 'en' }))
+      .toBe('圣经, 加拉太书 3:28');
+  });
+
   it('falls back to English for an unknown locale', () => {
     expect(buildCitation(passage, book, null, { locale: 'zz' }))
       .toBe('The Bible, Genesis 1:1');

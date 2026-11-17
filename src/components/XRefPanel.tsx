@@ -15,6 +15,7 @@ interface Passage {
   section_title: string | null;
   paragraph_number: number | null;
   citation_format: string | null;
+  language?: string | null;
 }
 
 interface XRefPanelProps {
@@ -49,7 +50,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
     try {
       const { data } = await supabase
         .from('passages')
-        .select('id, content, chapter_label, section_title, paragraph_number, books(title, citation_format, authors(name))')
+        .select('id, content, chapter_label, section_title, paragraph_number, books(title, citation_format, language, authors(name))')
         .ilike('content', `%${q}%`)
         .limit(10);
 
@@ -62,6 +63,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
         section_title:    p.section_title,
         paragraph_number: p.paragraph_number,
         citation_format:  p.books?.citation_format ?? null,
+        language:         p.books?.language ?? null,
       })));
     } finally {
       setSearching(false);
@@ -80,7 +82,7 @@ export default function XRefPanel({ visible, onClose, selectionText, onSave }: X
   }
 
   function citationFor(p: Passage) {
-    return buildCitation(p, { title: p.book_title, citation_format: p.citation_format }, p.author_name);
+    return buildCitation(p, { title: p.book_title, citation_format: p.citation_format, language: p.language }, p.author_name);
   }
 
   return (

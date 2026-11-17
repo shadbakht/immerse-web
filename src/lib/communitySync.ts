@@ -259,7 +259,7 @@ export async function buildCommunityPayload(
   if (bookIds.length) {
     const { data: bookData } = await supabase
       .from('books')
-      .select('id, title, citation_format, is_user_imported, authors(name)')
+      .select('id, title, citation_format, language, is_user_imported, authors(name)')
       .in('id', bookIds);
     for (const b of (bookData ?? []) as any[]) bookMap[b.id] = b;
   }

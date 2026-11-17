@@ -98,7 +98,7 @@ export interface FetchArgs {
 
 const PLAN_TEXT_CAP = 400;
 const PASSAGE_SELECT =
-  'id, content, chapter_label, section_title, paragraph_number, book_id, books(id, title, citation_format, authors(name))';
+  'id, content, chapter_label, section_title, paragraph_number, book_id, books(id, title, citation_format, language, authors(name))';
 
 // LibraryPanel keeps its own copy of this; replicated minimally here to stay a
 // leaf module (no dependency on the component tree).
@@ -124,6 +124,7 @@ interface PassageRow {
     id?: string | null;
     title?: string | null;
     citation_format?: string | null;
+    language?: string | null;
     authors?: { name?: string | null } | null;
   } | null;
   __matchPhrase: string;
@@ -213,7 +214,7 @@ export async function fetchXrefSuggestions(args: FetchArgs): Promise<XrefSuggest
               section_title: row.section_title,
               paragraph_number: row.paragraph_number,
             },
-            { title: row.books?.title, citation_format: row.books?.citation_format },
+            { title: row.books?.title, citation_format: row.books?.citation_format, language: row.books?.language },
             row.books?.authors?.name,
           ) || (row.books?.title ?? '');
       } catch {
