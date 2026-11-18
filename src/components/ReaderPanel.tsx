@@ -100,7 +100,7 @@ interface BookMeta {
   // \n-separated lines inside one passage (one stanza per passage, as the
   // mobile reader shows them with <br>) — those lines must not collapse.
   isBuddhist?: boolean;
-  // Whether it is on a Jain shelf (en More › Jainism, hi और › जैन, de Weiteres ›
+  // Whether it is on a Jain shelf (en More › Jain, hi और › जैन, de Weiteres ›
   // Jainismus): every verse/sūtra is numbered, so an unnumbered body row is the
   // credit line, and the Samayasāra Nāṭaka's verses carry \n-separated lines.
   isJain?: boolean;
