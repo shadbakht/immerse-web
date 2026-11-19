@@ -22,6 +22,12 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
       { src: '/favicon.png', sizes: '1024x1024', type: 'image/png' },
+      // Padded copies for platforms that crop app icons into circles or other
+      // shapes (Windows, Android): the whale sits inside the central safe zone
+      // and the gradient runs to the edges. Regenerate from favicon.png if the
+      // icon changes (whale scaled to 75%, left-edge gradient extended).
+      { src: '/icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import type { NavTab } from './AppShell';
 import type { TranslationKey } from '@immerse/i18n';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { useInstallPrompt } from '@/lib/useInstallPrompt';
 import {
   HomeIcon,
   LibraryIcon,
@@ -43,6 +44,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) {
   const { t } = useTranslation();
+  const { canInstall, install } = useInstallPrompt();
   const [fullName, setFullName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -94,6 +96,24 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
           </button>
         ))}
       </nav>
+
+      {/* Install App — only where the browser offers it (Chrome / Edge /
+          Brave) and not already inside the installed app. */}
+      {canInstall && (
+        <button
+          onClick={install}
+          className="w-full flex items-center gap-3 px-5 py-3 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors text-start"
+        >
+          <span className="w-6 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v12" />
+              <path d="m7 10 5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+          </span>
+          {t('nav.installApp')}
+        </button>
+      )}
 
       {/* Footer */}
       <div className="px-5 pb-6 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
