@@ -164,7 +164,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                 <button
                   key={label}
                   onClick={() => onTabChange(tab)}
-                  className="bg-white dark:bg-[#1B2A38] rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-[#2D4050] text-start hover:border-[#1B6B7B]/30 dark:hover:border-[#2D9DB3]/30 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-[#1B2A38] rounded-2xl px-3 py-6 min-w-0 shadow-sm border border-gray-100 dark:border-[#2D4050] text-center hover:border-[#1B6B7B]/30 dark:hover:border-[#2D9DB3]/30 hover:shadow-md transition-all"
                 >
                   <div className="text-5xl font-light text-gray-900 dark:text-[#E2EAF2] mb-1">{count}</div>
                   <div className="text-xs font-bold tracking-widest uppercase" style={{ color }}>
