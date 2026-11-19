@@ -42,7 +42,10 @@ export async function proxy(request: NextRequest) {
   // before. '/lifetime' is the unlisted one-time-purchase page; it shows its own
   // "Sign in to continue" link for signed-out visitors. '/get' is the
   // share-the-app page (both store buttons) — the whole point is strangers.
-  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/d/', '/.well-known', '/api/stripe/webhook', '/lifetime', '/get'];
+  // '/manifest.webmanifest' (app/manifest.ts) is fetched by the browser before
+  // anyone signs in — for Safari's Add to Dock / Chrome's Install — so it must
+  // not be bounced to /login.
+  const publicPaths = ['/login', '/auth', '/read', '/privacy', '/support', '/c', '/d/', '/.well-known', '/api/stripe/webhook', '/lifetime', '/get', '/manifest.webmanifest'];
   const isPublic = pathname === '/' || publicPaths.some(p => pathname.startsWith(p));
 
   if (!user && !isPublic) {
