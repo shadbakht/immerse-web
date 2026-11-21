@@ -2782,7 +2782,7 @@ async function handleCopy() {
                           className="w-8 h-11 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title={t('reader.viewTags')}
                         >
-                          <TagIcon size={20} />
+                          <TagIcon size={20} glyph={false} />
                         </button>
                       )}
                       {notedPassageIds.has(passage.id) && (
@@ -2791,7 +2791,7 @@ async function handleCopy() {
                           className="w-8 h-11 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title={t('reader.viewNote')}
                         >
-                          <NoteIcon size={20} />
+                          <NoteIcon size={20} glyph={false} />
                         </button>
                       )}
                       {xrefPassageIds.has(passage.id) && (
@@ -2800,7 +2800,7 @@ async function handleCopy() {
                           className="w-8 h-11 flex items-center justify-center cursor-pointer hover:opacity-60 active:opacity-40 transition-opacity drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.28)]"
                           title={t('reader.viewXrefs')}
                         >
-                          <XRefIcon size={20} />
+                          <XRefIcon size={20} glyph={false} />
                         </button>
                       )}
                     </div>

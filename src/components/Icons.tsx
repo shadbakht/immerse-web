@@ -1,6 +1,6 @@
 /**
- * SVG icon components that mirror the shapes from the mobile AnnotationIcons.js.
- * Each uses a fixed intrinsic viewBox; the `size` prop scales width/height.
+ * SVG icon components that mirror the shapes in the mobile app's
+ * AnnotationIcons.js. Each draws in a square `size` box.
  */
 
 interface IconProps {
@@ -29,131 +29,183 @@ function roundedRect(x: number, y: number, w: number, h: number, r: number) {
 }
 
 /**
- * Unified filled house — roof and walls are one silhouette, with the doorway
- * cut out of it (20×20 base). Mirrors the HomeIcon in AnnotationIcons.js.
+ * Unified house (20×20 base). Filled: roof and walls are one silhouette with
+ * the doorway cut out. Outline (`filled={false}`): the same two subpaths,
+ * stroked — the unselected state, like mobile's HomeGlyph.
  *
- * The corner rounding comes from stroking the same path in the fill colour
- * with `strokeLinejoin="round"`: it rounds every join at once (apex, eaves,
- * base) and, because the stroke also runs round the doorway subpath, it
- * rounds the door and leaves a hairline threshold at its foot.
+ * The filled corner rounding comes from stroking the same path in the fill
+ * colour with `strokeLinejoin="round"`: it rounds every join at once and,
+ * because the stroke also runs round the doorway, rounds the door too.
  */
 const HOUSE_BODY = 'M10 2L18.4 8.9L16.2 8.9L16.2 17.6L3.8 17.6L3.8 8.9L1.6 8.9Z';
 const HOUSE_DOOR = roundedRect(8.2, 11.6, 3.6, 6, 0.9);
 
-export function HomeIcon({ color = '#FFFFFF', size = 20 }: IconProps) {
+export function HomeIcon({ color = '#FFFFFF', size = 20, filled = true }: IconProps & { filled?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d={`${HOUSE_BODY} ${HOUSE_DOOR}`}
-        fill={color}
-        fillRule="evenodd"
-        stroke={color}
-        strokeWidth={1.3}
-        strokeLinejoin="round"
-      />
+    <svg width={size} height={size} viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      {filled ? (
+        <path d={`${HOUSE_BODY} ${HOUSE_DOOR}`} fill={color} fillRule="evenodd"
+          stroke={color} strokeWidth={1.3} strokeLinejoin="round" />
+      ) : (
+        <path d={`${HOUSE_BODY} ${HOUSE_DOOR}`} fill="none"
+          stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+      )}
     </svg>
   );
 }
 
-/**
- * Three solid book spines on a shared baseline, each with a cover band cut out
- * near its top (24×20 base). Mirrors the LibraryIcon in AnnotationIcons.js.
+/* ─── Shared 24×24 grid — byte-for-byte the mobile geometry ────────────────
  *
- * `size` is the height, and the caller is expected to pass a slightly larger
- * size than the other nav icons — three narrow uprights read lighter than one
- * solid mass at the same nominal size, which is what made the old four-bar
- * version disappear next to the tag, note and xref shapes.
+ * Mirrors Immerse/src/components/AnnotationIcons.js. Change both together:
+ * the point of this set is that a user learns ONE mark per type on every
+ * platform.
  */
-const LIBRARY_VB = { w: 24, h: 20 };
-const LIBRARY_SPINES = [
-  { x: 0.7,  top: 4.6 },
-  { x: 8.9,  top: 1.6 },
-  { x: 17.1, top: 6.4 },
-];
-const LIBRARY_PATH = [
-  // Spines first, then the cover bands — one path, so evenodd punches them out.
-  ...LIBRARY_SPINES.map(s => roundedRect(s.x, s.top, 6.2, 19 - s.top, 1.4)),
-  ...LIBRARY_SPINES.map(s => roundedRect(s.x + 1.3, s.top + 2.6, 3.6, 1.4, 0.7)),
-].join(' ');
+const STROKE = 1.6;
 
-export function LibraryIcon({ color = '#C1605A', size = 20 }: IconProps) {
+/** `filled`: solid + glyph (selected / tiles). `outline`: type-colour outline
+ *  on a pale wash, glyph in the outline colour (unselected nav). */
+type Variant = 'filled' | 'outline';
+
+interface MarkProps extends IconProps {
+  /** Show the glyph inside. Defaults to on above 16px; at or below, the bare
+   *  silhouette reads better (reader margin, list rows). */
+  glyph?: boolean;
+  variant?: Variant;
+  /** Outline variant only. */
+  strokeColor?: string;
+  insideColor?: string;
+}
+
+/** #RRGGBB blended toward another #RRGGBB by t. */
+function mixHex(a: string, b: string, t: number) {
+  const pa = a.replace('#', ''), pb = b.replace('#', '');
+  return '#' + [0, 2, 4].map(i => {
+    const v = Math.round(parseInt(pa.slice(i, i + 2), 16) * (1 - t) + parseInt(pb.slice(i, i + 2), 16) * t);
+    return v.toString(16).padStart(2, '0');
+  }).join('');
+}
+
+type Kind = 'tag' | 'note' | 'xref';
+
+const MARK_BODY: Record<Kind, string> = {
+  // Pennant, pointy side right.
+  tag:  'M5.5 4.5H16L22 12L16 19.5H5.5A3.5 3.5 0 0 1 2 16V8A3.5 3.5 0 0 1 5.5 4.5Z',
+  // Rounded note with the bottom-right corner turned up (the dog-ear).
+  note: 'M5.5 4.5H18.5A3.5 3.5 0 0 1 22 8V14.5L17 19.5H5.5A3.5 3.5 0 0 1 2 16V8A3.5 3.5 0 0 1 5.5 4.5Z',
+  // Hexagon.
+  xref: 'M6 4.5H18L22 12L18 19.5H6L2 12Z',
+};
+const NOTE_FOLD = 'M22 14.5H18.5A1.5 1.5 0 0 0 17 16V19.5';
+
+function MarkGlyph({ kind, color }: { kind: Kind; color: string }) {
+  if (kind === 'tag') {
+    // A quote mark: "quotes filed under a label".
+    return (
+      <>
+        <circle cx="8" cy="10.6" r="1.75" fill={color} />
+        <circle cx="12.6" cy="10.6" r="1.75" fill={color} />
+        <path d="M9.75 10.9C9.75 12.9 8.8 14.3 7.2 15M14.35 10.9C14.35 12.9 13.4 14.3 11.8 15"
+          fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+      </>
+    );
+  }
+  if (kind === 'note') {
+    return <path d="M6.2 9.6H16.4M6.2 13.6H12.4" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />;
+  }
+  // Exchange arrows: "these two refer to each other".
   return (
-    <svg width={(size * LIBRARY_VB.w) / LIBRARY_VB.h} height={size} viewBox="0 0 24 20" xmlns="http://www.w3.org/2000/svg">
-      <path d={LIBRARY_PATH} fill={color} fillRule="evenodd" />
-    </svg>
+    <path d="M7.5 10H16M14 8L16 10L14 12M16.5 14H8M10 12L8 14L10 16"
+      fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
   );
 }
 
 /**
- * Discover: a semi-solid globe (20×20 base) — a filled disc with one meridian
- * and the equator carved out of it, at a single line weight. Mirrors
- * DiscoverIcon in AnnotationIcons.js, and replaces the 🌐 emoji that used to
- * sit in this row, whose shading and detail made it the loudest thing in the
- * sidebar.
+ * One annotation mark. Square box of `size` px. SVG content never mirrors in
+ * an RTL page, so the tag's point and the arrows keep their direction.
  *
- * ⚠️ The graticule is a MASK, not `fillRule="evenodd"` like the house door and
- * the book bands. Evenodd counts crossings, so wherever the meridian and the
- * equator overlap the count returns to odd and the cut fills back in — the
- * lines grow a solid blob at each intersection. A mask has no such arithmetic.
- * The disc is what gets painted, so nothing can spill outside radius 9.
- *
- * The mask id is fixed rather than generated: every instance defines the same
- * geometry in the same viewBox units, so two of them resolving to one id is
- * harmless, and a stable id survives SSR/hydration without a mismatch.
+ * The glyph on a filled Compilation / X-ref is `currentColor`, and the svg
+ * carries `text-white dark:text-[#D5DADF]`: white in light mode, light grey in
+ * dark mode (pure white was too stark there — owner's call, same as mobile).
+ * Pass `glyphClassName` to override, e.g. on the always-dark sidebar.
  */
-const GLOBE_MASK_ID = 'immerseDiscoverGlobe';
-
-export function DiscoverIcon({ color = '#3FB6CE', size = 20 }: IconProps) {
+function AnnotationMark({
+  kind, color, size = 20, glyph, variant = 'filled', strokeColor, insideColor, glyphClassName,
+}: MarkProps & { kind: Kind; color: string; glyphClassName?: string }) {
+  const showGlyph = glyph ?? size > 16;
+  const filled = variant === 'filled';
+  const edge = filled ? mixHex(color, '#000000', 0.22) : (strokeColor ?? color);
+  const glyphColor = !filled ? edge : kind === 'note' ? mixHex(color, '#000000', 0.62) : 'currentColor';
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <mask id={GLOBE_MASK_ID}>
-          <circle cx="10" cy="10" r="9" fill="#fff" />
-          {/* Meridian — an ellipse, so the disc reads as a sphere, not a wheel */}
-          <ellipse cx="10" cy="10" rx="3.6" ry="9" fill="none" stroke="#000" strokeWidth={1.5} />
-          {/* Equator — stops just inside the rim so it can't notch the edge */}
-          <path d="M1.03 10H18.97" stroke="#000" strokeWidth={1.5} />
-        </mask>
-      </defs>
-      <circle cx="10" cy="10" r="9" fill={color} mask={`url(#${GLOBE_MASK_ID})`} />
+    <svg
+      width={size} height={size} viewBox="1.2 1.2 21.6 21.6"
+      xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+      className={glyphClassName ?? 'text-white dark:text-[#D5DADF]'}
+    >
+      <path d={MARK_BODY[kind]} fill={filled ? color : (insideColor ?? 'none')}
+        stroke={edge} strokeWidth={filled ? 1 : STROKE} strokeLinejoin="round" />
+      {kind === 'note' && (
+        <path d={NOTE_FOLD} fill="none" stroke={edge} strokeWidth={filled ? 1 : STROKE} strokeLinejoin="round" />
+      )}
+      {showGlyph && <MarkGlyph kind={kind} color={glyphColor} />}
+    </svg>
+  );
+}
+
+type MarkIconProps = MarkProps & { glyphClassName?: string };
+
+/** Compilation: tag + quote mark. */
+export function TagIcon({ color = '#5B8EC4', ...rest }: MarkIconProps) {
+  return <AnnotationMark kind="tag" color={color} {...rest} />;
+}
+
+/** Note: dog-eared note + two written lines. */
+export function NoteIcon({ color = '#D4BC6A', ...rest }: MarkIconProps) {
+  return <AnnotationMark kind="note" color={color} {...rest} />;
+}
+
+/** X-ref: hexagon + exchange arrows. */
+export function XRefIcon({ color = '#5A9460', ...rest }: MarkIconProps) {
+  return <AnnotationMark kind="xref" color={color} {...rest} />;
+}
+
+/**
+ * Library: two upright books and a third leaning back against them, on a
+ * shelf line (24×24). The lean is what stops three uprights reading as a bar
+ * chart. Mirrors mobile's LibraryGlyph.
+ */
+const SHELF_Y = 20;
+
+export function LibraryIcon({ color = '#C1605A', size = 20, filled = true }: IconProps & { filled?: boolean }) {
+  const half = filled ? 0 : STROKE / 2;
+  const p = filled
+    ? { fill: color }
+    : { fill: 'none', stroke: color, strokeWidth: STROKE, strokeLinejoin: 'round' as const };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x={2 + half} y={5 + half} width={4.8 - 2 * half} height={SHELF_Y - 5 - 2 * half} rx={1} {...p} />
+      <rect x={7.8 + half} y={3 + half} width={4.8 - 2 * half} height={SHELF_Y - 3 - 2 * half} rx={1} {...p} />
+      <rect x={17.7 + half} y={6.2 + half} width={4.8 - 2 * half} height={13.8 - 2 * half} rx={1} {...p}
+        transform={`rotate(-18 ${17.7 + half} ${SHELF_Y - half})`} />
+      <path d="M1.5 21.4H22.5" stroke={color} strokeWidth={STROKE} strokeLinecap="round" />
     </svg>
   );
 }
 
 /**
- * Price-tag shape: rectangle body + right-pointing triangular tip (28×20 base).
- * Mirrors the TagIcon in AnnotationIcons.js.
+ * Discover: two people — "other readers' work", which the old globe never
+ * said (it read as language / region). The person behind is two open arcs.
+ * Mirrors mobile's DiscoverGlyph.
  */
-export function TagIcon({ color = '#5B8EC4', size = 20 }: IconProps) {
-  // body=21, tip=7 → total width=28
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 20" fill={color} xmlns="http://www.w3.org/2000/svg">
-      <polygon points="0,0 21,0 28,10 21,20 0,20" />
-    </svg>
-  );
-}
+const PERSON_FRONT_BODY = 'M3 20.5V18.9A4.6 4.6 0 0 1 7.6 14.3H10.4A4.6 4.6 0 0 1 15 18.9V20.5';
+const PERSON_BACK = 'M15.9 3.9A3.6 3.6 0 0 1 15.9 10.9M21 20.5V18.9A4.6 4.6 0 0 0 17.7 14.5';
 
-/**
- * Filled rectangle — same proportions as TagIcon (28×20 base).
- * Mirrors the NoteIcon in AnnotationIcons.js.
- */
-export function NoteIcon({ color = '#D4BC6A', size = 20 }: IconProps) {
+export function DiscoverIcon({ color = '#1B6B7B', size = 20, filled = true }: IconProps & { filled?: boolean }) {
+  const line = { stroke: color, strokeWidth: filled ? 2 : STROKE, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return (
-    <svg width={size} height={size} viewBox="0 0 28 20" fill={color} xmlns="http://www.w3.org/2000/svg">
-      <rect width="28" height="20" rx="3" />
-    </svg>
-  );
-}
-
-/**
- * Hexagon: left triangle + rectangle + right triangle (28×20 base).
- * Mirrors the XRefIcon in AnnotationIcons.js.
- */
-export function XRefIcon({ color = '#5A9460', size = 20 }: IconProps) {
-  // tip=6, body=16 → total width=28
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 20" fill={color} xmlns="http://www.w3.org/2000/svg">
-      <polygon points="0,10 6,0 22,0 28,10 22,20 6,20" />
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="9" cy="7.4" r="3.6" fill={filled ? color : 'none'} {...line} />
+      <path d={filled ? `${PERSON_FRONT_BODY}Z` : PERSON_FRONT_BODY} fill={filled ? color : 'none'} {...line} />
+      <path d={PERSON_BACK} fill="none" {...line} />
     </svg>
   );
 }

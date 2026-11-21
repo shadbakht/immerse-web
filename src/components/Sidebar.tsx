@@ -23,17 +23,33 @@ import {
 // and the label is resolved at render, the same shape the mobile screens use
 // for their module-level helpers.
 //
-// Every destination is one flat geometric glyph in its own colour, so the row
-// is identifiable by shape and hue alike. Home is the only neutral one — it
-// brightens to white when selected and sits back in grey when it isn't, which
-// is why `icon` is a function of the active state rather than an element.
+// Same colour rule as the mobile tab bar, on the sidebar's always-dark navy
+// (so the mobile DARK palette): the three annotation types keep their colour
+// in both states — outlined on a faint wash when unselected, filled with their
+// glyph when selected — so the sidebar doubles as a legend for the reader's
+// highlights. Home, Library and Discover are grey outlines until selected,
+// then fill in their own colour (Library red, the other two teal).
+const SIDEBAR_GREY = 'rgba(255,255,255,0.70)';
+const SIDEBAR_GLYPH = 'text-[#D5DADF]';   // light grey, never pure white, on the dark sidebar
+
+function wash(hex: string) {
+  const h = hex.replace('#', '');
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},0.32)`;
+}
+
+function markProps(accent: string, active: boolean) {
+  return active
+    ? { color: accent, variant: 'filled' as const, glyph: true, glyphClassName: SIDEBAR_GLYPH }
+    : { color: accent, variant: 'outline' as const, glyph: true, strokeColor: accent, insideColor: wash(accent) };
+}
+
 const NAV_ITEMS: { tab: NavTab; labelKey: TranslationKey; icon: (active: boolean) => ReactNode }[] = [
-  { tab: 'home',      labelKey: 'nav.home',     icon: (active) => <HomeIcon size={20} color={active ? '#FFFFFF' : 'rgba(255,255,255,0.80)'} /> },
-  { tab: 'library',   labelKey: 'nav.library',  icon: () => <LibraryIcon  size={18} /> },
-  { tab: 'tags',      labelKey: 'nav.tags',     icon: () => <TagIcon      size={18} /> },
-  { tab: 'notes',     labelKey: 'nav.notes',    icon: () => <NoteIcon     size={18} /> },
-  { tab: 'xrefs',     labelKey: 'nav.xrefs',    icon: () => <XRefIcon     size={18} /> },
-  { tab: 'community', labelKey: 'nav.discover', icon: () => <DiscoverIcon size={18} /> },
+  { tab: 'home',      labelKey: 'nav.home',     icon: (a) => <HomeIcon     size={20} filled={a} color={a ? '#2D9DB3' : SIDEBAR_GREY} /> },
+  { tab: 'library',   labelKey: 'nav.library',  icon: (a) => <LibraryIcon  size={22} filled={a} color={a ? '#DD8B85' : SIDEBAR_GREY} /> },
+  { tab: 'tags',      labelKey: 'nav.tags',     icon: (a) => <TagIcon      size={22} {...markProps('#7BAFD8', a)} /> },
+  { tab: 'notes',     labelKey: 'nav.notes',    icon: (a) => <NoteIcon     size={22} {...markProps('#E8CC78', a)} /> },
+  { tab: 'xrefs',     labelKey: 'nav.xrefs',    icon: (a) => <XRefIcon     size={22} {...markProps('#6BB073', a)} /> },
+  { tab: 'community', labelKey: 'nav.discover', icon: (a) => <DiscoverIcon size={22} filled={a} color={a ? '#2D9DB3' : SIDEBAR_GREY} /> },
 ];
 
 interface SidebarProps {
@@ -90,7 +106,7 @@ export default function Sidebar({ activeTab, onTabChange, user }: SidebarProps) 
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
             }`}
           >
-            {/* w-6 — wide enough for the Library glyph, the widest of the six */}
+            {/* w-6 — every glyph draws in a square box of 20–22px */}
             <span className="w-6 flex items-center justify-center shrink-0">{icon(activeTab === tab)}</span>
             {t(labelKey)}
           </button>
