@@ -7,6 +7,10 @@ import type { Catalog } from '@/lib/catalog';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { useTranslation } from '@/contexts/LanguageProvider';
 
+/** How many books Recently Viewed shows. Mobile's recentBooksMerge.ts has the
+ *  same number (RECENT_BOOKS_LIMIT) — keep them equal. */
+const RECENT_BOOKS_LIMIT = 20;
+
 interface Stats {
   tags: number;
   notes: number;
@@ -91,7 +95,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
           .select('book_id, passage_id, updated_at, fraction')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false })
-          .limit(8),
+          .limit(RECENT_BOOKS_LIMIT),
         loadCatalog(),
         loadSlugMaps(supabase),
       ]);
