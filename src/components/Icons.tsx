@@ -114,7 +114,7 @@ function MarkGlyph({ kind, color }: { kind: Kind; color: string }) {
   }
   // Exchange arrows: "these two refer to each other".
   return (
-    <path d="M7.5 10H16M14.8 7.75L16 10M16.5 14H8M8 14L9.2 16.25"
+    <path d="M7.5 10H16M14 8L16 10L14 12M16.5 14H8M10 12L8 14L10 16"
       fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
   );
 }
