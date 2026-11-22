@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
@@ -117,9 +116,11 @@ export default async function GetPage({ searchParams }: Props) {
 
         <p className="mt-6 text-sm text-gray-700 dark:text-[#B8C7D6]">
           {c.or}{' '}
-          <Link href="/" className="font-semibold text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">
+          {/* A full page load, not <Link>: LanguageProvider lives in the root
+              layout and reads ?lang only when it mounts. */}
+          <a href={locale === 'en' ? '/' : `/?lang=${locale}`} className="font-semibold text-[#1B6B7B] dark:text-[#2D9DB3] hover:underline">
             {c.readInBrowser} {dir === 'rtl' ? '←' : '→'}
-          </Link>
+          </a>
         </p>
 
         <div className="mt-auto pt-12">

@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { translate, type TranslationKey, type TranslateVars } from '@immerse/i18n';
+import { translate, SUPPORTED_UI_LANGUAGES, type TranslationKey, type TranslateVars } from '@immerse/i18n';
 import {
   DEFAULT_UI_LANGUAGE,
   DEFAULT_CONTENT_LANGUAGE,
@@ -19,7 +19,9 @@ import {
   getChosenContentLanguage,
   storeUiLanguage,
   storeContentLanguage,
+  consumeArrivalLanguage,
 } from '@/lib/language';
+import { loadCatalog } from '@/lib/catalog';
 import { createClient } from '@/lib/supabase/client';
 import { fetchLanguagePrefs, pushLanguagePrefs } from '@/lib/languageSync';
 
@@ -55,11 +57,38 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const userIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
+  // Settles once a `?lang=` arrival (from the localized /get page) has been
+  // applied. reconcile() waits on it so the account rule below sees the
+  // arrival as this device's choice, never the other way round.
+  const arrivalDone = useRef<Promise<void>>(Promise.resolve());
+
   useEffect(() => {
+    // `/?lang=de` is stored exactly as a choice in Settings would be, before the
+    // stored values are read. Only what exists is set: the UI language if
+    // Immerse is translated into it, the library if the catalog has books in it.
+    //
+    // Signed-in users: the arrival becomes this device's choice and then goes
+    // through the normal account rule — an account that already holds a
+    // language keeps it (the link is aimed at newcomers, and a user's own
+    // setting outranks a marketing link), while an account with none is seeded
+    // from it. Guests and first visits simply get it.
+    const arrival = consumeArrivalLanguage();
+    if (arrival && SUPPORTED_UI_LANGUAGES.includes(arrival)) storeUiLanguage(arrival);
+
     const storedUi = getStoredUiLanguage();
     setUiLanguageState(storedUi);
     applyUiLanguage(storedUi);
     setContentLanguageState(getChosenContentLanguage() ?? DEFAULT_CONTENT_LANGUAGE);
+
+    if (arrival) {
+      arrivalDone.current = loadCatalog()
+        .then(catalog => {
+          if (!catalog.books.some(b => (b.language ?? 'en') === arrival)) return;
+          storeContentLanguage(arrival);
+          setContentLanguageState(arrival);
+        })
+        .catch(() => { /* catalog unreachable — leave the library as it was */ });
+    }
   }, []);
 
   /**
@@ -70,6 +99,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
    * rendered in whatever this browser had stored.
    */
   const reconcile = useCallback(async (userId: string) => {
+    await arrivalDone.current;
     const remote = await fetchLanguagePrefs(supabase, userId);
     if (!remote) return;                       // unreachable or no row — leave local alone
 

@@ -33,6 +33,14 @@ import { fetchLanguagePrefs, pushLanguagePrefs } from '@/lib/languageSync';
 
 jest.mock('@/lib/supabase/client', () => ({ createClient: jest.fn() }));
 
+jest.mock('@/lib/catalog', () => ({
+  // A library in every language except Japanese, so a UI-only language can be tested
+  loadCatalog: jest.fn().mockResolvedValue({
+    categories: [],
+    books: ['en', 'de', 'fa', 'ar', 'es', 'xx'].map(language => ({ id: `b-${language}`, language })),
+  }),
+}));
+
 jest.mock('@/lib/languageSync', () => ({
   fetchLanguagePrefs: jest.fn(),
   pushLanguagePrefs: jest.fn().mockResolvedValue(undefined),
@@ -215,5 +223,73 @@ describe('reconciling on a session that appears after the page already rendered'
     act(() => { client.__fireAuthChange({ user: { id: USER } }); });
 
     expect(fetchLanguagePrefs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('arriving from the localized /get page with ?lang=', () => {
+  const at = (path: string) => window.history.replaceState(null, '', path);
+  afterEach(() => at('/'));
+  beforeEach(() => {
+    Object.defineProperty(window.navigator, 'languages', { value: ['en-US'], configurable: true });
+  });
+
+  it('sets both the UI and the library language, and persists them', async () => {
+    at('/?lang=de');
+    const view = await mount(fakeSupabase(null));
+    await waitFor(() => expect(langsOf(view)).toBe('de/de'));
+    expect(window.localStorage.getItem(UI_KEY)).toBe('de');
+    expect(window.localStorage.getItem(CONTENT_KEY)).toBe('de');
+    // Consumed: a reload must not re-apply it over a later Settings choice.
+    expect(window.location.search).toBe('');
+  });
+
+  it('mirrors the layout for a right-to-left language', async () => {
+    at('/?lang=fa');
+    const view = await mount(fakeSupabase(null));
+    await waitFor(() => expect(langsOf(view)).toBe('fa/fa'));
+    expect(document.documentElement.dir).toBe('rtl');
+  });
+
+  it('sets only the library when the language is not a UI language', async () => {
+    at('/?lang=xx');
+    const view = await mount(fakeSupabase(null));
+    await waitFor(() => expect(langsOf(view)).toBe('en/xx'));
+    expect(window.localStorage.getItem(UI_KEY)).toBeNull();
+  });
+
+  it('sets only the UI when the catalog has no books in that language', async () => {
+    at('/?lang=ru');
+    const view = await mount(fakeSupabase(null));
+    await waitFor(() => expect(langsOf(view)).toBe('ru/en'));
+    expect(window.localStorage.getItem(CONTENT_KEY)).toBeNull();
+  });
+
+  it('changes nothing for English, and keeps other params', async () => {
+    window.localStorage.setItem(UI_KEY, 'fr');
+    at('/?guest=1&lang=en');
+    const view = await mount(fakeSupabase(null));
+    await waitFor(() => expect(langsOf(view)).toBe('fr/en'));
+    expect(window.location.search).toBe('?guest=1');
+  });
+
+  it('is ignored off the root path', async () => {
+    at('/read/abc?lang=de');
+    const view = await mount(fakeSupabase(null));
+    await waitFor(() => expect(langsOf(view)).toBe('en/en'));
+  });
+
+  it('keeps a signed-in account\'s saved languages', async () => {
+    (fetchLanguagePrefs as jest.Mock).mockResolvedValue({ ui: 'fr', content: 'es' });
+    at('/?lang=de');
+    const view = await mount(fakeSupabase({ user: { id: USER } }));
+    await waitFor(() => expect(langsOf(view)).toBe('fr/es'));
+  });
+
+  it('seeds an account that has no saved language from the arrival', async () => {
+    at('/?lang=de');
+    await mount(fakeSupabase({ user: { id: USER } }));
+    await waitFor(() => expect(pushLanguagePrefs).toHaveBeenCalledWith(
+      expect.anything(), USER, { ui_language: 'de', content_language: 'de' },
+    ));
   });
 });

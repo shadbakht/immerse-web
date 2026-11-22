@@ -122,3 +122,38 @@ export function applyUiLanguage(lang: string) {
 export function storeUiLanguage(lang: string) {
   try { localStorage.setItem(STORAGE_KEY, lang); } catch { /* ignore */ }
 }
+
+// ─── Arriving with ?lang= ────────────────────────────────────────────────────
+// The localized /get page links to `/?lang=de`, so a visitor who read the store
+// page in German lands in an app that is already German: the chrome when it is
+// a UI language, the library when the catalog has books in it. Each is set only
+// if that language actually exists for it; English (the default) or anything
+// unrecognised sets nothing.
+
+export const ARRIVAL_LANG_PARAM = 'lang';
+
+/** The `?lang=` value worth acting on, or null. Strips region ("pt-BR" → "pt"). */
+export function arrivalLanguage(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const lang = baseLanguage(raw);
+  if (!/^[a-z]{2,3}$/.test(lang) || lang === DEFAULT_UI_LANGUAGE) return null;
+  return lang;
+}
+
+/**
+ * Read `?lang=` off the current URL (root path only — the param means
+ * "open the app in this language", nowhere else), then remove it with
+ * replaceState so a reload or a copied URL doesn't re-apply it over a later
+ * choice made in Settings. Other params (e.g. ?guest=1) are kept.
+ */
+export function consumeArrivalLanguage(): string | null {
+  if (typeof window === 'undefined') return null;
+  const url = new URL(window.location.href);
+  if (url.pathname !== '/' || !url.searchParams.has(ARRIVAL_LANG_PARAM)) return null;
+  const lang = arrivalLanguage(url.searchParams.get(ARRIVAL_LANG_PARAM));
+  url.searchParams.delete(ARRIVAL_LANG_PARAM);
+  try {
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  } catch { /* cosmetic only */ }
+  return lang;
+}
