@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { containsObjectionable, isObjectionableError } from '@/lib/moderation';
 
 // Reached only from /auth/callback, which already checked
 // profiles.username_confirmed === false — a Google/Apple sign-in whose
@@ -97,7 +98,9 @@ function ChooseUsernameInner() {
 
     setLoading(true);
     try {
+      if (await containsObjectionable(raw)) { setError(t('moderation.objectionable')); return; }
       const { error } = await supabase.from('profiles').update({ username: raw, username_confirmed: true }).eq('id', userId);
+      if (isObjectionableError(error)) { setError(t('moderation.objectionable')); return; }
       if (error) throw error;
       router.push(next);
       router.refresh();

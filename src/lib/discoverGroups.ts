@@ -55,6 +55,8 @@ export function groupDiscoverFeed<C extends DiscoverItemBase, X extends Discover
     query?: string;
     compilationText: (c: C) => string;
     xrefText: (x: X) => string;
+    /** Users the viewer has blocked (user_blocks): their rows never show. */
+    blockedUserIds?: ReadonlySet<string>;
   },
 ): DiscoverGroup<C, X>[] {
   const q = (opts.query ?? '').trim().toLowerCase();
@@ -71,8 +73,9 @@ export function groupDiscoverFeed<C extends DiscoverItemBase, X extends Discover
     if (it.published_at > g.latestAt) g.latestAt = it.published_at;
     return g;
   };
-  for (const c of compilations) groupFor(c).compilations.push(c);
-  for (const x of xrefs) groupFor(x).xrefs.push(x);
+  const blocked = opts.blockedUserIds;
+  for (const c of compilations) if (!blocked?.has(c.user_id)) groupFor(c).compilations.push(c);
+  for (const x of xrefs) if (!blocked?.has(x.user_id)) groupFor(x).xrefs.push(x);
 
   const cmp = byMode(opts.mode);
   let groups = [...map.values()];

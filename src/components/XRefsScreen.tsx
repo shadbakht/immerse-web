@@ -25,6 +25,7 @@ import {
 import {
   publishXref, unpublishXref, fetchPublicXrefIds, pruneOrphanedCommunityXrefs, XrefNotPublishableError,
 } from '@/lib/communityXrefs';
+import { ensureCommunityRules, isObjectionableError } from '@/lib/moderation';
 
 /** Same globe the Compilations screen puts on a public row. */
 function GlobeIcon() {
@@ -373,11 +374,15 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
       label,
     }).catch(() => {});
     // A public X-Ref's Discover copy carries the label — refresh it.
-    if (publicIds.has(id)) void publishXref({ ...row, label }, userId).catch(() => {});
+    // A refused word keeps the old label on Discover — say so.
+    if (publicIds.has(id)) void publishXref({ ...row, label }, userId)
+      .catch((e) => { if (isObjectionableError(e)) alert(t('moderation.objectionable')); });
   }
 
   async function handleTogglePublic(row: XRefRow) {
     const makePublic = !publicIds.has(row.id);
+    if (makePublic &&
+        !(await ensureCommunityRules(userId, async () => confirm(`${t('moderation.rulesTitle')}\n\n${t('moderation.rulesBody')}`)))) return;
     try {
       if (makePublic) {
         await publishXref(row, userId);
@@ -387,7 +392,8 @@ export default function XRefsScreen({ userId, onOpenBook, onOpenLibrary }: XRefs
         setPublicIds(prev => { const n = new Set(prev); n.delete(row.id); return n; });
       }
     } catch (e) {
-      alert(e instanceof XrefNotPublishableError ? t('discover.importedOnlyError') : t('discover.publishFailed'));
+      alert(e instanceof XrefNotPublishableError ? t('discover.importedOnlyError')
+        : isObjectionableError(e) ? t('moderation.objectionable') : t('discover.publishFailed'));
     }
   }
 

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { fetchSelectionsByUser } from '@/lib/fetchAnnotationSelections';
 import { pushTag, deleteRemote } from '@/lib/annotationSync';
 import { publishTag, unpublishTag, ImportedOnlyError } from '@/lib/communitySync';
+import { ensureCommunityRules, isObjectionableError } from '@/lib/moderation';
 import { getShareState, createShareLink, revokeShareLink, shareUrl, type ShareState } from '@/lib/shareLinks';
 import { findMultiCompilationShare, ensureMultiCompilationShare, revokeSharedSet } from '@/lib/sharedSets';
 import { refreshSharedCompilation, pruneOrphanedSharedSets } from '@/lib/sharedSets';
@@ -639,6 +640,9 @@ export default function TagsScreen({ userId, onOpenBook, onOpenLibrary }: TagsSc
   async function handleToggleVisibility(id: string, visibility: string) {
     const tag = tags.find(t => t.id === id);
     if (!tag) return;
+    // First publish: the community rules, once (Apple 1.2).
+    if (visibility === 'published' &&
+        !(await ensureCommunityRules(userId, async () => confirm(`${t('moderation.rulesTitle')}\n\n${t('moderation.rulesBody')}`)))) return;
     const wasPublished = tag.visibility === 'published';
     await pushTag({
       id: tag.id,
@@ -660,14 +664,15 @@ export default function TagsScreen({ userId, onOpenBook, onOpenLibrary }: TagsSc
         await unpublishTag(tag.id, userId);
       }
     } catch (e) {
-      if (e instanceof ImportedOnlyError || (e as { name?: string })?.name === 'ImportedOnlyError') {
+      const objectionable = isObjectionableError(e);
+      if (objectionable || e instanceof ImportedOnlyError || (e as { name?: string })?.name === 'ImportedOnlyError') {
         // Revert the optimistic toggle (local state + persisted visibility).
         setTags(prev => prev.map(t => t.id === id ? { ...t, visibility: tag.visibility } : t));
         await pushTag({
           id: tag.id, user_id: userId, name: tag.name,
           visibility: tag.visibility, updated_at: new Date().toISOString(),
         }).catch(() => {});
-        alert((e as Error).message);
+        alert(objectionable ? t('moderation.objectionable') : (e as Error).message);
         return;
       }
       console.warn('[Community] publish/unpublish error:', e);

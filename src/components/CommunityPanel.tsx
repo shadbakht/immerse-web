@@ -18,6 +18,9 @@ import { shareUrl } from '@/lib/shareUrl';
 import { scriptScaleForText, treeDepthWeight } from '@/lib/readerTypography';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import { DiscoverIcon } from './Icons';
+import { ContextMenu } from './ContextMenu';
+import { ReportDialog } from './ReportDialog';
+import { reportContent, fetchBlockedIds, blockUser, type ReportKind } from '@/lib/moderation';
 import type { TranslationKey, TranslateVars } from '@immerse/i18n';
 import {
   CompilationTree,
@@ -164,8 +167,9 @@ function TypeMark({ kind }: { kind: 'compilation' | 'xref' }) {
 }
 
 function TagCard({
-  ct, isImported, isOwn, onImport, onOpenBook, selectedIds, onToggleSelect, open, onToggleOpen,
+  ct, isImported, isOwn, onImport, onOpenBook, selectedIds, onToggleSelect, open, onToggleOpen, menu,
 }: {
+  menu?:          React.ReactNode;
   ct:             CommunityTag;
   isImported:     boolean;
   isOwn:          boolean;
@@ -207,6 +211,7 @@ function TagCard({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {!isOwn && menu}
           <ImportButton isOwn={isOwn} isImported={isImported} onImport={() => onImport(ct)} />
           <span className="text-xs text-gray-400 dark:text-[#5C7A8E]">{ct.selection_count}</span>
           <Chevron open={open} onClick={onToggleOpen} />
@@ -266,8 +271,9 @@ function XrefPair({ sides, onOpenBook }: { sides: CommunityXrefRow['payload']['a
 }
 
 function XrefCard({
-  cx, isImported, isOwn, onImport, onOpenBook, selected, onToggleSelect, open, onToggleOpen,
+  cx, isImported, isOwn, onImport, onOpenBook, selected, onToggleSelect, open, onToggleOpen, menu,
 }: {
+  menu?: React.ReactNode;
   cx: CommunityXrefRow;
   isImported: boolean;
   isOwn: boolean;
@@ -297,6 +303,7 @@ function XrefCard({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {!isOwn && menu}
           <ImportButton isOwn={isOwn} isImported={isImported} onImport={() => onImport(cx)} />
           <Chevron open={open} onClick={onToggleOpen} />
         </div>
@@ -326,8 +333,9 @@ function Avatar({ profile }: { profile: DiscoverGroup<CommunityTag, CommunityXre
 type Group = DiscoverGroup<CommunityTag, CommunityXrefRow>;
 
 function UserRow({
-  group, isOwn, isFollowing, onFollowToggle, open, onToggleOpen, children,
+  group, isOwn, isFollowing, onFollowToggle, open, onToggleOpen, menu, children,
 }: {
+  menu?: React.ReactNode;
   group: Group;
   isOwn: boolean;
   isFollowing: boolean;
@@ -358,6 +366,7 @@ function UserRow({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {!isOwn && menu}
           {!isOwn && (
             <button
               onClick={async e => { e.stopPropagation(); setBusy(true); await onFollowToggle(group.userId, isFollowing); setBusy(false); }}
@@ -466,6 +475,8 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [subscribedXrefIds, setSubscribedXrefIds] = useState<Set<string>>(new Set());
   const [followingIds, setFollowingIds]   = useState<Set<string>>(new Set());
+  const [blockedIds, setBlockedIds]       = useState<Set<string>>(new Set());
+  const [reportTarget, setReportTarget]   = useState<{ kind: ReportKind; id: string; userId: string } | null>(null);
   // A guest tapped Import, Follow or Export: show the sign-in card.
   const [askSignIn, setAskSignIn]         = useState(false);
 
@@ -617,6 +628,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     setSubscribedIds(new Set((subs ?? []).map((r: { community_tag_id: string }) => r.community_tag_id)));
     setFollowingIds(new Set((follows ?? []).map((r: { followed_user_id: string }) => r.followed_user_id)));
     setSubscribedXrefIds(xrefSubs);
+    fetchBlockedIds(uid).then(setBlockedIds).catch(() => {});
   }, [uid]);
 
   async function loadFeed() {
@@ -685,11 +697,11 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
 
   // ── Groups + open state ─────────────────────────────────────────────────────
   const trendingGroups = useMemo(
-    () => groupDiscoverFeed(allTags, allXrefs, { mode: 'trending', query: searchQuery, compilationText, xrefText }),
-    [allTags, allXrefs, searchQuery]);
+    () => groupDiscoverFeed(allTags, allXrefs, { mode: 'trending', query: searchQuery, compilationText, xrefText, blockedUserIds: blockedIds }),
+    [allTags, allXrefs, searchQuery, blockedIds]);
   const recentGroups = useMemo(
-    () => groupDiscoverFeed(allTags, allXrefs, { mode: 'recent', query: searchQuery, compilationText, xrefText }),
-    [allTags, allXrefs, searchQuery]);
+    () => groupDiscoverFeed(allTags, allXrefs, { mode: 'recent', query: searchQuery, compilationText, xrefText, blockedUserIds: blockedIds }),
+    [allTags, allXrefs, searchQuery, blockedIds]);
 
   // Not persisted. While searching, matches open on their own; a click during a
   // search overrides that until the query changes.
@@ -722,6 +734,31 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
     if (isUserKey(k)) setClosedUsers(flip); else setOpenKeys(flip);
   }, [searchQuery, isOpen]);
 
+  // ── Report / block (Apple 1.2) ──────────────────────────────────────────────
+  async function handleBlock(userId: string, name: string) {
+    if (!uid) { setAskSignIn(true); return; }
+    if (!confirm(`${t('moderation.blockConfirmTitle', { name })}\n\n${t('moderation.blockConfirmBody')}`)) return;
+    try {
+      await blockUser(uid, userId);
+      setBlockedIds(prev => new Set(prev).add(userId));
+    } catch (e) {
+      console.warn('[CommunityPanel] block error:', e);
+      alert(t('moderation.blockFailed'));
+    }
+  }
+  const REPORT_LABEL: Record<ReportKind, TranslationKey> = {
+    user: 'moderation.reportUser', compilation: 'moderation.reportCompilation', xref: 'moderation.reportXref',
+  };
+  function modMenu(kind: ReportKind, id: string, userId: string, profile: Group['profile'] | undefined) {
+    const name = profile?.full_name?.trim() || (profile?.username ? `@${profile.username}` : t('discover.anonymous'));
+    return (
+      <ContextMenu options={[
+        { label: t(REPORT_LABEL[kind]), onClick: () => setReportTarget({ kind, id, userId }) },
+        { label: t('moderation.blockUser'), color: 'danger', onClick: () => { void handleBlock(userId, name); } },
+      ]} />
+    );
+  }
+
   const renderGroup = (prefix: string) => function DiscoverUser(g: Group) {
     const isOwn = !!user?.id && g.userId === user.id;
     const uk = `${prefix}user:${g.userId}`;
@@ -733,6 +770,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
         onFollowToggle={handleFollowToggle}
         open={isOpen(uk)}
         onToggleOpen={() => toggleOpen(uk)}
+        menu={modMenu('user', g.userId, g.userId, g.profile)}
       >
         {g.compilations.map(ct => (
           <TagCard
@@ -746,6 +784,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
             onToggleSelect={toggleSelect}
             open={isOpen(`${prefix}${ct.id}`)}
             onToggleOpen={() => toggleOpen(`${prefix}${ct.id}`)}
+            menu={modMenu('compilation', ct.id, ct.user_id, g.profile)}
           />
         ))}
         {g.xrefs.map(cx => (
@@ -760,6 +799,7 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
             onToggleSelect={toggleXrefSelect}
             open={isOpen(`${prefix}${cx.id}`)}
             onToggleOpen={() => toggleOpen(`${prefix}${cx.id}`)}
+            menu={modMenu('xref', cx.id, cx.user_id, g.profile)}
           />
         ))}
       </UserRow>
@@ -900,6 +940,15 @@ export default function CommunityPanel({ user, onOpenBook }: CommunityPanelProps
       </div>
 
       {askSignIn && <GuestSignInCard onClose={() => setAskSignIn(false)} />}
+      {reportTarget && (
+        <ReportDialog
+          kind={reportTarget.kind}
+          onClose={() => setReportTarget(null)}
+          onSubmit={reason => reportContent({
+            kind: reportTarget.kind, targetId: reportTarget.id, targetUserId: reportTarget.userId, reason, reporterId: uid ?? null,
+          })}
+        />
+      )}
     </div>
   );
 }

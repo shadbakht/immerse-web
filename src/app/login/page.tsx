@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import { containsObjectionable } from '@/lib/moderation';
 
 // 'choose' = the 3-button landing screen (Sign in / Sign up / Guest access, no
 // fields). 'signin' / 'signup' expand into the matching form, each ending in
@@ -144,6 +145,10 @@ function LoginPageInner() {
         router.push(redirectTo);
         router.refresh();
       } else {
+        // A word Discover does not allow (Apple 1.2) in the username or name.
+        if (await containsObjectionable(username.toLowerCase().trim(), fullName)) {
+          throw new Error(t('moderation.objectionable'));
+        }
         const { data: signUpData, error } = await supabase.auth.signUp({
           email,
           password,

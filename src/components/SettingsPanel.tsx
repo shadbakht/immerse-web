@@ -17,6 +17,8 @@ import {
 } from '@/lib/avatarUpload';
 import type { User } from '@supabase/supabase-js';
 import pkg from '../../package.json';
+import { containsObjectionable, isObjectionableError } from '@/lib/moderation';
+import { BlockedUsersSection } from './BlockedUsersSection';
 
 // Alphabetical by language code, so this "App Language" list matches the order
 // of the library's content-language switcher (LibraryPanel's availableLanguages).
@@ -242,7 +244,10 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
     const trimmed = nameInput.trim();
     if (!trimmed || trimmed === fullName) { setEditingName(false); return; }
     setNameSaving(true);
-    await supabase.from('profiles').update({ full_name: trimmed }).eq('id', user.id);
+    // A word Discover does not allow (Apple 1.2): the profiles trigger refuses it too.
+    if (await containsObjectionable(trimmed)) { setNameSaving(false); alert(t('moderation.objectionable')); return; }
+    const { error } = await supabase.from('profiles').update({ full_name: trimmed }).eq('id', user.id);
+    if (isObjectionableError(error)) { setNameSaving(false); alert(t('moderation.objectionable')); return; }
     setFullName(trimmed);
     setEditingName(false);
     setNameSaving(false);
@@ -531,6 +536,9 @@ export default function SettingsPanel({ user }: SettingsPanelProps) {
                 </section>
               );
             })()}
+
+            {/* Discover blocks (Apple 1.2) — made from Discover's "⋮", undone here. */}
+            {!isGuest && user && <BlockedUsersSection userId={user.id} cardClass={CARD} headClass={CARD_HEAD} />}
 
             {/* Reorganized 2026-10-18 to match mobile's Settings order, grouped
                 by what a setting affects: Reader Appearance (the page) → App
