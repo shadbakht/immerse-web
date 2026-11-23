@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { pushNote, pushXref, deleteRemote, cleanupOrphanedSelection } from '@/lib/annotationSync';
 import { buildCitation } from '@/lib/citationUtils';
@@ -11,7 +11,7 @@ import TagPanel from './TagPanel';
 import NotePanel from './NotePanel';
 import AiPanel from './AiPanel';
 import { ContextMenu, type MenuOption } from './ContextMenu';
-import { TagIcon, NoteIcon, XRefIcon } from './Icons';
+import { TagIcon, NoteIcon, XRefIcon, SparklesIcon, CopyIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
 import { logEvent } from '@/lib/analytics';
@@ -1589,7 +1589,8 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     if (!containerRect) return;
     setSelectionBar({
       x: rect.left + rect.width / 2 - containerRect.left,
-      y: rect.top - containerRect.top - 48,
+      // Clears the bar's ~56px icon-over-label height above the selection.
+      y: rect.top - containerRect.top - 60,
       text: resolved.text.trim(),
       startPassageId: resolved.startPassageId,
       endPassageId: resolved.endPassageId,
@@ -2478,29 +2479,33 @@ async function handleCopy() {
           style={{ left: Math.max(8, selectionBar.x - 150), top: Math.max(8, selectionBar.y) }}
         >
           {(editingSel
-            ? [{ label: savingEdit ? t('reader.updating') : t('reader.updateSelection'), onClick: confirmEditSelection, hint: undefined as string | undefined }]
+            ? [{ label: savingEdit ? t('reader.updating') : t('reader.updateSelection'), onClick: confirmEditSelection, hint: undefined as string | undefined, icon: undefined as ReactNode }]
             : [
-                { label: t('reader.actionTag'),  onClick: () => openPanel('tag'), hint: 'Add this selection to a compilation' },
-                { label: t('reader.actionNote'), onClick: () => openPanel('note'), hint: 'Add a note about this selection' },
-                { label: t('reader.actionXref'), onClick: handleXrefStart, hint: 'Add a cross-reference linking this selection to another' },
+                // Glyph over a short label, like the nav — colours match the
+                // mobile selection bar (tagBlue / noteYellow / xrefGreen / teal).
+                { label: t('reader.actionTag'),  onClick: () => openPanel('tag'), hint: 'Add this selection to a compilation', icon: <TagIcon size={20} color="#5B8EC4" /> },
+                { label: t('reader.actionNote'), onClick: () => openPanel('note'), hint: 'Add a note about this selection', icon: <NoteIcon size={20} color="#D4BC6A" /> },
+                { label: t('reader.actionXref'), onClick: handleXrefStart, hint: 'Add a cross-reference linking this selection to another', icon: <XRefIcon size={20} color="#5A9460" /> },
                 ...(setXrefSuggestions && selectionBar.startPassageId === selectionBar.endPassageId
-                  ? [{ label: `✦ ${t('xref.suggestMatch')}`, onClick: handleSuggestMatch, hint: 'Let AI suggest a passage to cross-reference' }]
+                  ? [{ label: t('xref.suggestMatch'), onClick: handleSuggestMatch, hint: 'Let AI suggest a passage to cross-reference', icon: <span className="text-[17px] leading-5 text-[#6BB073]">✦</span> }]
                   : []),
-                { label: t('reader.actionAi'),   onClick: () => openPanel('ai'), hint: 'Get an AI-generated summary of this selection' },
-                { label: t('reader.actionCopy'), onClick: handleCopy, hint: 'Copy this selection to your clipboard' },
+                { label: t('reader.actionAi'),   onClick: () => openPanel('ai'), hint: 'Get an AI-generated summary of this selection', icon: <SparklesIcon size={20} color="#2D9DB3" /> },
+                { label: t('reader.actionCopy'), onClick: handleCopy, hint: 'Copy this selection to your clipboard', icon: <CopyIcon size={20} color="#FFFFFF" /> },
               ]
-          ).map(({ label, onClick, hint }, i, arr) => (
-            <div key={label} className="flex items-center">
-              <button
-                onClick={onClick}
-                disabled={savingAnnotation || pickSaving || savingEdit}
-                title={hint}
-                className="px-[15px] py-[7px] text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {label}
-              </button>
-              {i < arr.length - 1 && <div className="w-px h-4 bg-white/20" />}
-            </div>
+          ).map(({ label, onClick, hint, icon }) => (
+            <button
+              key={label}
+              onClick={onClick}
+              disabled={savingAnnotation || pickSaving || savingEdit}
+              title={hint}
+              aria-label={label}
+              className={icon
+                ? 'flex flex-col items-center justify-center gap-0.5 min-w-[56px] max-w-[128px] px-2 py-1 text-white hover:bg-white/15 rounded-xl transition-colors disabled:opacity-50'
+                : 'px-[15px] py-[7px] text-sm font-medium text-white hover:bg-white/20 rounded-xl transition-colors disabled:opacity-50'}
+            >
+              {icon && <span className="h-5 flex items-center justify-center">{icon}</span>}
+              <span className={icon ? 'text-[11px] leading-tight text-white/80 truncate max-w-full' : undefined}>{label}</span>
+            </button>
           ))}
         </div>
       )}

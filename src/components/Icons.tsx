@@ -250,3 +250,26 @@ export function SettingsIcon({ color = '#FFFFFF', size = 20 }: IconProps) {
     </svg>
   );
 }
+
+/** AI: a large four-point sparkle with a small one beside it (24×24 stroke),
+ *  mirroring the lucide Sparkles glyph on mobile's selection bar. */
+export function SparklesIcon({ color = '#2D9DB3', size = 20 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M10 3.5L11.6 8.4L16.5 10L11.6 11.6L10 16.5L8.4 11.6L3.5 10L8.4 8.4Z" />
+      <path d="M18 14.5V20.5M15 17.5H21" />
+    </svg>
+  );
+}
+
+/** Copy: two overlapping rounded sheets (24×24 stroke). */
+export function CopyIcon({ color = '#FFFFFF', size = 20 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5V4.5A1.5 1.5 0 0 1 4.5 3H13.5A1.5 1.5 0 0 1 15 4.5V5" />
+    </svg>
+  );
+}
