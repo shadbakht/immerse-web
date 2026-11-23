@@ -6,6 +6,7 @@ import { loadCatalog, loadSlugMaps, collectionName } from '@/lib/catalog';
 import type { Catalog } from '@/lib/catalog';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { useTranslation } from '@/contexts/LanguageProvider';
+import ReadingRing from './ReadingRing';
 
 /** How many books Recently Viewed shows. Mobile's recentBooksMerge.ts has the
  *  same number (RECENT_BOOKS_LIMIT) — keep them equal. */
@@ -24,39 +25,6 @@ interface RecentBook {
   subtitle:   string;
   updatedAt:  string;
   fraction:   number;
-}
-
-/**
- * Apple-Watch-style progress ring: the old horizontal bar's colour and 4px
- * thickness, closed clockwise around the percentage instead of laid out under
- * the title. Always clockwise — rings don't mirror in RTL.
- */
-function ProgressRing({ percent, size = 44, stroke = 4 }: { percent: number; size?: number; stroke?: number }) {
-  const pct = Math.min(100, Math.max(0, percent));
-  const r = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * r;
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="absolute inset-0 -rotate-90">
-        <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke}
-          className="stroke-gray-100 dark:stroke-[#2D4050]"
-        />
-        {pct > 0 && (
-          <circle
-            cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - pct / 100)}
-            className="stroke-[#1B6B7B] dark:stroke-[#2D9DB3] transition-all"
-          />
-        )}
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-[#1B6B7B] dark:text-[#2D9DB3]">
-        {pct}%
-      </div>
-    </div>
-  );
 }
 
 interface HomePanelProps {
@@ -199,7 +167,6 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
             ) : (
               <div className="space-y-1.5">
                 {recentBooks.map(book => {
-                  const pct = Math.min(100, Math.max(0, Math.round(book.fraction * 100)));
                   const menuOptions: MenuOption[] = [{
                     label: t('home.removeFromRecent'),
                     icon: '✕',
@@ -215,7 +182,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                         onClick={() => onOpenBook(book.bookId, book.passageId ?? undefined)}
                         className="flex flex-1 min-w-0 items-center gap-4 text-start px-5 py-3"
                       >
-                        <ProgressRing percent={pct} />
+                        <ReadingRing fraction={book.fraction} ringKey={book.bookId} />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
                           {book.subtitle && (
