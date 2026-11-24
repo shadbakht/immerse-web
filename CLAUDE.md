@@ -87,6 +87,11 @@ Guest users see a `SignInPrompt` on Tags/Notes/XRefs/Settings tabs and a sign-in
 | `src/lib/traditionKey.ts` | Language-neutral tradition key for X-Ref grouping (`cat-fr-bahai` → `bahai`). Same code as mobile `src/utils/traditionKey.ts` — change both |
 | `src/lib/noteShare.ts` / `noteExport.ts` | Note share payload (`shared_sets` kind `notes`) + PDF/DOCX/CSV/MD export; page view `src/app/c/[id]/SharedNotesView.tsx` |
 | `src/lib/annotationSync.ts` → `cleanupOrphanedSelection` | Call after deleting a note or X-Ref so its selection doesn't linger |
+| `src/components/ReadingRing.tsx` + `src/lib/readingRingGeometry.ts` | Recently Viewed progress ring (Apple Watch style). Twin of mobile `ReadingRing.tsx` / `readingRingGeometry.ts` — change both |
+| `src/lib/timeLeft.ts` | Home's "N min left in chapter" (same pace table as mobile `chapterTimeLeft.ts`; chapter = `chapter_label` run) |
+| `src/components/BookFinishedDialog.tsx` + `src/lib/finishedBooks.ts` | End-of-book panel, once per book per browser; "Choose your next book" → `onOpenLibrary` |
+| `src/components/QuoteCardDialog.tsx` + `src/lib/quoteCardLayout.ts` + `src/lib/quoteCardBackground.ts` | Share a selection as a parchment quote card (canvas 1080×1350, photos in `public/daily-backgrounds`) |
+| `src/lib/quoteCardLimit.ts` + `src/components/ShareTooLongDialog.tsx` | Quote-card cap: 600 characters (260 zh/ja), same as mobile `utils/quoteCardLimit.ts` — change both; past it, Share as text |
 | `src/lib/fetchAnnotationSelections.ts` | Shared helper: fetches selections→passages→books in 3 queries (avoids RLS cross-table join issues) |
 | `src/proxy.ts` | Next.js middleware: redirects unauthenticated users to `/login` |
 | `src/app/login/page.tsx` | Login page: sign-in / sign-up toggle, username validation |
@@ -162,3 +167,6 @@ Tags, Notes, XRefs all use **self-contained card components** (`TagCard`, `NoteC
 - `pendingSelectionRef` captures the selection before panels clear it
 - Footnote clicks always open a panel; shows fallback if text unavailable
 - Selection bar appears on text selection; triggers tag/note/xref panels
+- Selection bar: Compilation, Note, Xref, (Suggest a match), Share, AI — **no Copy button** (owner, 2026-11-23: Ctrl/Cmd+C and right-click do it). `selectionCitation()` builds the citation for the quote card
+- Shift+click extends a selection: the click-away dismiss handler must keep ignoring shift-presses
+- Cancel on the too-long Share message restores the selection and its bar (`cancelTooLongShare`)
