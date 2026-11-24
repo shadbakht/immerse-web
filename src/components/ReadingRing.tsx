@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RING_START, ringArc, ringPoint, ringSegments, ringColorAt, chevronColor } from '@/lib/readingRingGeometry';
+import { RING_START, ringArc, ringPoint, ringSegments, ringColorAt } from '@/lib/readingRingGeometry';
 
 /**
  * Reading progress ring in the style of Apple Watch's activity rings — the web
  * twin of mobile `src/components/ReadingRing.tsx` (change both). A thick band
  * on a tinted track, light teal at 12 o'clock shading to dark teal at 100% (the
  * shade follows the position on the circle, not the filled length),
- * a white chevron in the head cap, a soft shadow ahead of the head near the
+ * a solid dark teal head dot like the reader scrubber's thumb, a soft shadow ahead of the head near the
  * end, and a check in place of the percentage at 100%.
  *
  * Sweeps from the value it last showed (remembered per `ringKey` for the page
@@ -74,7 +74,10 @@ export default function ReadingRing({ fraction, ringKey, size = 44 }: { fraction
 
   const stroke = size * 0.13;
   const c = size / 2;
-  const r = (size - stroke) / 2;
+  // The head is a solid dot a little wider than the band, like the reader
+  // scrubber's thumb; the radius leaves room for it.
+  const knobR = stroke * 0.7;
+  const r = size / 2 - knobR;
   const capR = stroke / 2;
   const pct = ringPercent(shown);
   const full = pct === 100;
@@ -84,9 +87,6 @@ export default function ReadingRing({ fraction, ringKey, size = 44 }: { fraction
   const [hx, hy] = ringPoint(c, r, end);
   const [dx, dy] = ringPoint(c, r, end + 0.12);
   const shadow = drawn > 0.8 ? 0.3 * Math.min(1, (drawn - 0.8) / 0.15) : 0;
-  // The chevron fills most of the head cap (it was drawn for a 12pt band at
-  // 1/12 scale, which left it ~3pt tall at row size and hard to see).
-  const k = stroke / 8;
   const checkScale = celebrate === null ? 1
     : celebrate < 0.4 ? Math.max(0.01, (celebrate / 0.4) * 1.15)
     : 1.15 - 0.15 * Math.min(1, (celebrate - 0.4) / 0.3);
@@ -104,11 +104,8 @@ export default function ReadingRing({ fraction, ringKey, size = 44 }: { fraction
         {ringSegments(drawn).map(({ a0, a1, t }, i) => (
           <path key={i} d={ringArc(c, r, a0, a1)} fill="none" strokeWidth={stroke} style={{ stroke: ringColorAt(t) }} />
         ))}
-        {shadow > 0 && <circle cx={dx} cy={dy} r={capR + size * 0.012} fill={`rgba(0,0,0,${shadow.toFixed(3)})`} />}
-        <circle cx={hx} cy={hy} r={capR} style={{ fill: ringColorAt(drawn) }} />
-        <g transform={`translate(${hx} ${hy}) rotate(${(end * 180) / Math.PI + 90}) scale(${k})`}>
-          <path d="M-2 -3.2L1.8 0L-2 3.2" fill="none" stroke={chevronColor(drawn)} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </g>
+        {shadow > 0 && <circle cx={dx} cy={dy} r={knobR + size * 0.012} fill={`rgba(0,0,0,${shadow.toFixed(3)})`} />}
+        <circle cx={hx} cy={hy} r={knobR} className="fill-[#1B6B7B] dark:fill-[#2D9DB3]" />
         {full && (
           <g transform={`translate(${c} ${c}) scale(${(size / 88) * checkScale}) translate(-44 -44)`}>
             <path d="M31 45 L40 54 L58 35" fill="none" strokeWidth={7} strokeLinecap="round" strokeLinejoin="round" style={{ stroke: ringColorAt(1) }} />

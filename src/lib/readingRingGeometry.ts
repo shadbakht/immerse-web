@@ -56,14 +56,3 @@ export function ringColorAt(t: number): string {
   const k = Math.round(Math.min(1, Math.max(0, t)) * 100);
   return `color-mix(in srgb, var(--ring-dark) ${k}%, var(--ring-light))`;
 }
-
-/**
- * The head cap's chevron colour: dark teal on the light first half of the
- * circle (white was faint on light teal, owner 2026-11-23), white once the
- * head has darkened.
- */
-export const CHEVRON_ON_LIGHT = '#0B3A43';
-export const CHEVRON_ON_DARK = '#FFFFFF';
-export function chevronColor(t: number): string {
-  return t < 0.5 ? CHEVRON_ON_LIGHT : CHEVRON_ON_DARK;
-}
