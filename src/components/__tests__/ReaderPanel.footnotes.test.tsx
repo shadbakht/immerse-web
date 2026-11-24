@@ -24,6 +24,11 @@ describe('resolveFootnoteText', () => {
     expect(resolveFootnoteText(passage, '1', bookMap)).toBe('Book-wide text');
   });
 
+  it('finds a note stored under its bracketed printed marker ("[1]")', () => {
+    expect(resolveFootnoteText({ footnotes: { '[1]': 'Scoped' } }, '1', {})).toBe('Scoped');
+    expect(resolveFootnoteText({ footnotes: null }, '55', { '[55]': 'Book-wide' })).toBe('Book-wide');
+  });
+
   it('returns empty string when neither source has the number', () => {
     const passage = { footnotes: null };
     expect(resolveFootnoteText(passage, '1', {})).toBe('');

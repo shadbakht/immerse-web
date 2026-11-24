@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { loadCatalog, loadSlugMaps, collectionName } from '@/lib/catalog';
+import { loadCatalog, loadSlugMaps, bookAuthorName } from '@/lib/catalog';
 import type { Catalog } from '@/lib/catalog';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { useTranslation } from '@/contexts/LanguageProvider';
@@ -82,7 +82,7 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
           const slug = uuidToSlug.get(p.book_id);
           const catBook = slug ? catalogBookMap.get(slug) : null;
           const title    = catBook?.title ?? '—';
-          const subtitle = catBook ? collectionName(catalog, catBook.categoryId) : '';
+          const subtitle = catBook ? bookAuthorName(catalog, catBook) : '';
 
           return {
             bookId:    p.book_id,

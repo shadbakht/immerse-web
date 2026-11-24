@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Catalog } from './catalog';
-import { collectionName, traditionName } from './catalog';
+import { bookAuthorName, traditionName } from './catalog';
 
 let _catalog: Catalog | null = null;
 
@@ -32,7 +32,7 @@ export function findBook(catalog: Catalog, bookId: string) {
 export function bookDescription(catalog: Catalog, bookId: string): string | null {
   const book = findBook(catalog, bookId);
   if (!book) return null;
-  const collection = collectionName(catalog, book.categoryId);
+  const collection = bookAuthorName(catalog, book);
   const tradition = traditionName(catalog, book.categoryId);
   const by = collection && collection !== tradition ? `${collection} — ` : '';
   return `${by}${tradition ? `${tradition} scripture` : 'Sacred text'}. Read “${book.title}” free online at Immerse.`;

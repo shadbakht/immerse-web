@@ -448,7 +448,11 @@ export function resolveFootnoteText(
   num: string,
   bookFootnotes: Record<string, string>,
 ): string {
-  return passage.footnotes?.[num] ?? bookFootnotes[num] ?? '';
+  // Books whose printed marker is itself bracketed ("[1]" — Tablets of
+  // Bahá'u'lláh and 15 other English books) were synced with keys "[1]" while
+  // the tap hands us "1": try both spellings.
+  const alt = `[${num}]`;
+  return passage.footnotes?.[num] ?? passage.footnotes?.[alt] ?? bookFootnotes[num] ?? bookFootnotes[alt] ?? '';
 }
 
 function PassageContent({ text, onFootnoteClick, hasFootnote, highlight, highlightExact, prayerBreaks }: { text: string; onFootnoteClick: (n: string) => void; hasFootnote?: (n: string) => boolean; highlight?: string; highlightExact?: boolean; prayerBreaks?: boolean }) {
@@ -2715,10 +2719,22 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
             // as a body paragraph identical to the divider we just drew above it.
             // Draw the divider, skip the echo. The row's wrapper stays so a
             // selection anchored at the chapter start keeps its gutter icon.
+            // A heading with a footnote ("…Fasting[3]") still echoes its label,
+            // which carries no marker — compare without markers, and draw the
+            // eyebrow from the row's own text so the note stays tappable.
+            const headingPlain = passage.paragraph_number === 0 ? stripFootnoteMarkers(passage.content).replace(/\[\s*\]/g, '').trim() : null;
             const isHeadingEcho =
               passage.paragraph_number === 0 &&
               (passage.content === passage.chapter_label ||
-               passage.content === passage.section_title);
+               passage.content === passage.section_title ||
+               (headingPlain !== passage.content &&
+                (headingPlain === passage.chapter_label || headingPlain === passage.section_title)));
+            const headingNotes = isHeadingEcho && headingPlain !== passage.content
+              ? (n: string) => setActiveFootnote({ num: n, text: resolveFootnoteText(passage, n, footnoteMap) })
+              : null;
+            const headingText = (label: string) => headingNotes && headingPlain === label
+              ? renderFootnotes(passage.content, headingNotes, `h-${passage.id}-`, false, n => !!resolveFootnoteText(passage, n, footnoteMap))
+              : label;
 
             // Letter date-lines ("19 December 1922", "[circa 30 July 1936]",
             // "8 February [1939]") render as bold sub-headings and are skipped by
@@ -2849,13 +2865,13 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
                     {showChapter && passage.chapter_label && (
                       <div className="flex items-center gap-3 mt-12 mb-1">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
-                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{passage.chapter_label}</span>
+                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{headingText(passage.chapter_label!)}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
                     {showSection && (
                       <h2 className="text-center text-xl font-semibold text-gray-900 dark:text-[#E2EAF2] mt-3 mb-4">
-                        {passage.section_title}
+                        {headingText(passage.section_title!)}
                       </h2>
                     )}
                   </>
@@ -2864,7 +2880,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
                     {showChapter && (
                       <div className="flex items-center gap-3 mt-12 mb-4">
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
-                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{passage.chapter_label}</span>
+                        <span className={`text-sm font-semibold uppercase text-[#1B6B7B] dark:text-[#2D9DB3]${disableHeadingTracking ? '' : ' tracking-[0.14em]'}`}>{headingText(passage.chapter_label!)}</span>
                         <span className="flex-1 h-px bg-[#1B6B7B]/25 dark:bg-[#2D9DB3]/25" />
                       </div>
                     )}
@@ -2873,7 +2889,7 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
                     )}
                     {showSection && (
                       <h3 className={`text-sm font-medium text-gray-400 dark:text-[#5C7A8E] uppercase text-center mt-8 mb-3${disableHeadingTracking ? '' : ' tracking-wide'}`}>
-                        {passage.section_title}
+                        {headingText(passage.section_title!)}
                       </h3>
                     )}
                   </>

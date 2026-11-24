@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from 'rea
 import { createClient } from '@/lib/supabase/client';
 import type { NavTab } from './AppShell';
 import TagPanel from './TagPanel';
-import { loadCatalog, loadSlugMaps } from '@/lib/catalog';
+import { loadCatalog, loadSlugMaps, libraryRowAuthor } from '@/lib/catalog';
 import { resolveIsPro } from '@/lib/proStatus';
 import { logEvent } from '@/lib/analytics';
 import type { Catalog, CatalogCategory, CatalogBook } from '@/lib/catalog';
@@ -29,6 +29,12 @@ const ALPHA_SORTED_CATEGORIES = new Set([
   'cat-bahai-bahullh',        // Bahá'u'lláh
   'cat-bahai-abdulbah',       // ‘Abdu'l-Bahá
   'cat-bahai-shoghi-effendi', // Shoghi Effendi
+  // Their grouping shelves (2026-11-24 reorganisation).
+  'cat-bahai-abdulbah-writings', 'cat-bahai-abdulbah-talks',
+  'cat-bahai-shoghi-effendi-major-works', 'cat-bahai-shoghi-effendi-letters',
+  // Titles lost their "Author - " prefix, so file order (by author) no longer
+  // reads as sorted; mobile already sorts this shelf by title.
+  'cat-bahai-other',
 ]);
 
 // Normalised alphabetical key: strip diacritics and leading punctuation
@@ -365,10 +371,19 @@ export default function LibraryPanel({ activeTab, userId, onOpenBook, onCollapse
                 onClick={() => onOpenBook(uuid)}
                 className="flex-1 flex items-center gap-2 text-start pe-4 py-2.5 min-w-0"
               >
-                <div
-                  className="leading-5 text-gray-800 dark:text-[#D2DCE8] truncate min-w-0"
-                  style={{ fontSize: `calc(0.875rem * ${treeScale})` }}
-                >{book.title}</div>
+                <div className="min-w-0">
+                  <div
+                    className="leading-5 text-gray-800 dark:text-[#D2DCE8] truncate min-w-0"
+                    style={{ fontSize: `calc(0.875rem * ${treeScale})` }}
+                  >{book.title}</div>
+                  {/* The book's own author on a shelf of several authors. */}
+                  {libraryRowAuthor(book) && (
+                    <div
+                      className="leading-4 text-gray-500 dark:text-[#8FA4B8] truncate"
+                      style={{ fontSize: `calc(0.75rem * ${treeScale})` }}
+                    >{libraryRowAuthor(book)}</div>
+                  )}
+                </div>
                 {newSlugs.has(book.id) && (
                   <span
                     className="shrink-0 rounded-full px-[7px] py-px font-semibold leading-4 bg-[#1B6B7B]/[0.14] text-[#1B6B7B] dark:bg-[#2D9DB3]/20 dark:text-[#2D9DB3]"

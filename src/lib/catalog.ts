@@ -14,7 +14,8 @@ export interface CatalogCategory {
   parentId: string | null;
   name: string;
   sortOrder: number;
-  kind: 'tradition' | 'collection' | 'imported' | null;
+  // 'group' = a grouping shelf ("Talks", "Prayers") — never an author.
+  kind: 'tradition' | 'collection' | 'imported' | 'group' | null;
 }
 
 export interface CatalogBook {
@@ -23,6 +24,9 @@ export interface CatalogBook {
   title: string;
   language?: string;   // BCP-47; absent on legacy entries, treated as 'en'
   sortOrder?: number;  // absent on legacy entries (raw array order stands in)
+  // The book's own author when its shelf holds several (History & Commentary,
+  // Chinese Tradition, Jain …). Mirrors mobile books.author.
+  author?: string;
 }
 
 export interface Catalog {
@@ -101,6 +105,25 @@ export function collectionName(catalog: Catalog, catId: string): string {
  *  or absent (legacy entries predate the language field). */
 export function bookLanguage(catalog: Catalog, slug: string): string {
   return catalog.books.find(b => b.id === slug)?.language ?? 'en';
+}
+
+/**
+ * The name a book is attributed to on Home (Recently Viewed) and in page
+ * descriptions: its own author, else its collection (see collectionName).
+ * ⚠️ Mobile twin: Immerse src/utils/bookAuthor.ts.
+ */
+export function bookAuthorName(catalog: Catalog, book: CatalogBook): string {
+  return book.author?.trim() || collectionName(catalog, book.categoryId);
+}
+
+/**
+ * The author line under a Library row: only when the book names its own
+ * author and the title doesn't already say it ("Mencius (Mengzi)").
+ */
+export function libraryRowAuthor(book: CatalogBook): string | null {
+  const own = book.author?.trim();
+  if (!own) return null;
+  return book.title.toLowerCase().includes(own.toLowerCase()) ? null : own;
 }
 
 /** Get the root tradition name for a category. */
