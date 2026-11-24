@@ -6,7 +6,8 @@ import { RING_START, ringArc, ringPoint, ringSegments, ringColorAt } from '@/lib
 /**
  * Reading progress ring in the style of Apple Watch's activity rings — the web
  * twin of mobile `src/components/ReadingRing.tsx` (change both). A thick band
- * on a tinted track, light teal at 12 o'clock shading to dark teal at the head,
+ * on a tinted track, light teal at 12 o'clock shading to dark teal at 100% (the
+ * shade follows the position on the circle, not the filled length),
  * a white chevron in the head cap, a soft shadow ahead of the head near the
  * end, and a check in place of the percentage at 100%.
  *
@@ -102,7 +103,7 @@ export default function ReadingRing({ fraction, ringKey, size = 44 }: { fraction
           <path key={i} d={ringArc(c, r, a0, a1)} fill="none" strokeWidth={stroke} style={{ stroke: ringColorAt(t) }} />
         ))}
         {shadow > 0 && <circle cx={dx} cy={dy} r={capR + size * 0.012} fill={`rgba(0,0,0,${shadow.toFixed(3)})`} />}
-        <circle cx={hx} cy={hy} r={capR} style={{ fill: ringColorAt(1) }} />
+        <circle cx={hx} cy={hy} r={capR} style={{ fill: ringColorAt(drawn) }} />
         <g transform={`translate(${hx} ${hy}) rotate(${(end * 180) / Math.PI + 90}) scale(${k})`}>
           <path d="M-2 -3.2L1.8 0L-2 3.2" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
         </g>

@@ -35,3 +35,7 @@ it('shades the band from the light end to the dark end', () => {
   expect(ringColorAt(0)).toContain('var(--ring-dark) 0%');
   expect(ringColorAt(1)).toContain('var(--ring-dark) 100%');
 });
+
+it('keeps a low-progress ring in the light end', () => {
+  expect(Math.max(...ringSegments(0.14).map((s) => s.t))).toBeLessThanOrEqual(0.14);
+});

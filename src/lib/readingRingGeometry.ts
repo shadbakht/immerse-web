@@ -25,8 +25,11 @@ export function ringArc(c: number, r: number, a0: number, a1: number): string {
 
 /**
  * The band split into short arcs so it can shade along its length (SVG has no
- * conic gradient). `t` is each segment's place along the band, 0 at the start
- * and 1 at the head, which picks its colour. Empty at 0%.
+ * conic gradient). `t` is each segment's place around the WHOLE circle, 0 at
+ * 12 o'clock and 1 back at 12 o'clock, which picks its colour: the shade is
+ * tied to the position, not stretched over the filled part, so a 14% ring
+ * stays light and only a nearly finished one reaches dark teal (owner's call,
+ * 2026-11-23). The head cap takes the colour at `fraction`. Empty at 0%.
  */
 export function ringSegments(fraction: number): { a0: number; a1: number; t: number }[] {
   const p = Math.min(Math.max(fraction, 0), 0.9999);
@@ -38,7 +41,7 @@ export function ringSegments(fraction: number): { a0: number; a1: number; t: num
   for (let i = 0; i < n; i++) {
     const a0 = RING_START + (span * i) / n;
     const a1 = Math.min(end, RING_START + (span * (i + 1)) / n + SEGMENT_OVERLAP);
-    out.push({ a0, a1, t: n === 1 ? 1 : (i + 0.5) / n });
+    out.push({ a0, a1, t: (p * (i + 0.5)) / n });
   }
   return out;
 }
