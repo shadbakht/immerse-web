@@ -29,6 +29,8 @@ import FirstUseHint from './FirstUseHint';
 import WhalieLayer from './WhalieLayer';
 import BookFinishedDialog from './BookFinishedDialog';
 import QuoteCardDialog from './QuoteCardDialog';
+import ShareTooLongDialog from './ShareTooLongDialog';
+import { fitsQuoteCard } from '@/lib/quoteCardLimit';
 import { markBookFinished } from '@/lib/finishedBooks';
 import { useDocumentDark, useWhalie, whaliePaletteFor } from '@/lib/whalie/whalie';
 
@@ -1076,7 +1078,10 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // above never reaches the last passage on a tall screen).
   const [finishedTitle, setFinishedTitle] = useState<string | null>(null);
   // The selection shared as a quote card (QuoteCardDialog), or null.
-  const [quoteCard, setQuoteCard] = useState<{ text: string; citation: string } | null>(null);
+  const [quoteCard, setQuoteCard] = useState<{ text: string; citation: string; tooLong: boolean } | null>(null);
+  // The selection as it was when a too-long Share opened its message, so
+  // Cancel can put it back exactly (owner: Cancel must keep the selection).
+  const tooLongRestoreRef = useRef<{ range: Range | null; bar: SelectionBar } | null>(null);
   useEffect(() => {
     const bookId = target?.bookId;
     const container = scrollRef.current;
@@ -1237,6 +1242,10 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
   useEffect(() => {
     function handleDismiss(e: MouseEvent | TouchEvent) {
+      // Shift+click extends the selection (the browser's own behaviour): keep
+      // it, so the browser has an anchor to extend from; mouseup then rebuilds
+      // the bar for the whole range (owner: select, scroll, Shift+click).
+      if ('shiftKey' in e && e.shiftKey) return;
       if (selectionBar && selectionBarRef.current && !selectionBarRef.current.contains(e.target as Node)) {
         setSelectionBar(null);
         window.getSelection()?.removeAllRanges();
@@ -1727,7 +1736,37 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
   // Share the selection as a quote card (same parchment card as mobile).
   function handleShareCard() {
     if (!selectionBar) return;
-    setQuoteCard({ text: selectionBar.text, citation: selectionCitation() });
+    // Past the quote-card limit the text would be too small to read: offer it
+    // as text instead, and leave the selection alone so Cancel keeps it.
+    const tooLong = !fitsQuoteCard(selectionBar.text, book?.language);
+    setQuoteCard({ text: selectionBar.text, citation: selectionCitation(), tooLong });
+    if (tooLong) {
+      const sel = window.getSelection();
+      tooLongRestoreRef.current = { range: sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null, bar: selectionBar };
+      return;
+    }
+    setSelectionBar(null);
+    window.getSelection()?.removeAllRanges();
+  }
+
+  // Cancel on the too-long message: the selection and its bar come back as they were.
+  function cancelTooLongShare() {
+    const saved = tooLongRestoreRef.current;
+    tooLongRestoreRef.current = null;
+    setQuoteCard(null);
+    if (!saved) return;
+    if (saved.range) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(saved.range);
+    }
+    setSelectionBar(saved.bar);
+  }
+
+  // After sharing it as text, the selection has done its job.
+  function finishTooLongShare() {
+    tooLongRestoreRef.current = null;
+    setQuoteCard(null);
     setSelectionBar(null);
     window.getSelection()?.removeAllRanges();
   }
@@ -2444,7 +2483,16 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
 
   return (
     <div className="h-full flex flex-col relative" ref={readerRef}>
-      {quoteCard && (
+      {quoteCard?.tooLong && (
+        <ShareTooLongDialog
+          text={quoteCard.text}
+          citation={quoteCard.citation}
+          language={book?.language}
+          onCancel={cancelTooLongShare}
+          onShared={finishTooLongShare}
+        />
+      )}
+      {quoteCard && !quoteCard.tooLong && (
         <QuoteCardDialog
           text={quoteCard.text}
           citation={quoteCard.citation}
