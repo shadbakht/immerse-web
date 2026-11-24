@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RING_START, ringArc, ringPoint, ringSegments, ringColorAt } from '@/lib/readingRingGeometry';
+import { RING_START, ringArc, ringPoint, ringSegments, ringColorAt, chevronColor } from '@/lib/readingRingGeometry';
 
 /**
  * Reading progress ring in the style of Apple Watch's activity rings — the web
@@ -105,7 +105,7 @@ export default function ReadingRing({ fraction, ringKey, size = 44 }: { fraction
         {shadow > 0 && <circle cx={dx} cy={dy} r={capR + size * 0.012} fill={`rgba(0,0,0,${shadow.toFixed(3)})`} />}
         <circle cx={hx} cy={hy} r={capR} style={{ fill: ringColorAt(drawn) }} />
         <g transform={`translate(${hx} ${hy}) rotate(${(end * 180) / Math.PI + 90}) scale(${k})`}>
-          <path d="M-2 -3.2L1.8 0L-2 3.2" fill="none" stroke="#FFFFFF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M-2 -3.2L1.8 0L-2 3.2" fill="none" stroke={chevronColor(drawn)} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
         </g>
         {full && (
           <g transform={`translate(${c} ${c}) scale(${(size / 88) * checkScale}) translate(-44 -44)`}>
