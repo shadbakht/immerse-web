@@ -8,7 +8,7 @@ import { RING_START, ringArc, ringPoint, ringSegments, ringColorAt } from '@/lib
  * twin of mobile `src/components/ReadingRing.tsx` (change both). A thick band
  * on a tinted track, light teal at 12 o'clock shading to dark teal at 100% (the
  * shade follows the position on the circle, not the filled length),
- * a solid dark teal head dot like the reader scrubber's thumb, a soft shadow ahead of the head near the
+ * a solid dark teal head dot (the band's width) like the reader scrubber's thumb, a soft shadow ahead of the head near the
  * end, and a check in place of the percentage at 100%.
  *
  * Sweeps from the value it last showed (remembered per `ringKey` for the page
@@ -74,10 +74,10 @@ export default function ReadingRing({ fraction, ringKey, size = 44 }: { fraction
 
   const stroke = size * 0.13;
   const c = size / 2;
-  // The head is a solid dot a little wider than the band, like the reader
-  // scrubber's thumb; the radius leaves room for it.
-  const knobR = stroke * 0.7;
-  const r = size / 2 - knobR;
+  // The head is a solid dark teal dot the band's own width, like the reader
+  // scrubber's thumb (owner, 2026-11-23).
+  const knobR = stroke / 2;
+  const r = (size - stroke) / 2;
   const capR = stroke / 2;
   const pct = ringPercent(shown);
   const full = pct === 100;

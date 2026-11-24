@@ -7,6 +7,7 @@ import type { Catalog } from '@/lib/catalog';
 import { ContextMenu, type MenuOption } from './ContextMenu';
 import { useTranslation } from '@/contexts/LanguageProvider';
 import ReadingRing from './ReadingRing';
+import { countReadingUnits, describeTimeLeft } from '@/lib/timeLeft';
 
 /** How many books Recently Viewed shows. Mobile's recentBooksMerge.ts has the
  *  same number (RECENT_BOOKS_LIMIT) — keep them equal. */
@@ -25,6 +26,7 @@ interface RecentBook {
   subtitle:   string;
   updatedAt:  string;
   fraction:   number;
+  language:   string;
 }
 
 interface HomePanelProps {
@@ -39,6 +41,8 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
   const [stats, setStats]           = useState<Stats>({ tags: 0, notes: 0, xrefs: 0 });
   const [recentBooks, setRecentBooks] = useState<RecentBook[]>([]);
   const [loading, setLoading]       = useState(true);
+  // bookId → reading units (words; characters for zh/ja) left in the chapter.
+  const [unitsLeft, setUnitsLeft] = useState<Record<string, number>>({});
 
   useEffect(() => {
     load();
@@ -87,14 +91,40 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
             subtitle,
             updatedAt: p.updated_at,
             fraction:  p.fraction ?? 0,
+            language:  catBook?.language ?? 'en',
           };
         }).filter(b => b.title !== '—');
 
         setRecentBooks(recent);
+        loadTimeLeft(recent);
       }
     } finally {
       setLoading(false);
     }
+  }
+
+  // "12 min left in chapter": the words from the saved passage to the end of
+  // its chapter (the passages sharing its chapter_label), counted after the
+  // list paints. Finished books and books with no saved passage are skipped.
+  async function loadTimeLeft(books: RecentBook[]) {
+    const entries = await Promise.all(books.map(async (b): Promise<[string, number] | null> => {
+      if (!b.passageId || b.fraction >= 0.995) return null;
+      try {
+        const { data: at } = await supabase
+          .from('passages').select('chapter_label, sort_order').eq('id', b.passageId).maybeSingle();
+        if (!at || at.chapter_label == null) return null;
+        const { data: rest } = await supabase
+          .from('passages').select('content')
+          .eq('book_id', b.bookId).eq('chapter_label', at.chapter_label)
+          .gte('sort_order', at.sort_order).order('sort_order').limit(5000);
+        if (!rest?.length) return null;
+        const units = rest.reduce((n, r) => n + countReadingUnits(r.content ?? '', b.language), 0);
+        return [b.bookId, units];
+      } catch {
+        return null;
+      }
+    }));
+    setUnitsLeft(Object.fromEntries(entries.filter((e): e is [string, number] => !!e)));
   }
 
   async function handleRemoveRecentBook(bookId: string) {
@@ -185,8 +215,11 @@ export default function HomePanel({ userId, onOpenBook, onTabChange }: HomePanel
                         <ReadingRing fraction={book.fraction} ringKey={book.bookId} />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm text-gray-800 dark:text-[#D2DCE8] truncate">{book.title}</div>
-                          {book.subtitle && (
-                            <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 truncate">{book.subtitle}</div>
+                          {(book.subtitle || unitsLeft[book.bookId] !== undefined) && (
+                            <div className="text-xs text-gray-400 dark:text-[#5C7A8E] mt-0.5 truncate">
+                              {[book.subtitle, unitsLeft[book.bookId] !== undefined ? describeTimeLeft(t, unitsLeft[book.bookId], book.language) : null]
+                                .filter(Boolean).join(' · ')}
+                            </div>
                           )}
                         </div>
                         <div className="text-xs text-gray-300 dark:text-[#4A6478] shrink-0">{formatDate(book.updatedAt)}</div>

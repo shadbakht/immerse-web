@@ -270,6 +270,7 @@ export default function AppShell({ user, initialBookId, initialPassageId, initia
               setXrefSuggestions={setXrefSuggestions}
               xrefSuggestSource={xrefSuggestSource}
               setXrefSuggestSource={setXrefSuggestSource}
+              onOpenLibrary={() => { setActiveTab('library'); setLibraryCollapsed(false); }}
             />
           </div>
         </>

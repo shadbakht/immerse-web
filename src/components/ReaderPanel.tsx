@@ -11,7 +11,7 @@ import TagPanel from './TagPanel';
 import NotePanel from './NotePanel';
 import AiPanel from './AiPanel';
 import { ContextMenu, type MenuOption } from './ContextMenu';
-import { TagIcon, NoteIcon, XRefIcon, SparklesIcon, CopyIcon } from './Icons';
+import { TagIcon, NoteIcon, XRefIcon, SparklesIcon } from './Icons';
 import { getLocalBook } from '@/lib/importedBooksDb';
 import { resolveIsPro } from '@/lib/proStatus';
 import { logEvent } from '@/lib/analytics';
@@ -27,6 +27,9 @@ import { seedCollapsedToc, TOC_EXPAND_ROW_BUDGET } from '@/lib/tocCollapse';
 import { useFirstUseHint } from '@/lib/useFirstUseHint';
 import FirstUseHint from './FirstUseHint';
 import WhalieLayer from './WhalieLayer';
+import BookFinishedDialog from './BookFinishedDialog';
+import QuoteCardDialog from './QuoteCardDialog';
+import { markBookFinished } from '@/lib/finishedBooks';
 import { useDocumentDark, useWhalie, whaliePaletteFor } from '@/lib/whalie/whalie';
 
 interface Passage {
@@ -356,6 +359,8 @@ interface ReaderPanelProps {
   setXrefSuggestions?: (s: XrefSuggestion[] | null) => void;
   xrefSuggestSource?: { passageId: string; bookId: string } | null;
   setXrefSuggestSource?: (s: { passageId: string; bookId: string } | null) => void;
+  /** Opens the Library (the end-of-book panel's "Choose your next book"). */
+  onOpenLibrary?: () => void;
 }
 
 // Prayer paragraph break: each newline in a prayer body is a source paragraph
@@ -791,7 +796,7 @@ export function recentlyViewedProgressRow(
   };
 }
 
-export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone, xrefSuggestions, setXrefSuggestions, xrefSuggestSource, setXrefSuggestSource }: ReaderPanelProps) {
+export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, onStartXrefPick, onXrefPickDone, xrefSuggestions, setXrefSuggestions, xrefSuggestSource, setXrefSuggestSource, onOpenLibrary }: ReaderPanelProps) {
   const supabase = createClient();
   const { t } = useTranslation();
   const [passages, setPassages] = useState<Passage[]>([]);
@@ -1063,6 +1068,38 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
       if (progressTimerRef.current) clearTimeout(progressTimerRef.current);
     };
   }, [passages, userId, saveProgress]);
+
+  // End of book: held at the very bottom of a fully loaded book for 2.5 s (a
+  // fling past the end doesn't count), the end-of-book panel shows — once per
+  // book in this browser (lib/finishedBooks). The last passage is saved as the
+  // position, so Home's ring closes with its check (the topmost-visible rule
+  // above never reaches the last passage on a tall screen).
+  const [finishedTitle, setFinishedTitle] = useState<string | null>(null);
+  // The selection shared as a quote card (QuoteCardDialog), or null.
+  const [quoteCard, setQuoteCard] = useState<{ text: string; citation: string } | null>(null);
+  useEffect(() => {
+    const bookId = target?.bookId;
+    const container = scrollRef.current;
+    if (!bookId || passages.length === 0 || !container) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const atBottom = () => container.scrollTop + container.clientHeight >= container.scrollHeight - 8;
+    function check() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (!bookFullyLoadedRef.current || !atBottom()) return;
+      timer = setTimeout(() => {
+        if (!bookFullyLoadedRef.current || !atBottom() || !bookId) return;
+        if (!markBookFinished(bookId)) return;
+        const last = passages[passages.length - 1];
+        if (userId && last) saveProgress(last.id).catch(() => {});
+        setFinishedTitle(book?.title ?? '');
+      }, 2500);
+    }
+    container.addEventListener('scroll', check, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', check);
+      if (timer) clearTimeout(timer);
+    };
+  }, [target?.bookId, passages, userId, saveProgress, book?.title]);
 
   // Record this book as "recently viewed" once it has been open for 10s — the
   // web mirror of the mobile reader's rule. Ordering on Home is pure recency,
@@ -1632,8 +1669,11 @@ export default function ReaderPanel({ target, userId, onOpenBook, xrefPickFrom, 
     };
   }, [isImported, buildSelectionBar]);
 
-async function handleCopy() {
-    if (!selectionBar) return;
+  // The selection's citation ("— Author, Book, Chapter, p.N") for the quote card
+  // (the web bar has no Copy: Ctrl/Cmd+C and right-click already do that).
+  // Mirrors the mobile app's per-format citations.
+  function selectionCitation(): string {
+    if (!selectionBar) return '';
     const passage = passages.find(p => p.id === selectionBar.startPassageId);
 
     let citation = '';
@@ -1681,8 +1721,13 @@ async function handleCopy() {
       const citationParts = [author, book?.title, location, para].filter(Boolean);
       citation = citationParts.length ? `— ${citationParts.join(', ')}` : '';
     }
-    const textToCopy = citation ? `"${selectionBar.text}"\n${citation}` : selectionBar.text;
-    await navigator.clipboard.writeText(textToCopy);
+    return citation;
+  }
+
+  // Share the selection as a quote card (same parchment card as mobile).
+  function handleShareCard() {
+    if (!selectionBar) return;
+    setQuoteCard({ text: selectionBar.text, citation: selectionCitation() });
     setSelectionBar(null);
     window.getSelection()?.removeAllRanges();
   }
@@ -2399,6 +2444,22 @@ async function handleCopy() {
 
   return (
     <div className="h-full flex flex-col relative" ref={readerRef}>
+      {quoteCard && (
+        <QuoteCardDialog
+          text={quoteCard.text}
+          citation={quoteCard.citation}
+          bookTitle={book?.title ?? ''}
+          language={book?.language}
+          onClose={() => setQuoteCard(null)}
+        />
+      )}
+      {finishedTitle !== null && (
+        <BookFinishedDialog
+          title={finishedTitle}
+          onDone={() => setFinishedTitle(null)}
+          onChooseNext={() => { setFinishedTitle(null); onOpenLibrary?.(); }}
+        />
+      )}
       {marginHintShown && (
         <FirstUseHint
           text={t('hints.marginIcon')}
@@ -2489,8 +2550,12 @@ async function handleCopy() {
                 ...(setXrefSuggestions && selectionBar.startPassageId === selectionBar.endPassageId
                   ? [{ label: t('xref.suggestMatch'), onClick: handleSuggestMatch, hint: 'Let AI suggest a passage to cross-reference', icon: <span className="text-[17px] leading-5 text-[#6BB073]">✦</span> }]
                   : []),
+                { label: t('reminders.shareCard'), onClick: handleShareCard, hint: 'Share this selection as a quote card', icon: (
+                  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M10 12 V2.5 M6.5 6 L10 2.5 L13.5 6 M4.5 9 V16 H15.5 V9" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </svg>
+                ) },
                 { label: t('reader.actionAi'),   onClick: () => openPanel('ai'), hint: 'Get an AI-generated summary of this selection', icon: <SparklesIcon size={20} color="#2D9DB3" /> },
-                { label: t('reader.actionCopy'), onClick: handleCopy, hint: 'Copy this selection to your clipboard', icon: <CopyIcon size={20} color="#FFFFFF" /> },
               ]
           ).map(({ label, onClick, hint, icon }) => (
             <button
