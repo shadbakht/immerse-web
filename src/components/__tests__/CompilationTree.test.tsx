@@ -47,10 +47,10 @@ describe('CompilationTree — imported-book quotes', () => {
     expect(screen.getByText('from a private import')).toBeTruthy();
   });
 
-  it('never shows an "Open in reader" button, even when the quote is expanded', () => {
+  it('never shows a "Continue reading" button, even when the quote is expanded', () => {
     render(<CompilationTree payload={importedPayload} />);
     // Expand the card by clicking its quote.
     fireEvent.click(screen.getByText(/A quote from a private import/));
-    expect(screen.queryByText(/Open in reader/)).toBeNull();
+    expect(screen.queryByText(/Continue reading/)).toBeNull();
   });
 });
